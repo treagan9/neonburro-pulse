@@ -93,147 +93,150 @@ const Login = () => {
       />
 
       <Center minH="100vh" px={4} position="relative" zIndex={1}>
-        <Box w="100%" maxW="360px">
-          <VStack spacing={6} align="stretch">
+        <Box w="100%" maxW="340px">
+          <VStack spacing={8} align="stretch">
+
+            {/* Logo */}
             <Center>
-              <Image src="/logo-main.svg" alt="NeonBurro" w="80px" h="auto" />
+              <Image src="/logo-main.svg" alt="NeonBurro" w="120px" h="auto" />
             </Center>
 
-            <Box bg="surface.900" border="1px solid" borderColor="surface.800" borderRadius="2xl" p={7}>
-              <VStack as="form" onSubmit={handleSubmit} spacing={4}>
-                {error && (
-                  <Alert status="error" borderRadius="lg" bg="status.redMuted" border="1px solid" borderColor="status.red" py={2}>
-                    <AlertIcon color="status.red" boxSize={4} />
-                    <Text fontSize="xs" color="status.red">{error}</Text>
-                  </Alert>
-                )}
+            {/* Form - naked on background */}
+            <VStack as="form" onSubmit={handleSubmit} spacing={4}>
+              {error && (
+                <Alert status="error" borderRadius="lg" bg="status.redMuted" border="1px solid" borderColor="status.red" py={2} w="100%">
+                  <AlertIcon color="status.red" boxSize={4} />
+                  <Text fontSize="xs" color="status.red">{error}</Text>
+                </Alert>
+              )}
 
-                <FormControl>
-                  <Input
-                    type="text"
-                    value={identifier}
-                    onChange={(e) => setIdentifier(e.target.value)}
-                    bg="surface.950"
-                    border="1px solid"
-                    borderColor="surface.700"
-                    color="white"
-                    fontSize="sm"
-                    h="48px"
-                    borderRadius="xl"
-                    _hover={{ borderColor: 'surface.600' }}
-                    _focus={{ borderColor: 'brand.500', boxShadow: '0 0 0 1px var(--chakra-colors-brand-500)' }}
-                    _placeholder={{ color: 'surface.600', fontSize: 'sm' }}
-                    placeholder="username or email"
-                    required
-                    autoComplete="username"
-                  />
-                </FormControl>
-
-                <FormControl>
-                  <Input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    bg="surface.950"
-                    border="1px solid"
-                    borderColor="surface.700"
-                    color="white"
-                    fontSize="sm"
-                    h="48px"
-                    borderRadius="xl"
-                    _hover={{ borderColor: 'surface.600' }}
-                    _focus={{ borderColor: 'brand.500', boxShadow: '0 0 0 1px var(--chakra-colors-brand-500)' }}
-                    _placeholder={{ color: 'surface.600', fontSize: 'sm' }}
-                    placeholder="password"
-                    required
-                    autoComplete="current-password"
-                  />
-                </FormControl>
-
-                <Button
-                  type="submit"
-                  w="100%"
+              <FormControl>
+                <Input
+                  type="text"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  bg="transparent"
+                  border="1px solid"
+                  borderColor="surface.700"
+                  color="white"
+                  fontSize="sm"
                   h="48px"
                   borderRadius="xl"
-                  isLoading={loading}
-                  loadingText="Signing in..."
+                  _hover={{ borderColor: 'surface.500' }}
+                  _focus={{ borderColor: 'brand.500', boxShadow: '0 0 0 1px var(--chakra-colors-brand-500)' }}
+                  _placeholder={{ color: 'surface.600', fontSize: 'sm' }}
+                  placeholder="username"
+                  required
+                  autoComplete="username"
+                />
+              </FormControl>
+
+              <FormControl>
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  bg="transparent"
+                  border="1px solid"
+                  borderColor="surface.700"
+                  color="white"
                   fontSize="sm"
-                  fontWeight="700"
-                >
-                  Sign In
-                </Button>
+                  h="48px"
+                  borderRadius="xl"
+                  _hover={{ borderColor: 'surface.500' }}
+                  _focus={{ borderColor: 'brand.500', boxShadow: '0 0 0 1px var(--chakra-colors-brand-500)' }}
+                  _placeholder={{ color: 'surface.600', fontSize: 'sm' }}
+                  placeholder="password"
+                  required
+                  autoComplete="current-password"
+                />
+              </FormControl>
 
-                <HStack
-                  spacing={1.5}
-                  justify="center"
-                  cursor="pointer"
-                  onClick={() => { setShowForgot(!showForgot); setResetSent(false); setError(''); }}
-                  opacity={0.4}
-                  _hover={{ opacity: 1 }}
-                  transition="opacity 0.2s"
-                  userSelect="none"
-                  py={1}
-                >
-                  <Icon as={TbLock} boxSize={3.5} color="surface.400" />
-                  <Text fontSize="xs" color="surface.400">Forgot password?</Text>
-                </HStack>
-              </VStack>
+              <Button
+                type="submit"
+                w="100%"
+                h="48px"
+                borderRadius="xl"
+                isLoading={loading}
+                loadingText="Signing in..."
+                fontSize="sm"
+                fontWeight="700"
+              >
+                Sign In
+              </Button>
 
-              <Collapse in={showForgot} animateOpacity>
-                <Box mt={4} pt={4} borderTop="1px solid" borderColor="surface.800">
-                  {resetSent ? (
-                    <VStack spacing={2} py={2}>
-                      <Icon as={GiBananaPeeled} boxSize={8} color="accent.banana" />
-                      <Text fontSize="sm" color="accent.banana" fontWeight="600" textAlign="center">
-                        Check your inbox
-                      </Text>
-                      <Text fontSize="xs" color="surface.400" textAlign="center">
-                        We sent a reset link. Feed the burro.
-                      </Text>
-                    </VStack>
-                  ) : (
-                    <VStack spacing={3}>
-                      <HStack spacing={2}>
-                        <Icon as={GiBananaPeeled} boxSize={5} color="accent.banana" />
-                        <Text fontSize="xs" color="surface.400">Even burros forget sometimes</Text>
-                      </HStack>
-                      <Input
-                        type="text"
-                        value={resetEmail}
-                        onChange={(e) => setResetEmail(e.target.value)}
-                        bg="surface.950"
-                        border="1px solid"
-                        borderColor="surface.700"
-                        color="white"
-                        fontSize="sm"
-                        h="44px"
-                        borderRadius="xl"
-                        _hover={{ borderColor: 'surface.600' }}
-                        _focus={{ borderColor: 'accent.banana', boxShadow: '0 0 0 1px #FFE500' }}
-                        _placeholder={{ color: 'surface.600', fontSize: 'sm' }}
-                        placeholder="username or email"
-                      />
-                      <Button
-                        w="100%"
-                        h="44px"
-                        borderRadius="xl"
-                        bg="accent.banana"
-                        color="surface.950"
-                        fontSize="sm"
-                        fontWeight="700"
-                        _hover={{ bg: '#E6CE00', transform: 'translateY(-1px)' }}
-                        _active={{ transform: 'translateY(0)' }}
-                        isLoading={resetLoading}
-                        loadingText="Sending..."
-                        onClick={handleResetPassword}
-                      >
-                        Send Reset Link
-                      </Button>
-                    </VStack>
-                  )}
-                </Box>
-              </Collapse>
-            </Box>
+              <HStack
+                spacing={1.5}
+                justify="center"
+                cursor="pointer"
+                onClick={() => { setShowForgot(!showForgot); setResetSent(false); setError(''); }}
+                opacity={0.35}
+                _hover={{ opacity: 1 }}
+                transition="opacity 0.2s"
+                userSelect="none"
+                pt={2}
+              >
+                <Icon as={TbLock} boxSize={3.5} color="surface.400" />
+                <Text fontSize="xs" color="surface.400">Forgot password?</Text>
+              </HStack>
+            </VStack>
+
+            {/* Forgot password panel */}
+            <Collapse in={showForgot} animateOpacity>
+              <Box pt={2}>
+                {resetSent ? (
+                  <VStack spacing={2} py={2}>
+                    <Icon as={GiBananaPeeled} boxSize={8} color="accent.banana" />
+                    <Text fontSize="sm" color="accent.banana" fontWeight="600" textAlign="center">
+                      Check your inbox
+                    </Text>
+                    <Text fontSize="xs" color="surface.400" textAlign="center">
+                      We sent a reset link. Feed the burro.
+                    </Text>
+                  </VStack>
+                ) : (
+                  <VStack spacing={3}>
+                    <HStack spacing={2}>
+                      <Icon as={GiBananaPeeled} boxSize={5} color="accent.banana" />
+                      <Text fontSize="xs" color="surface.400">Even burros forget sometimes</Text>
+                    </HStack>
+                    <Input
+                      type="text"
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      bg="transparent"
+                      border="1px solid"
+                      borderColor="surface.700"
+                      color="white"
+                      fontSize="sm"
+                      h="44px"
+                      borderRadius="xl"
+                      _hover={{ borderColor: 'surface.500' }}
+                      _focus={{ borderColor: 'accent.banana', boxShadow: '0 0 0 1px #FFE500' }}
+                      _placeholder={{ color: 'surface.600', fontSize: 'sm' }}
+                      placeholder="username or email"
+                    />
+                    <Button
+                      w="100%"
+                      h="44px"
+                      borderRadius="xl"
+                      bg="accent.banana"
+                      color="surface.950"
+                      fontSize="sm"
+                      fontWeight="700"
+                      _hover={{ bg: '#E6CE00', transform: 'translateY(-1px)' }}
+                      _active={{ transform: 'translateY(0)' }}
+                      isLoading={resetLoading}
+                      loadingText="Sending..."
+                      onClick={handleResetPassword}
+                    >
+                      Send Reset Link
+                    </Button>
+                  </VStack>
+                )}
+              </Box>
+            </Collapse>
+
           </VStack>
         </Box>
       </Center>
