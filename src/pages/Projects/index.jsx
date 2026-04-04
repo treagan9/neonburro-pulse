@@ -22,26 +22,32 @@ const Projects = () => {
 
   const fetchData = async () => {
     setLoading(true);
-    const [projectsRes, clientsRes] = await Promise.all([
-      supabase
-        .from('projects')
-        .select('*, clients(name, company)')
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('clients')
-        .select('id, name, company')
-        .eq('status', 'active')
-        .order('name'),
-    ]);
+    try {
+      const [projectsRes, clientsRes] = await Promise.all([
+        supabase
+          .from('projects')
+          .select('*, clients(name, company)')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('clients')
+          .select('id, name, company')
+          .eq('status', 'active')
+          .order('name'),
+      ]);
 
-    const enriched = (projectsRes.data || []).map((p) => ({
-      ...p,
-      client_name: p.clients?.name || null,
-      client_company: p.clients?.company || null,
-    }));
+      const enriched = (projectsRes.data || []).map((p) => ({
+        ...p,
+        client_name: p.clients?.name || null,
+        client_company: p.clients?.company || null,
+      }));
 
-    setProjects(enriched);
-    setClients(clientsRes.data || []);
+      setProjects(enriched);
+      setClients(clientsRes.data || []);
+    } catch (err) {
+      console.error('Projects fetch error:', err);
+      setProjects([]);
+      setClients([]);
+    }
     setLoading(false);
   };
 
@@ -51,10 +57,10 @@ const Projects = () => {
   const filtered = projects.filter((p) => {
     const q = search.toLowerCase();
     const matchSearch = search
-      ? p.name?.toLowerCase().includes(q) ||
-        p.project_number?.toLowerCase().includes(q) ||
-        p.client_name?.toLowerCase().includes(q) ||
-        p.client_company?.toLowerCase().includes(q)
+      ? (p.name || '').toLowerCase().includes(q) ||
+        (p.project_number || '').toLowerCase().includes(q) ||
+        (p.client_name || '').toLowerCase().includes(q) ||
+        (p.client_company || '').toLowerCase().includes(q)
       : true;
     const matchStatus = filterStatus === 'all' || p.status === filterStatus;
     return matchSearch && matchStatus;

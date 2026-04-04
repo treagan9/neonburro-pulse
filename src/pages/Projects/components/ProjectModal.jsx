@@ -1,193 +1,290 @@
-// src/pages/Projects/components/ProjectGrid.jsx
+// src/pages/Projects/components/ProjectModal.jsx
+import { useState, useEffect } from 'react';
 import {
-  Box, VStack, HStack, Text, SimpleGrid, Icon, Badge,
-  Center, Spinner, Divider, Button,
+  Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody,
+  ModalFooter, ModalCloseButton, VStack, HStack, Text,
+  Input, Button, FormControl, FormLabel, Textarea, Select,
+  Icon, Badge, useToast, Box,
 } from '@chakra-ui/react';
-import { TbRocket, TbUser, TbBuilding } from 'react-icons/tb';
-import { format } from 'date-fns';
+import { TbEdit, TbPlus, TbTrash, TbAlertTriangle } from 'react-icons/tb';
+import { supabase } from '../../../lib/supabase';
 
-const STATUS_CONFIG = {
-  lead:     { label: 'Lead',     accent: '#FFE500', bg: 'rgba(255,229,0,0.08)',    border: 'rgba(255,229,0,0.25)' },
-  proposal: { label: 'Proposal', accent: '#8B5CF6', bg: 'rgba(139,92,246,0.08)',   border: 'rgba(139,92,246,0.25)' },
-  active:   { label: 'Active',   accent: '#39FF14', bg: 'rgba(57,255,20,0.08)',    border: 'rgba(57,255,20,0.25)' },
-  complete: { label: 'Complete', accent: '#00E5E5', bg: 'rgba(0,229,229,0.08)',    border: 'rgba(0,229,229,0.25)' },
-  archived: { label: 'Archived', accent: '#737373', bg: 'rgba(128,128,128,0.08)',  border: 'rgba(128,128,128,0.25)' },
+const STATUS_OPTIONS = [
+  { value: 'lead',     label: 'Lead',     color: '#FFE500' },
+  { value: 'proposal', label: 'Proposal', color: '#8B5CF6' },
+  { value: 'active',   label: 'Active',   color: '#39FF14' },
+  { value: 'complete', label: 'Complete', color: '#00E5E5' },
+  { value: 'archived', label: 'Archived', color: '#737373' },
+];
+
+const inputProps = {
+  bg: 'transparent',
+  border: '1px solid',
+  borderColor: 'surface.700',
+  color: 'white',
+  fontSize: 'sm',
+  h: '44px',
+  borderRadius: 'xl',
+  _hover: { borderColor: 'surface.500' },
+  _focus: { borderColor: 'accent.purple', boxShadow: '0 0 0 1px var(--chakra-colors-accent-purple)' },
+  _placeholder: { color: 'surface.600' },
 };
 
-const PIPELINE_STAGES = ['lead', 'proposal', 'active', 'complete'];
+const generateProjectNumber = async () => {
+  const now = new Date();
+  const year = now.getFullYear().toString().slice(-2);
+  const month = (now.getMonth() + 1).toString().padStart(2, '0');
+  const prefix = `NB-${year}${month}`;
 
-const PipelineIndicator = ({ status }) => {
-  const activeIndex = PIPELINE_STAGES.indexOf(status);
+  try {
+    const { data } = await supabase
+      .from('projects')
+      .select('project_number')
+      .like('project_number', `${prefix}%`)
+      .order('project_number', { ascending: false })
+      .limit(1);
 
-  return (
-    <HStack spacing={1} w="100%">
-      {PIPELINE_STAGES.map((stage, idx) => {
-        const config = STATUS_CONFIG[stage];
-        const isReached = activeIndex >= idx;
-        const isCurrent = status === stage;
-
-        return (
-          <Box
-            key={stage}
-            flex={1}
-            h="3px"
-            borderRadius="full"
-            bg={isReached ? config.accent : 'surface.800'}
-            opacity={isReached ? (isCurrent ? 1 : 0.4) : 0.15}
-            transition="all 0.2s"
-            boxShadow={isCurrent ? `0 0 6px ${config.accent}60` : 'none'}
-          />
-        );
-      })}
-    </HStack>
-  );
+    let seq = 1;
+    if (data && data.length > 0 && data[0].project_number) {
+      const last = parseInt(data[0].project_number.slice(-2)) || 0;
+      seq = last + 1;
+    }
+    return `${prefix}${seq.toString().padStart(2, '0')}`;
+  } catch {
+    return `${prefix}01`;
+  }
 };
 
-const ProjectCard = ({ project, onEdit }) => {
-  const config = STATUS_CONFIG[project.status] || STATUS_CONFIG.lead;
-  const isArchived = project.status === 'archived';
+const logActivity = async (action, entityId, metadata) => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    await supabase.from('activity_log').insert({
+      user_id: user?.id,
+      action,
+      entity_type: 'project',
+      entity_id: entityId,
+      metadata,
+      created_at: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error('Activity log error:', err);
+  }
+};
+
+const ProjectModal = ({ isOpen, onClose, project, clients = [], onSave }) => {
+  const [name, setName] = useState('');
+  const [clientId, setClientId] = useState('');
+  const [status, setStatus] = useState('lead');
+  const [notes, setNotes] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const toast = useToast();
+
+  const isEditing = !!project?.id;
+
+  useEffect(() => {
+    if (project) {
+      setName(project.name || '');
+      setClientId(project.client_id || '');
+      setStatus(project.status || 'lead');
+      setNotes(project.notes || '');
+    } else {
+      setName('');
+      setClientId('');
+      setStatus('lead');
+      setNotes('');
+    }
+    setConfirmDelete(false);
+  }, [project, isOpen]);
+
+  const handleSave = async () => {
+    if (!name.trim()) {
+      toast({ title: 'Project name is required', status: 'warning', duration: 2000 });
+      return;
+    }
+    setSaving(true);
+    try {
+      const payload = {
+        name: name.trim(),
+        client_id: clientId || null,
+        status,
+        notes: notes.trim() || null,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (isEditing) {
+        const { error } = await supabase.from('projects').update(payload).eq('id', project.id);
+        if (error) throw error;
+        await logActivity('project_updated', project.id, {
+          project_name: name.trim(),
+          project_number: project.project_number,
+        });
+        toast({ title: 'Project updated', status: 'success', duration: 2000 });
+      } else {
+        const projectNumber = await generateProjectNumber();
+        const { data, error } = await supabase
+          .from('projects')
+          .insert({ ...payload, project_number: projectNumber })
+          .select()
+          .single();
+        if (error) throw error;
+        await logActivity('project_created', data.id, {
+          project_name: name.trim(),
+          project_number: projectNumber,
+        });
+        toast({ title: 'Project created', description: projectNumber, status: 'success', duration: 3000 });
+      }
+      onSave();
+      onClose();
+    } catch (err) {
+      toast({ title: 'Save failed', description: err.message, status: 'error', duration: 3000 });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirmDelete) { setConfirmDelete(true); return; }
+    setDeleting(true);
+    try {
+      const { error } = await supabase.from('projects').delete().eq('id', project.id);
+      if (error) throw error;
+      await logActivity('project_deleted', project.id, {
+        project_name: project.name,
+        project_number: project.project_number,
+      });
+      toast({ title: 'Project removed', status: 'success', duration: 2000 });
+      onSave();
+      onClose();
+    } catch (err) {
+      toast({ title: 'Delete failed', description: err.message, status: 'error', duration: 3000 });
+    } finally {
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  };
 
   return (
-    <Box
-      bg="surface.900"
-      border="1px solid"
-      borderColor="surface.800"
-      borderRadius="xl"
-      overflow="hidden"
-      transition="all 0.15s"
-      cursor="pointer"
-      onClick={() => onEdit(project)}
-      opacity={isArchived ? 0.6 : 1}
-      _hover={{
-        borderColor: config.accent,
-        transform: 'translateY(-2px)',
-        shadow: `0 8px 24px ${config.accent}12`,
-        opacity: 1,
-      }}
-    >
-      {/* Top accent */}
-      <Box h="2px" bg={config.accent} opacity={0.7} />
-
-      <Box p={4}>
-        {/* Project number + status */}
-        <HStack justify="space-between" align="start" mb={2}>
-          {project.project_number && (
-            <Text
-              color="surface.500"
-              fontSize="2xs"
-              fontFamily="mono"
-              fontWeight="700"
-              letterSpacing="0.02em"
-            >
-              {project.project_number}
-            </Text>
-          )}
-          <Badge
-            fontSize="2xs"
-            fontWeight="700"
-            textTransform="uppercase"
-            letterSpacing="0.05em"
-            px={2}
-            py={0.5}
-            borderRadius="full"
-            bg={config.bg}
-            color={config.accent}
-            border="1px solid"
-            borderColor={config.border}
-          >
-            {config.label}
-          </Badge>
-        </HStack>
-
-        {/* Project name */}
-        <Text color="white" fontSize="sm" fontWeight="700" noOfLines={2} mb={2} lineHeight="1.4">
-          {project.name}
-        </Text>
-
-        {/* Client info */}
-        {(project.client_name || project.client_company) && (
-          <HStack spacing={1.5} mb={3}>
-            <Icon as={project.client_company ? TbBuilding : TbUser} boxSize={3} color="surface.600" />
-            <Text color="surface.400" fontSize="xs" noOfLines={1}>
-              {project.client_name}
-              {project.client_company && project.client_name ? ` · ${project.client_company}` : project.client_company || ''}
-            </Text>
+    <Modal isOpen={isOpen} onClose={onClose} size="md">
+      <ModalOverlay bg="blackAlpha.800" />
+      <ModalContent bg="surface.900" border="1px solid" borderColor="surface.800" mx={4}>
+        <ModalHeader color="white" fontSize="md" pb={2}>
+          <HStack spacing={2}>
+            <Icon as={isEditing ? TbEdit : TbPlus} color="accent.purple" boxSize={5} />
+            <Text>{isEditing ? 'Edit Project' : 'New Project'}</Text>
+            {isEditing && project?.project_number && (
+              <Badge fontSize="2xs" fontFamily="mono" bg="surface.800" color="surface.400" px={2} borderRadius="md">
+                {project.project_number}
+              </Badge>
+            )}
           </HStack>
-        )}
+        </ModalHeader>
+        <ModalCloseButton color="surface.400" />
 
-        {/* Notes preview */}
-        {project.notes && (
-          <Text color="surface.500" fontSize="xs" noOfLines={2} lineHeight="1.5" mb={3}>
-            {project.notes}
-          </Text>
-        )}
+        <ModalBody>
+          <VStack spacing={4}>
+            <FormControl isRequired>
+              <FormLabel fontSize="xs" fontWeight="600" color="surface.500">Project Name</FormLabel>
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Website Redesign, Monthly Retainer, etc." {...inputProps} />
+            </FormControl>
 
-        {/* Pipeline indicator */}
-        {!isArchived && (
-          <Box mb={3}>
-            <PipelineIndicator status={project.status} />
-          </Box>
-        )}
+            <FormControl>
+              <FormLabel fontSize="xs" fontWeight="600" color="surface.500">Client</FormLabel>
+              <Select value={clientId} onChange={(e) => setClientId(e.target.value)} {...inputProps}>
+                <option value="" style={{ background: '#0a0a0a' }}>No client linked</option>
+                {(clients || []).map((c) => (
+                  <option key={c.id} value={c.id} style={{ background: '#0a0a0a' }}>
+                    {c.name}{c.company ? ` (${c.company})` : ''}
+                  </option>
+                ))}
+              </Select>
+            </FormControl>
 
-        <Divider borderColor="surface.800" mb={3} />
+            <FormControl>
+              <FormLabel fontSize="xs" fontWeight="600" color="surface.500">Status</FormLabel>
+              <HStack spacing={0} border="1px solid" borderColor="surface.700" borderRadius="xl" overflow="hidden">
+                {STATUS_OPTIONS.map((opt) => {
+                  const isActive = status === opt.value;
+                  return (
+                    <Box
+                      key={opt.value}
+                      flex={1}
+                      py={2.5}
+                      textAlign="center"
+                      cursor="pointer"
+                      onClick={() => setStatus(opt.value)}
+                      bg={isActive ? `${opt.color}12` : 'transparent'}
+                      borderRight="1px solid"
+                      borderColor="surface.800"
+                      transition="all 0.15s"
+                      _last={{ borderRight: 'none' }}
+                      _hover={{ bg: isActive ? undefined : 'surface.850' }}
+                    >
+                      <Text
+                        fontSize="2xs"
+                        fontWeight="700"
+                        color={isActive ? opt.color : 'surface.500'}
+                        textTransform="uppercase"
+                        letterSpacing="0.03em"
+                      >
+                        {opt.label}
+                      </Text>
+                    </Box>
+                  );
+                })}
+              </HStack>
+            </FormControl>
 
-        {/* Footer */}
-        <Text color="surface.600" fontSize="2xs" fontFamily="mono">
-          {format(new Date(project.created_at), 'MMM d, yyyy')}
-        </Text>
-      </Box>
-    </Box>
+            <FormControl>
+              <FormLabel fontSize="xs" fontWeight="600" color="surface.500">Notes</FormLabel>
+              <Textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Scope, timeline, key details"
+                bg="transparent"
+                border="1px solid"
+                borderColor="surface.700"
+                color="white"
+                fontSize="sm"
+                borderRadius="xl"
+                rows={4}
+                _hover={{ borderColor: 'surface.500' }}
+                _focus={{ borderColor: 'accent.purple', boxShadow: '0 0 0 1px var(--chakra-colors-accent-purple)' }}
+                _placeholder={{ color: 'surface.600' }}
+              />
+            </FormControl>
+          </VStack>
+        </ModalBody>
+
+        <ModalFooter borderTop="1px solid" borderColor="surface.800" pt={4}>
+          <HStack spacing={2} w="100%" justify={isEditing ? 'space-between' : 'flex-end'}>
+            {isEditing && (
+              <Button
+                size="sm" variant="ghost"
+                color={confirmDelete ? 'red.400' : 'surface.500'}
+                leftIcon={confirmDelete ? <TbAlertTriangle /> : <TbTrash />}
+                onClick={handleDelete} isLoading={deleting} loadingText="Removing..."
+                _hover={{ color: 'red.400', bg: 'red.900' }}
+              >
+                {confirmDelete ? 'Confirm Remove' : 'Remove'}
+              </Button>
+            )}
+            <HStack spacing={2}>
+              <Button size="sm" variant="ghost" color="surface.400" onClick={onClose}>Cancel</Button>
+              <Button
+                size="sm" bg="accent.purple" color="white" fontWeight="700"
+                _hover={{ bg: '#7C3AED', transform: 'translateY(-1px)' }}
+                onClick={handleSave} isLoading={saving} loadingText="Saving..."
+              >
+                {isEditing ? 'Save Changes' : 'Create Project'}
+              </Button>
+            </HStack>
+          </HStack>
+        </ModalFooter>
+      </ModalContent>
+    </Modal>
   );
 };
 
-const ProjectGrid = ({ projects, loading, onEdit, onAdd, isEmpty }) => {
-  if (loading) {
-    return (
-      <Center py={12}>
-        <Spinner size="lg" color="accent.purple" thickness="3px" />
-      </Center>
-    );
-  }
-
-  if (projects.length === 0) {
-    return (
-      <Box
-        bg="surface.900"
-        border="1px dashed"
-        borderColor="surface.700"
-        borderRadius="xl"
-        p={8}
-        textAlign="center"
-      >
-        <VStack spacing={2}>
-          <Icon as={TbRocket} boxSize={8} color="surface.600" />
-          <Text color="surface.400" fontSize="sm">
-            {isEmpty ? 'No projects yet' : 'No projects match your search'}
-          </Text>
-          {isEmpty && (
-            <Button
-              size="sm"
-              variant="outline"
-              borderColor="accent.purple"
-              color="accent.purple"
-              onClick={onAdd}
-              mt={2}
-            >
-              Create your first project
-            </Button>
-          )}
-        </VStack>
-      </Box>
-    );
-  }
-
-  return (
-    <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} spacing={3}>
-      {projects.map((project) => (
-        <ProjectCard key={project.id} project={project} onEdit={onEdit} />
-      ))}
-    </SimpleGrid>
-  );
-};
-
-export default ProjectGrid;
+export default ProjectModal;
