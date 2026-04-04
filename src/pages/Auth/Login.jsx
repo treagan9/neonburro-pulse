@@ -2,11 +2,10 @@
 import { useState } from 'react';
 import {
   Box, VStack, Text, Input, Button, FormControl,
-  Alert, AlertIcon, Center, Image, Icon, HStack,
-  Collapse,
+  Center, Image, Icon, HStack, Collapse,
 } from '@chakra-ui/react';
 import { GiBananaPeeled } from 'react-icons/gi';
-import { TbLock } from 'react-icons/tb';
+import { TbLock, TbAlertTriangle } from 'react-icons/tb';
 import { useAuth } from '../../hooks/useAuth';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
@@ -29,12 +28,12 @@ const Login = () => {
   const resolveEmail = async (input) => {
     const trimmed = input.trim().toLowerCase();
     if (trimmed.includes('@')) return trimmed;
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('profiles')
       .select('email')
       .eq('username', trimmed)
-      .single();
-    if (error || !data) throw new Error('Username not found');
+      .maybeSingle();
+    if (!data) throw new Error('Username not recognized');
     return data.email;
   };
 
@@ -54,19 +53,14 @@ const Login = () => {
   };
 
   const handleResetPassword = async () => {
-    if (!resetEmail) return;
+    if (!resetEmail || !resetEmail.includes('@')) {
+      setError('Please enter a valid email');
+      return;
+    }
     setResetLoading(true);
+    setError('');
     try {
-      let email = resetEmail.trim().toLowerCase();
-      if (!email.includes('@')) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('email')
-          .eq('username', email)
-          .single();
-        if (data) email = data.email;
-      }
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail.trim().toLowerCase(), {
         redirectTo: `${window.location.origin}/reset-password/`,
       });
       if (error) throw error;
@@ -95,21 +89,28 @@ const Login = () => {
       <Center minH="100vh" px={4} position="relative" zIndex={1}>
         <Box w="100%" maxW="340px">
           <VStack spacing={8} align="stretch">
-
-            {/* Logo */}
             <Center>
               <Image src="/logo-main.svg" alt="NeonBurro" w="120px" h="auto" />
             </Center>
 
-            {/* Form - naked on background */}
-            <VStack as="form" onSubmit={handleSubmit} spacing={4}>
-              {error && (
-                <Alert status="error" borderRadius="lg" bg="status.redMuted" border="1px solid" borderColor="status.red" py={2} w="100%">
-                  <AlertIcon color="status.red" boxSize={4} />
-                  <Text fontSize="xs" color="status.red">{error}</Text>
-                </Alert>
-              )}
+            {/* Error - neon style */}
+            {error && (
+              <HStack
+                spacing={2}
+                bg="rgba(255, 229, 0, 0.08)"
+                border="1px solid"
+                borderColor="rgba(255, 229, 0, 0.3)"
+                borderRadius="xl"
+                px={4}
+                py={3}
+              >
+                <Icon as={TbAlertTriangle} boxSize={4} color="accent.banana" flexShrink={0} />
+                <Text fontSize="xs" color="accent.banana">{error}</Text>
+              </HStack>
+            )}
 
+            {/* Form */}
+            <VStack as="form" onSubmit={handleSubmit} spacing={4}>
               <FormControl>
                 <Input
                   type="text"
@@ -181,60 +182,58 @@ const Login = () => {
               </HStack>
             </VStack>
 
-            {/* Forgot password panel */}
+            {/* Forgot password */}
             <Collapse in={showForgot} animateOpacity>
-              <Box pt={2}>
-                {resetSent ? (
-                  <VStack spacing={2} py={2}>
-                    <Icon as={GiBananaPeeled} boxSize={8} color="accent.banana" />
-                    <Text fontSize="sm" color="accent.banana" fontWeight="600" textAlign="center">
-                      Check your inbox
-                    </Text>
-                    <Text fontSize="xs" color="surface.400" textAlign="center">
-                      We sent a reset link. Feed the burro.
-                    </Text>
-                  </VStack>
-                ) : (
-                  <VStack spacing={3}>
-                    <HStack spacing={2}>
-                      <Icon as={GiBananaPeeled} boxSize={5} color="accent.banana" />
-                      <Text fontSize="xs" color="surface.400">Even burros forget sometimes</Text>
-                    </HStack>
-                    <Input
-                      type="text"
-                      value={resetEmail}
-                      onChange={(e) => setResetEmail(e.target.value)}
-                      bg="transparent"
-                      border="1px solid"
-                      borderColor="surface.700"
-                      color="white"
-                      fontSize="sm"
-                      h="44px"
-                      borderRadius="xl"
-                      _hover={{ borderColor: 'surface.500' }}
-                      _focus={{ borderColor: 'accent.banana', boxShadow: '0 0 0 1px #FFE500' }}
-                      _placeholder={{ color: 'surface.600', fontSize: 'sm' }}
-                      placeholder="username or email"
-                    />
-                    <Button
-                      w="100%"
-                      h="44px"
-                      borderRadius="xl"
-                      bg="accent.banana"
-                      color="surface.950"
-                      fontSize="sm"
-                      fontWeight="700"
-                      _hover={{ bg: '#E6CE00', transform: 'translateY(-1px)' }}
-                      _active={{ transform: 'translateY(0)' }}
-                      isLoading={resetLoading}
-                      loadingText="Sending..."
-                      onClick={handleResetPassword}
-                    >
-                      Send Reset Link
-                    </Button>
-                  </VStack>
-                )}
-              </Box>
+              {resetSent ? (
+                <VStack spacing={2} py={2}>
+                  <Icon as={GiBananaPeeled} boxSize={8} color="accent.banana" />
+                  <Text fontSize="sm" color="accent.banana" fontWeight="600" textAlign="center">
+                    Check your inbox
+                  </Text>
+                  <Text fontSize="xs" color="surface.400" textAlign="center">
+                    We sent a reset link. Feed the burro.
+                  </Text>
+                </VStack>
+              ) : (
+                <VStack spacing={3}>
+                  <HStack spacing={2}>
+                    <Icon as={GiBananaPeeled} boxSize={5} color="accent.banana" />
+                    <Text fontSize="xs" color="surface.400">Even burros forget sometimes</Text>
+                  </HStack>
+                  <Input
+                    type="email"
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    bg="transparent"
+                    border="1px solid"
+                    borderColor="surface.700"
+                    color="white"
+                    fontSize="sm"
+                    h="44px"
+                    borderRadius="xl"
+                    _hover={{ borderColor: 'surface.500' }}
+                    _focus={{ borderColor: 'accent.banana', boxShadow: '0 0 0 1px #FFE500' }}
+                    _placeholder={{ color: 'surface.600', fontSize: 'sm' }}
+                    placeholder="email"
+                  />
+                  <Button
+                    w="100%"
+                    h="44px"
+                    borderRadius="xl"
+                    bg="accent.banana"
+                    color="surface.950"
+                    fontSize="sm"
+                    fontWeight="700"
+                    _hover={{ bg: '#E6CE00', transform: 'translateY(-1px)' }}
+                    _active={{ transform: 'translateY(0)' }}
+                    isLoading={resetLoading}
+                    loadingText="Sending..."
+                    onClick={handleResetPassword}
+                  >
+                    Send Reset Link
+                  </Button>
+                </VStack>
+              )}
             </Collapse>
 
           </VStack>
