@@ -1,17 +1,24 @@
 // src/pages/Auth/Login.jsx
 import { useState } from 'react';
 import {
-  Box, VStack, HStack, Text, Input, Button, FormControl,
-  FormLabel, Alert, AlertIcon, Center, Image, Link,
+  Box, VStack, Text, Input, Button, FormControl,
+  Alert, AlertIcon, Center, Image, Icon, HStack,
+  Collapse,
 } from '@chakra-ui/react';
+import { GiBananaPeeled } from 'react-icons/gi';
 import { useAuth } from '../../hooks/useAuth';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { supabase } from '../../lib/supabase';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showForgot, setShowForgot] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetSent, setResetSent] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
   const { signIn } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -32,58 +39,60 @@ const Login = () => {
     }
   };
 
+  const handleResetPassword = async () => {
+    if (!resetEmail) return;
+    setResetLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: `${window.location.origin}/reset-password/`,
+      });
+      if (error) throw error;
+      setResetSent(true);
+    } catch (err) {
+      setError(err.message || 'Could not send reset email');
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
   return (
     <Box minH="100vh" bg="surface.950" position="relative" overflow="hidden">
-      {/* Subtle glow */}
+      {/* Subtle top glow */}
       <Box
         position="absolute"
-        top="-200px"
+        top="-300px"
         left="50%"
         transform="translateX(-50%)"
-        w="600px"
-        h="600px"
+        w="800px"
+        h="800px"
         borderRadius="full"
-        bg="radial-gradient(circle, rgba(0,229,229,0.06) 0%, transparent 70%)"
+        bg="radial-gradient(circle, rgba(0,229,229,0.04) 0%, transparent 60%)"
         pointerEvents="none"
       />
 
       <Center minH="100vh" px={4} position="relative" zIndex={1}>
-        <Box w="100%" maxW="380px">
-          <VStack spacing={8} align="stretch">
+        <Box w="100%" maxW="360px">
+          <VStack spacing={6} align="stretch">
+
             {/* Logo */}
-            <VStack spacing={4}>
+            <Center>
               <Image
                 src="/logo-main.svg"
                 alt="NeonBurro"
-                w="48px"
+                w="80px"
                 h="auto"
               />
-              <HStack spacing={2} align="baseline">
-                <Text
-                  fontSize="2xl"
-                  fontWeight="800"
-                  color="white"
-                  letterSpacing="-0.02em"
-                >
-                  Pulse
-                </Text>
-                <Text fontSize="xs" color="surface.500" fontWeight="500">
-                  by NeonBurro
-                </Text>
-              </HStack>
-            </VStack>
+            </Center>
 
-            {/* Form */}
+            {/* Login form */}
             <Box
-              as="form"
-              onSubmit={handleSubmit}
               bg="surface.900"
               border="1px solid"
               borderColor="surface.800"
-              borderRadius="xl"
-              p={6}
+              borderRadius="2xl"
+              p={7}
             >
-              <VStack spacing={4}>
+              <VStack as="form" onSubmit={handleSubmit} spacing={4}>
                 {error && (
                   <Alert
                     status="error"
@@ -94,14 +103,11 @@ const Login = () => {
                     py={2}
                   >
                     <AlertIcon color="status.red" boxSize={4} />
-                    <Text fontSize="sm" color="status.red">{error}</Text>
+                    <Text fontSize="xs" color="status.red">{error}</Text>
                   </Alert>
                 )}
 
                 <FormControl>
-                  <FormLabel fontSize="xs" color="surface.500" fontWeight="600" letterSpacing="0.03em">
-                    Email
-                  </FormLabel>
                   <Input
                     type="email"
                     value={email}
@@ -111,19 +117,17 @@ const Login = () => {
                     borderColor="surface.700"
                     color="white"
                     fontSize="sm"
-                    h="44px"
+                    h="48px"
+                    borderRadius="xl"
                     _hover={{ borderColor: 'surface.600' }}
                     _focus={{ borderColor: 'brand.500', boxShadow: '0 0 0 1px var(--chakra-colors-brand-500)' }}
-                    _placeholder={{ color: 'surface.600' }}
-                    placeholder="you@neonburro.com"
+                    _placeholder={{ color: 'surface.600', fontSize: 'sm' }}
+                    placeholder="username"
                     required
                   />
                 </FormControl>
 
                 <FormControl>
-                  <FormLabel fontSize="xs" color="surface.500" fontWeight="600" letterSpacing="0.03em">
-                    Password
-                  </FormLabel>
                   <Input
                     type="password"
                     value={password}
@@ -133,11 +137,12 @@ const Login = () => {
                     borderColor="surface.700"
                     color="white"
                     fontSize="sm"
-                    h="44px"
+                    h="48px"
+                    borderRadius="xl"
                     _hover={{ borderColor: 'surface.600' }}
                     _focus={{ borderColor: 'brand.500', boxShadow: '0 0 0 1px var(--chakra-colors-brand-500)' }}
-                    placeholder="••••••••"
-                    _placeholder={{ color: 'surface.600' }}
+                    _placeholder={{ color: 'surface.600', fontSize: 'sm' }}
+                    placeholder="password"
                     required
                   />
                 </FormControl>
@@ -145,27 +150,95 @@ const Login = () => {
                 <Button
                   type="submit"
                   w="100%"
-                  h="44px"
+                  h="48px"
+                  borderRadius="xl"
                   isLoading={loading}
                   loadingText="Signing in..."
                   fontSize="sm"
+                  fontWeight="700"
                 >
                   Sign In
                 </Button>
 
-                <Link
+                {/* Forgot password toggle */}
+                <Text
                   fontSize="xs"
                   color="surface.500"
-                  _hover={{ color: 'brand.500' }}
-                  href="/forgot-password/"
+                  cursor="pointer"
+                  _hover={{ color: 'accent.banana' }}
+                  onClick={() => { setShowForgot(!showForgot); setResetSent(false); setError(''); }}
                   textAlign="center"
-                  w="100%"
-                  display="block"
+                  transition="color 0.15s"
+                  userSelect="none"
                 >
                   Forgot password?
-                </Link>
+                </Text>
               </VStack>
+
+              {/* Forgot password panel */}
+              <Collapse in={showForgot} animateOpacity>
+                <Box
+                  mt={4}
+                  pt={4}
+                  borderTop="1px solid"
+                  borderColor="surface.800"
+                >
+                  {resetSent ? (
+                    <VStack spacing={2}>
+                      <Icon as={GiBananaPeeled} boxSize={8} color="accent.banana" />
+                      <Text fontSize="sm" color="accent.banana" fontWeight="600" textAlign="center">
+                        Check your inbox
+                      </Text>
+                      <Text fontSize="xs" color="surface.400" textAlign="center">
+                        We sent a reset link. Feed the burro.
+                      </Text>
+                    </VStack>
+                  ) : (
+                    <VStack spacing={3}>
+                      <HStack spacing={2}>
+                        <Icon as={GiBananaPeeled} boxSize={5} color="accent.banana" />
+                        <Text fontSize="xs" color="surface.400">
+                          Even burros forget sometimes
+                        </Text>
+                      </HStack>
+                      <Input
+                        type="email"
+                        value={resetEmail}
+                        onChange={(e) => setResetEmail(e.target.value)}
+                        bg="surface.950"
+                        border="1px solid"
+                        borderColor="surface.700"
+                        color="white"
+                        fontSize="sm"
+                        h="44px"
+                        borderRadius="xl"
+                        _hover={{ borderColor: 'surface.600' }}
+                        _focus={{ borderColor: 'accent.banana', boxShadow: '0 0 0 1px #FFE500' }}
+                        _placeholder={{ color: 'surface.600', fontSize: 'sm' }}
+                        placeholder="your email"
+                      />
+                      <Button
+                        w="100%"
+                        h="44px"
+                        borderRadius="xl"
+                        bg="accent.banana"
+                        color="surface.950"
+                        fontSize="sm"
+                        fontWeight="700"
+                        _hover={{ bg: '#E6CE00', transform: 'translateY(-1px)' }}
+                        _active={{ transform: 'translateY(0)' }}
+                        isLoading={resetLoading}
+                        loadingText="Sending..."
+                        onClick={handleResetPassword}
+                      >
+                        Send Reset Link
+                      </Button>
+                    </VStack>
+                  )}
+                </Box>
+              </Collapse>
             </Box>
+
           </VStack>
         </Box>
       </Center>
