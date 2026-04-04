@@ -6,12 +6,13 @@ import {
   Collapse,
 } from '@chakra-ui/react';
 import { GiBananaPeeled } from 'react-icons/gi';
+import { TbLock } from 'react-icons/tb';
 import { useAuth } from '../../hooks/useAuth';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 
 const Login = () => {
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -25,11 +26,24 @@ const Login = () => {
 
   const from = location.state?.from?.pathname || '/dashboard/';
 
+  const resolveEmail = async (input) => {
+    const trimmed = input.trim().toLowerCase();
+    if (trimmed.includes('@')) return trimmed;
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('email')
+      .eq('username', trimmed)
+      .single();
+    if (error || !data) throw new Error('Username not found');
+    return data.email;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
+      const email = await resolveEmail(identifier);
       await signIn(email, password);
       navigate(from, { replace: true });
     } catch (err) {
@@ -43,7 +57,16 @@ const Login = () => {
     if (!resetEmail) return;
     setResetLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+      let email = resetEmail.trim().toLowerCase();
+      if (!email.includes('@')) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('username', email)
+          .single();
+        if (data) email = data.email;
+      }
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password/`,
       });
       if (error) throw error;
@@ -57,7 +80,6 @@ const Login = () => {
 
   return (
     <Box minH="100vh" bg="surface.950" position="relative" overflow="hidden">
-      {/* Subtle top glow */}
       <Box
         position="absolute"
         top="-300px"
@@ -73,35 +95,14 @@ const Login = () => {
       <Center minH="100vh" px={4} position="relative" zIndex={1}>
         <Box w="100%" maxW="360px">
           <VStack spacing={6} align="stretch">
-
-            {/* Logo */}
             <Center>
-              <Image
-                src="/logo-main.svg"
-                alt="NeonBurro"
-                w="80px"
-                h="auto"
-              />
+              <Image src="/logo-main.svg" alt="NeonBurro" w="80px" h="auto" />
             </Center>
 
-            {/* Login form */}
-            <Box
-              bg="surface.900"
-              border="1px solid"
-              borderColor="surface.800"
-              borderRadius="2xl"
-              p={7}
-            >
+            <Box bg="surface.900" border="1px solid" borderColor="surface.800" borderRadius="2xl" p={7}>
               <VStack as="form" onSubmit={handleSubmit} spacing={4}>
                 {error && (
-                  <Alert
-                    status="error"
-                    borderRadius="lg"
-                    bg="status.redMuted"
-                    border="1px solid"
-                    borderColor="status.red"
-                    py={2}
-                  >
+                  <Alert status="error" borderRadius="lg" bg="status.redMuted" border="1px solid" borderColor="status.red" py={2}>
                     <AlertIcon color="status.red" boxSize={4} />
                     <Text fontSize="xs" color="status.red">{error}</Text>
                   </Alert>
@@ -109,9 +110,9 @@ const Login = () => {
 
                 <FormControl>
                   <Input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    type="text"
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
                     bg="surface.950"
                     border="1px solid"
                     borderColor="surface.700"
@@ -122,8 +123,9 @@ const Login = () => {
                     _hover={{ borderColor: 'surface.600' }}
                     _focus={{ borderColor: 'brand.500', boxShadow: '0 0 0 1px var(--chakra-colors-brand-500)' }}
                     _placeholder={{ color: 'surface.600', fontSize: 'sm' }}
-                    placeholder="username"
+                    placeholder="username or email"
                     required
+                    autoComplete="username"
                   />
                 </FormControl>
 
@@ -144,6 +146,7 @@ const Login = () => {
                     _placeholder={{ color: 'surface.600', fontSize: 'sm' }}
                     placeholder="password"
                     required
+                    autoComplete="current-password"
                   />
                 </FormControl>
 
@@ -160,31 +163,26 @@ const Login = () => {
                   Sign In
                 </Button>
 
-                {/* Forgot password toggle */}
-                <Text
-                  fontSize="xs"
-                  color="surface.500"
+                <HStack
+                  spacing={1.5}
+                  justify="center"
                   cursor="pointer"
-                  _hover={{ color: 'accent.banana' }}
                   onClick={() => { setShowForgot(!showForgot); setResetSent(false); setError(''); }}
-                  textAlign="center"
-                  transition="color 0.15s"
+                  opacity={0.4}
+                  _hover={{ opacity: 1 }}
+                  transition="opacity 0.2s"
                   userSelect="none"
+                  py={1}
                 >
-                  Forgot password?
-                </Text>
+                  <Icon as={TbLock} boxSize={3.5} color="surface.400" />
+                  <Text fontSize="xs" color="surface.400">Forgot password?</Text>
+                </HStack>
               </VStack>
 
-              {/* Forgot password panel */}
               <Collapse in={showForgot} animateOpacity>
-                <Box
-                  mt={4}
-                  pt={4}
-                  borderTop="1px solid"
-                  borderColor="surface.800"
-                >
+                <Box mt={4} pt={4} borderTop="1px solid" borderColor="surface.800">
                   {resetSent ? (
-                    <VStack spacing={2}>
+                    <VStack spacing={2} py={2}>
                       <Icon as={GiBananaPeeled} boxSize={8} color="accent.banana" />
                       <Text fontSize="sm" color="accent.banana" fontWeight="600" textAlign="center">
                         Check your inbox
@@ -197,12 +195,10 @@ const Login = () => {
                     <VStack spacing={3}>
                       <HStack spacing={2}>
                         <Icon as={GiBananaPeeled} boxSize={5} color="accent.banana" />
-                        <Text fontSize="xs" color="surface.400">
-                          Even burros forget sometimes
-                        </Text>
+                        <Text fontSize="xs" color="surface.400">Even burros forget sometimes</Text>
                       </HStack>
                       <Input
-                        type="email"
+                        type="text"
                         value={resetEmail}
                         onChange={(e) => setResetEmail(e.target.value)}
                         bg="surface.950"
@@ -215,7 +211,7 @@ const Login = () => {
                         _hover={{ borderColor: 'surface.600' }}
                         _focus={{ borderColor: 'accent.banana', boxShadow: '0 0 0 1px #FFE500' }}
                         _placeholder={{ color: 'surface.600', fontSize: 'sm' }}
-                        placeholder="your email"
+                        placeholder="username or email"
                       />
                       <Button
                         w="100%"
@@ -238,7 +234,6 @@ const Login = () => {
                 </Box>
               </Collapse>
             </Box>
-
           </VStack>
         </Box>
       </Center>
