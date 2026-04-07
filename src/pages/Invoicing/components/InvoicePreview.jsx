@@ -5,7 +5,7 @@ import {
   ModalFooter, Button, VStack, HStack, Box, Text,
   useToast, Badge, Icon, Image, Divider,
 } from '@chakra-ui/react';
-import { TbMail, TbX, TbCheck, TbAlertTriangle } from 'react-icons/tb';
+import { TbMail, TbX, TbCheck, TbAlertTriangle, TbBolt, TbLock } from 'react-icons/tb';
 
 const getDueNow = (item) => {
   const amount = parseFloat(item.amount || 0);
@@ -16,9 +16,9 @@ const getDueNow = (item) => {
 };
 
 const getFundingLabel = (mode) => {
-  if (mode === 'deposit_50') return 'Fund to Start';
+  if (mode === 'deposit_50') return '50% to Start';
   if (mode === 'pay_full') return 'Fund in Full';
-  return 'Scope Confirmed';
+  return 'Confirm Scope';
 };
 
 const getFundingColor = (mode) => {
@@ -35,9 +35,9 @@ const InvoicePreview = ({ isOpen, onClose, invoice, onSent }) => {
 
   if (!invoice) return null;
 
-  const lineItems = invoice.line_items || invoice.invoice_items || [];
-  const totalAmount = lineItems.reduce((sum, i) => sum + parseFloat(i.amount || 0), 0);
-  const totalDueNow = lineItems.reduce((sum, i) => sum + getDueNow(i), 0);
+  const sprints = invoice.line_items || invoice.invoice_items || [];
+  const totalAmount = sprints.reduce((sum, i) => sum + parseFloat(i.amount || 0), 0);
+  const totalDueNow = sprints.reduce((sum, i) => sum + getDueNow(i), 0);
   const invoiceDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
   const handleSend = async () => {
@@ -118,7 +118,7 @@ const InvoicePreview = ({ isOpen, onClose, invoice, onSent }) => {
             </HStack>
           )}
 
-          {/* Email preview - dark themed */}
+          {/* Email preview */}
           <Box bg="#000000" borderRadius="xl" p={3}>
             <Box bg="#0A0A0A" borderRadius="lg" overflow="hidden" border="1px solid" borderColor="#1f1f1f" maxW="560px" mx="auto">
 
@@ -130,7 +130,7 @@ const InvoicePreview = ({ isOpen, onClose, invoice, onSent }) => {
 
                 {/* Logo + tag */}
                 <HStack justify="space-between" mb={5}>
-                  <Image src="/logo-main.svg" alt="NeonBurro" w="50px" h="auto" />
+                  <Image src="/neon-burro-email-logo.png" alt="NeonBurro" w="44px" h="44px" borderRadius="full" />
                   <Text color="brand.500" fontSize="2xs" fontWeight="700" letterSpacing="0.15em" textTransform="uppercase">
                     Invoice
                   </Text>
@@ -141,7 +141,10 @@ const InvoicePreview = ({ isOpen, onClose, invoice, onSent }) => {
                 <Text color="white" fontSize="xl" fontWeight="800" mb={1}>
                   {invoice.invoice_number || 'Draft'}
                 </Text>
-                <Text color="surface.500" fontSize="xs" mb={5}>{invoiceDate}</Text>
+                <Text color="surface.500" fontSize="xs" mb={1}>{invoiceDate}</Text>
+                <Text color="surface.600" fontSize="2xs" mb={5}>
+                  Issued by <Text as="span" color="surface.400" fontWeight="600">The Burroship, LLC</Text>
+                </Text>
 
                 {/* Meta */}
                 <Box bg="surface.900" border="1px solid" borderColor="surface.800" borderRadius="lg" p={4} mb={5}>
@@ -162,26 +165,35 @@ const InvoicePreview = ({ isOpen, onClose, invoice, onSent }) => {
                   </VStack>
                 </Box>
 
-                {/* Line items */}
+                {/* Sprints */}
                 <Text color="brand.500" fontSize="2xs" fontWeight="700" letterSpacing="0.15em" textTransform="uppercase" mb={2}>
-                  Scope of Work
+                  Sprints
                 </Text>
 
                 <Box border="1px solid" borderColor="surface.800" borderRadius="lg" overflow="hidden" mb={5}>
-                  {lineItems.map((item, idx) => {
-                    const amount = parseFloat(item.amount || 0);
-                    const dueNow = getDueNow(item);
-                    const mode = item.payment_mode || 'approve_only';
+                  {sprints.map((sprint, idx) => {
+                    const amount = parseFloat(sprint.amount || 0);
+                    const dueNow = getDueNow(sprint);
+                    const mode = sprint.payment_mode || 'approve_only';
                     const modeColor = getFundingColor(mode);
+                    const isLocked = sprint.locked || sprint.payment_status === 'paid';
 
                     return (
-                      <Box key={idx} px={4} py={3.5} borderBottom="1px solid" borderColor="surface.800">
+                      <Box key={idx} px={4} py={3.5} borderBottom="1px solid" borderColor="surface.800" position="relative">
+                        {isLocked && (
+                          <Box position="absolute" top={3} right={3}>
+                            <HStack spacing={1} bg="rgba(57,255,20,0.15)" border="1px solid rgba(57,255,20,0.4)" borderRadius="full" px={2} py={0.5}>
+                              <Icon as={TbLock} boxSize={2.5} color="accent.neon" />
+                              <Text color="accent.neon" fontSize="2xs" fontWeight="800">PAID</Text>
+                            </HStack>
+                          </Box>
+                        )}
                         <Text color="surface.600" fontSize="2xs" fontFamily="mono" fontWeight="700" mb={0.5}>
-                          {String(idx + 1).padStart(2, '0')}
+                          SPRINT {String(idx + 1).padStart(2, '0')}
                         </Text>
-                        <Text color="white" fontSize="sm" fontWeight="700" mb={1}>{item.title}</Text>
-                        {item.description && (
-                          <Text color="surface.400" fontSize="xs" lineHeight="1.5" mb={2}>{item.description}</Text>
+                        <Text color="white" fontSize="sm" fontWeight="700" mb={1}>{sprint.title}</Text>
+                        {sprint.description && (
+                          <Text color="surface.400" fontSize="xs" lineHeight="1.5" mb={2}>{sprint.description}</Text>
                         )}
                         <Badge
                           fontSize="2xs"
@@ -199,12 +211,12 @@ const InvoicePreview = ({ isOpen, onClose, invoice, onSent }) => {
                         </Badge>
                         <Divider borderColor="surface.800" mb={2} />
                         <HStack justify="space-between">
-                          <Text color="surface.500" fontSize="xs">Amount</Text>
+                          <Text color="surface.500" fontSize="xs">Sprint value</Text>
                           <Text color="white" fontSize="sm" fontWeight="700" fontFamily="mono">{currency(amount)}</Text>
                         </HStack>
                         {dueNow > 0 && (
                           <HStack justify="space-between" mt={1}>
-                            <Text color="surface.500" fontSize="xs">Due now</Text>
+                            <Text color="surface.500" fontSize="xs">To push forward</Text>
                             <Text color="accent.banana" fontSize="sm" fontWeight="700" fontFamily="mono">{currency(dueNow)}</Text>
                           </HStack>
                         )}
@@ -215,12 +227,12 @@ const InvoicePreview = ({ isOpen, onClose, invoice, onSent }) => {
                   {/* Totals */}
                   <Box bg="surface.900" px={4} py={4} borderTop="2px solid" borderColor="surface.800">
                     <HStack justify="space-between" mb={totalDueNow > 0 ? 2 : 0}>
-                      <Text color="surface.400" fontSize="xs" fontWeight="600">Total</Text>
+                      <Text color="surface.400" fontSize="xs" fontWeight="600">Total Project Value</Text>
                       <Text color="white" fontSize="md" fontWeight="800" fontFamily="mono">{currency(totalAmount)}</Text>
                     </HStack>
                     {totalDueNow > 0 && (
                       <HStack justify="space-between">
-                        <Text color="accent.banana" fontSize="xs" fontWeight="700">Due to Activate</Text>
+                        <Text color="accent.banana" fontSize="xs" fontWeight="700">To Push Forward</Text>
                         <Text color="accent.banana" fontSize="md" fontWeight="800" fontFamily="mono">{currency(totalDueNow)}</Text>
                       </HStack>
                     )}
@@ -230,11 +242,12 @@ const InvoicePreview = ({ isOpen, onClose, invoice, onSent }) => {
                 {/* CTA preview */}
                 {totalDueNow > 0 ? (
                   <Box bg="surface.900" border="1px solid" borderColor="surface.800" borderRadius="lg" p={5} textAlign="center" mb={4}>
-                    <Text color="surface.500" fontSize="2xs" textTransform="uppercase" letterSpacing="0.08em" mb={2}>Due to Activate</Text>
-                    <Text color="accent.banana" fontSize="3xl" fontWeight="800" fontFamily="mono" mb={2}>{currency(totalDueNow)}</Text>
+                    <Text color="surface.500" fontSize="2xs" textTransform="uppercase" letterSpacing="0.08em" mb={2}>To Push Forward</Text>
+                    <Text color="accent.banana" fontSize="3xl" fontWeight="800" fontFamily="mono" mb={3}>{currency(totalDueNow)}</Text>
                     <Box display="inline-block" bg="brand.500" color="surface.950" px={8} py={3} borderRadius="full" fontWeight="800" fontSize="sm">
-                      Fund This Work
+                      Approve and Push Forward
                     </Box>
+                    <Text color="surface.600" fontSize="2xs" mt={3}>Client picks which sprints to fund</Text>
                   </Box>
                 ) : (
                   <Box bg="surface.900" border="1px solid" borderColor="surface.800" borderRadius="lg" p={4} textAlign="center" mb={4}>
@@ -247,7 +260,7 @@ const InvoicePreview = ({ isOpen, onClose, invoice, onSent }) => {
                 <HStack justify="space-between" pt={3} borderTop="1px solid" borderColor="surface.800">
                   <VStack align="start" spacing={0}>
                     <Text color="white" fontSize="xs" fontWeight="700">NeonBurro</Text>
-                    <Text color="surface.600" fontSize="2xs">Ridgway, Colorado</Text>
+                    <Text color="surface.600" fontSize="2xs">Powered by The Burroship, LLC</Text>
                   </VStack>
                   <Image src="/main-sms-burro.webp" alt="NeonBurro" w="40px" borderRadius="md" />
                 </HStack>
@@ -262,7 +275,7 @@ const InvoicePreview = ({ isOpen, onClose, invoice, onSent }) => {
               Cancel
             </Button>
             <Button
-              leftIcon={sending ? undefined : <TbMail />}
+              leftIcon={sending ? undefined : <TbBolt />}
               bg="brand.500"
               color="surface.950"
               fontWeight="700"

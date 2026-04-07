@@ -35,9 +35,9 @@ const getDueNow = (item) => {
 };
 
 const getFundingLabel = (mode) => {
-  if (mode === 'deposit_50') return 'Fund to Start';
+  if (mode === 'deposit_50') return '50% to Start';
   if (mode === 'pay_full') return 'Fund in Full';
-  return 'Scope Confirmed';
+  return 'Confirm Scope';
 };
 
 const generatePayToken = () => {
@@ -130,17 +130,17 @@ const buildClientEmail = ({ invoice, client, project, lineItems, totalAmount, to
     return `
       <tr>
         <td style="padding:16px 20px;border-bottom:1px solid #1f1f1f;">
-          <div style="color:#737373;font-size:10px;font-family:monospace;font-weight:700;margin-bottom:4px;">${String(idx + 1).padStart(2, '0')}</div>
+          <div style="color:#737373;font-size:10px;font-family:monospace;font-weight:700;margin-bottom:4px;">SPRINT ${String(idx + 1).padStart(2, '0')}</div>
           <div style="color:#ffffff;font-weight:700;font-size:15px;line-height:1.3;margin-bottom:4px;">${item.title}</div>
           ${item.description ? `<div style="color:#a0a0a0;font-size:13px;line-height:1.6;margin-bottom:8px;">${item.description}</div>` : ''}
           <div style="display:inline-block;background:${modeBg};color:${modeColor};font-size:10px;font-weight:700;padding:3px 10px;border-radius:100px;border:1px solid ${modeColor}40;margin-bottom:10px;">${getFundingLabel(mode)}</div>
           <table width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #1f1f1f;padding-top:8px;">
             <tr>
-              <td style="padding:3px 0;color:#737373;font-size:11px;">Amount</td>
+              <td style="padding:3px 0;color:#737373;font-size:11px;">Sprint value</td>
               <td style="padding:3px 0;text-align:right;color:#ffffff;font-weight:700;font-family:monospace;font-size:14px;">${currency(amount)}</td>
             </tr>
             <tr>
-              <td style="padding:3px 0;color:#737373;font-size:11px;">Due Now</td>
+              <td style="padding:3px 0;color:#737373;font-size:11px;">To push forward</td>
               <td style="padding:3px 0;text-align:right;">
                 ${dueNow > 0
                   ? `<span style="color:#FFE500;font-weight:700;font-family:monospace;font-size:14px;">${currency(dueNow)}</span>`
@@ -183,19 +183,19 @@ const buildClientEmail = ({ invoice, client, project, lineItems, totalAmount, to
           </td></tr>
         </table>
 
-        <div style="color:#00E5E5;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:2px;margin-bottom:10px;">Scope of Work</div>
+        <div style="color:#00E5E5;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:2px;margin-bottom:10px;">Sprints</div>
         <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #1f1f1f;border-radius:12px;overflow:hidden;margin-bottom:24px;">
           <tbody>${itemsHTML}</tbody>
           <tr>
             <td style="padding:18px 20px;background:#141414;border-top:2px solid #1f1f1f;">
               <table width="100%" cellpadding="0" cellspacing="0">
                 <tr>
-                  <td style="color:#a0a0a0;font-size:13px;font-weight:600;">Total</td>
+                  <td style="color:#a0a0a0;font-size:13px;font-weight:600;">Total Project Value</td>
                   <td style="text-align:right;color:#ffffff;font-size:18px;font-weight:800;font-family:monospace;">${currency(totalAmount)}</td>
                 </tr>
                 ${totalDueNow > 0 ? `
                 <tr>
-                  <td style="padding-top:6px;color:#FFE500;font-size:13px;font-weight:700;">Due to Activate</td>
+                  <td style="padding-top:6px;color:#FFE500;font-size:13px;font-weight:700;">To Push Forward</td>
                   <td style="padding-top:6px;text-align:right;color:#FFE500;font-size:16px;font-weight:800;font-family:monospace;">${currency(totalDueNow)}</td>
                 </tr>` : ''}
               </table>
@@ -206,14 +206,14 @@ const buildClientEmail = ({ invoice, client, project, lineItems, totalAmount, to
         ${totalDueNow > 0 ? `
         <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
           <tr><td style="background:#141414;border:1px solid #1f1f1f;border-radius:12px;padding:28px 20px;text-align:center;">
-            <div style="color:#737373;font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:10px;">Due to Activate</div>
+            <div style="color:#737373;font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:10px;">To Push Forward</div>
             <div style="color:#FFE500;font-size:40px;font-weight:800;font-family:monospace;line-height:1;margin-bottom:14px;">${currency(totalDueNow)}</div>
             <div style="color:#737373;font-size:12px;margin-bottom:4px;">ACH bank transfer, credit card, Apple Pay, Google Pay or check</div>
           </td></tr>
         </table>
         <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
           <tr><td style="text-align:center;">
-            <a href="${payUrl}" style="display:inline-block;background:#00E5E5;color:#0A0A0A;text-decoration:none;padding:16px 44px;border-radius:100px;font-weight:800;font-size:15px;">Fund This Work</a>
+            <a href="${payUrl}" style="display:inline-block;background:#00E5E5;color:#0A0A0A;text-decoration:none;padding:16px 44px;border-radius:100px;font-weight:800;font-size:15px;">Approve and Push Forward</a>
             <div style="margin-top:10px;color:#737373;font-size:11px;">Secure payment via Stripe</div>
           </td></tr>
         </table>
