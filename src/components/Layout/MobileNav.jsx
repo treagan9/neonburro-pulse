@@ -33,7 +33,7 @@ const MobileNav = () => {
       zIndex={20}
       pb="env(safe-area-inset-bottom)"
     >
-      <HStack justify="space-around" py={2}>
+      <HStack justify="space-around" py={1.5}>
         {MOBILE_ITEMS.map((item) => {
           const active = isActive(item.path);
           return (
@@ -42,20 +42,35 @@ const MobileNav = () => {
               spacing={0.5}
               cursor="pointer"
               onClick={() => navigate(item.path)}
-              opacity={active ? 1 : 0.5}
               transition="all 0.15s"
-              _hover={{ opacity: 1 }}
               flex={1}
+              py={1}
+              position="relative"
             >
+              {active && (
+                <Box
+                  position="absolute"
+                  top={0}
+                  left="50%"
+                  transform="translateX(-50%)"
+                  w="20px"
+                  h="2px"
+                  borderRadius="full"
+                  bg="brand.500"
+                  boxShadow="0 0 6px rgba(0,229,229,0.5)"
+                />
+              )}
               <Icon
                 as={item.icon}
                 boxSize={5}
-                color={active ? 'brand.500' : 'surface.400'}
+                color={active ? 'brand.500' : 'surface.500'}
+                transition="color 0.15s"
               />
               <Text
                 fontSize="2xs"
-                fontWeight={active ? '600' : '500'}
-                color={active ? 'brand.500' : 'surface.400'}
+                fontWeight={active ? '700' : '500'}
+                color={active ? 'brand.500' : 'surface.500'}
+                transition="color 0.15s"
               >
                 {item.label}
               </Text>

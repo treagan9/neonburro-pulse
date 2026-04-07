@@ -1,25 +1,20 @@
 // netlify/functions/send-invoice.js
 // NeonBurro Pulse - Invoice Email Sender
+// Generates pay_token for magic link client access
 // Dark NeonBurro email theme with cyan/banana accents
 // Client + admin emails via Resend
 // Invoice snapshots + activity logging
-// Funding modes: approve_only / deposit_50 / pay_full
-
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.VITE_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY
-);
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const HERO_IMG = 'https://pulse.neonburro.com/cimarron-range-neon.png';
-const LOGO_IMG = 'https://pulse.neonburro.com/logo-main.svg';
+const LOGO_IMG = 'https://pulse.neonburro.com/neon-burro-email-logo.png';
 const SMS_BURRO = 'https://pulse.neonburro.com/main-sms-burro.webp';
 const FROM_EMAIL = 'NeonBurro <invoices@neonburro.com>';
 const ADMIN_FROM = 'NeonBurro Pulse <notifications@neonburro.com>';
 const ADMIN_TO = ['hello@neonburro.com'];
-const PULSE_URL = 'https://pulse.neonburro.com';
+const PAY_BASE = 'https://neonburro.com/pay';
 
 const currency = (val) =>
   `$${parseFloat(val || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -28,7 +23,7 @@ const getMST = () => new Date().toLocaleString('en-US', {
   timeZone: 'America/Denver',
   month: 'short', day: 'numeric', year: 'numeric',
   hour: 'numeric', minute: '2-digit', hour12: true,
-}) + ' MST';
+}) + ' MT';
 
 const getDueNow = (item) => {
   const amount = parseFloat(item.amount || 0);
@@ -45,6 +40,46 @@ const getFundingLabel = (mode) => {
   return 'Scope Confirmed';
 };
 
+const generatePayToken = () => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  let token = '';
+  for (let i = 0; i < 32; i++) {
+    token += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return token;
+};
+
+// Supabase REST helpers
+const sbFetch = async (path, options = {}) => {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...options,
+    headers: {
+      'apikey': SUPABASE_SERVICE_KEY,
+      'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': options.prefer || 'return=representation',
+      ...options.headers,
+    },
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Supabase error: ${res.status} ${err}`);
+  }
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+};
+
+const sbGet = (table, query) => sbFetch(`${table}?${query}`);
+const sbUpdate = (table, id, data) => sbFetch(`${table}?id=eq.${id}`, {
+  method: 'PATCH',
+  body: JSON.stringify(data),
+});
+const sbInsert = (table, data) => sbFetch(table, {
+  method: 'POST',
+  body: JSON.stringify(data),
+  prefer: 'return=minimal',
+});
+
 const sendEmail = async (from, to, subject, html, replyTo) => {
   const payload = { from, to: Array.isArray(to) ? to : [to], subject, html };
   if (replyTo) payload.reply_to = replyTo;
@@ -58,7 +93,6 @@ const sendEmail = async (from, to, subject, html, replyTo) => {
   return result;
 };
 
-// NeonBurro dark email shell
 const emailShell = (content) => `<!DOCTYPE html>
 <html>
 <head>
@@ -69,7 +103,6 @@ const emailShell = (content) => `<!DOCTYPE html>
       .wrapper { padding: 8px !important; }
       .outer { border-radius: 0 !important; width: 100% !important; }
       .body-pad { padding: 24px 16px !important; }
-      .logo-pad { padding: 28px 16px !important; }
     }
   </style>
 </head>
@@ -86,8 +119,7 @@ const emailShell = (content) => `<!DOCTYPE html>
 </body>
 </html>`;
 
-// Client invoice email
-const buildClientEmail = ({ invoice, client, project, lineItems, totalAmount, totalDueNow, invoiceDate }) => {
+const buildClientEmail = ({ invoice, client, project, lineItems, totalAmount, totalDueNow, invoiceDate, payUrl }) => {
   const itemsHTML = lineItems.map((item, idx) => {
     const amount = parseFloat(item.amount || 0);
     const dueNow = getDueNow(item);
@@ -121,30 +153,20 @@ const buildClientEmail = ({ invoice, client, project, lineItems, totalAmount, to
   }).join('');
 
   return emailShell(`
-    <!-- Hero image -->
-    <tr>
-      <td style="line-height:0;">
-        <img src="${HERO_IMG}" alt="NeonBurro" width="600" style="display:block;width:100%;height:auto;max-height:200px;object-fit:cover;" />
-      </td>
-    </tr>
-
-    <!-- Logo + invoice header -->
+    <tr><td style="line-height:0;"><img src="${HERO_IMG}" alt="NeonBurro" width="600" style="display:block;width:100%;height:auto;max-height:200px;object-fit:cover;" /></td></tr>
     <tr>
       <td class="body-pad" style="padding:32px 40px;">
         <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
           <tr>
-            <td><img src="${LOGO_IMG}" alt="NeonBurro" width="60" style="display:block;height:auto;" /></td>
-            <td style="text-align:right;vertical-align:bottom;">
-              <div style="color:#00E5E5;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Invoice</div>
-            </td>
+            <td><img src="${LOGO_IMG}" alt="NeonBurro" width="44" height="44" style="display:block;width:44px;height:44px;border-radius:50%;" /></td>
+            <td style="text-align:right;vertical-align:bottom;"><div style="color:#00E5E5;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Invoice</div></td>
           </tr>
         </table>
-
         <div style="width:48px;height:2px;background:#00E5E5;margin:0 0 18px 0;border-radius:1px;"></div>
         <h1 style="margin:0 0 6px 0;color:#ffffff;font-size:28px;font-weight:800;line-height:1.2;letter-spacing:-0.02em;">${invoice.invoice_number}</h1>
-        <div style="color:#737373;font-size:13px;margin-bottom:24px;">${invoiceDate}</div>
+        <div style="color:#737373;font-size:13px;margin-bottom:6px;">${invoiceDate}</div>
+        <div style="color:#525252;font-size:11px;margin-bottom:24px;">Issued by <span style="color:#a0a0a0;font-weight:600;">The Burroship, LLC</span></div>
 
-        <!-- Meta -->
         <table width="100%" cellpadding="0" cellspacing="0" style="background:#141414;border:1px solid #1f1f1f;border-radius:12px;overflow:hidden;margin-bottom:24px;">
           <tr><td style="padding:18px 20px;">
             <div style="margin-bottom:12px;">
@@ -161,7 +183,6 @@ const buildClientEmail = ({ invoice, client, project, lineItems, totalAmount, to
           </td></tr>
         </table>
 
-        <!-- Line items -->
         <div style="color:#00E5E5;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:2px;margin-bottom:10px;">Scope of Work</div>
         <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #1f1f1f;border-radius:12px;overflow:hidden;margin-bottom:24px;">
           <tbody>${itemsHTML}</tbody>
@@ -183,18 +204,32 @@ const buildClientEmail = ({ invoice, client, project, lineItems, totalAmount, to
         </table>
 
         ${totalDueNow > 0 ? `
-        <!-- CTA -->
         <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
           <tr><td style="background:#141414;border:1px solid #1f1f1f;border-radius:12px;padding:28px 20px;text-align:center;">
             <div style="color:#737373;font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:10px;">Due to Activate</div>
-            <div style="color:#FFE500;font-size:40px;font-weight:800;font-family:monospace;line-height:1;margin-bottom:10px;">${currency(totalDueNow)}</div>
-            <div style="color:#737373;font-size:12px;">ACH bank transfer, credit card or check</div>
+            <div style="color:#FFE500;font-size:40px;font-weight:800;font-family:monospace;line-height:1;margin-bottom:14px;">${currency(totalDueNow)}</div>
+            <div style="color:#737373;font-size:12px;margin-bottom:4px;">ACH bank transfer, credit card, Apple Pay, Google Pay or check</div>
           </td></tr>
         </table>
-        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
           <tr><td style="text-align:center;">
-            <a href="${PULSE_URL}/pay/${invoice.id}/" style="display:inline-block;background:#00E5E5;color:#0A0A0A;text-decoration:none;padding:16px 44px;border-radius:100px;font-weight:800;font-size:15px;">Fund This Work</a>
-            <div style="margin-top:10px;color:#737373;font-size:11px;">Secure payment</div>
+            <a href="${payUrl}" style="display:inline-block;background:#00E5E5;color:#0A0A0A;text-decoration:none;padding:16px 44px;border-radius:100px;font-weight:800;font-size:15px;">Fund This Work</a>
+            <div style="margin-top:10px;color:#737373;font-size:11px;">Secure payment via Stripe</div>
+          </td></tr>
+        </table>
+
+        <!-- Mail a Check option -->
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+          <tr><td style="background:#0A0A0A;border:1px solid #1f1f1f;border-radius:12px;padding:20px 24px;">
+            <div style="color:#FFE500;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;">Prefer to mail a check?</div>
+            <div style="color:#a0a0a0;font-size:13px;line-height:1.6;margin-bottom:12px;">
+              Make checks payable to <span style="color:#ffffff;font-weight:700;">The Burroship, LLC</span> and include invoice <span style="color:#00E5E5;font-family:monospace;font-weight:600;">${invoice.invoice_number}</span> in the memo.
+            </div>
+            <div style="background:#141414;border:1px solid #1f1f1f;border-radius:8px;padding:14px 16px;">
+              <div style="color:#ffffff;font-size:13px;font-weight:700;margin-bottom:2px;">The Burroship, LLC</div>
+              <div style="color:#a0a0a0;font-size:13px;">P.O. Box 2111</div>
+              <div style="color:#a0a0a0;font-size:13px;">Ridgway, CO 81432</div>
+            </div>
           </td></tr>
         </table>` : `
         <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
@@ -204,21 +239,18 @@ const buildClientEmail = ({ invoice, client, project, lineItems, totalAmount, to
           </td></tr>
         </table>`}
 
-        <!-- Contact -->
         <table width="100%" cellpadding="0" cellspacing="0" style="background:#141414;border:1px solid #1f1f1f;border-radius:12px;overflow:hidden;">
           <tr><td style="padding:20px 24px;">
-            <table width="100%" cellpadding="0" cellspacing="0">
-              <tr>
-                <td style="vertical-align:top;">
-                  <div style="color:#737373;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Questions?</div>
-                  <div style="color:#ffffff;font-size:14px;font-weight:700;margin-bottom:2px;">NeonBurro</div>
-                  <div style="color:#737373;font-size:12px;">Ridgway, Colorado</div>
-                </td>
-                <td style="vertical-align:top;text-align:right;">
-                  <img src="${SMS_BURRO}" alt="NeonBurro" width="60" style="display:block;margin-left:auto;border-radius:8px;" />
-                </td>
-              </tr>
-            </table>
+            <table width="100%" cellpadding="0" cellspacing="0"><tr>
+              <td style="vertical-align:top;">
+                <div style="color:#737373;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Questions?</div>
+                <div style="color:#ffffff;font-size:14px;font-weight:700;margin-bottom:2px;">NeonBurro</div>
+                <div style="color:#737373;font-size:12px;">Ridgway, Colorado</div>
+              </td>
+              <td style="vertical-align:top;text-align:right;">
+                <img src="${SMS_BURRO}" alt="NeonBurro" width="60" style="display:block;margin-left:auto;border-radius:8px;" />
+              </td>
+            </tr></table>
             <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px;">
               <tr>
                 <td style="padding:4px 0;color:#737373;font-size:12px;border-top:1px solid #1f1f1f;">Email</td>
@@ -233,18 +265,16 @@ const buildClientEmail = ({ invoice, client, project, lineItems, totalAmount, to
         </table>
       </td>
     </tr>
-
-    <!-- Footer -->
     <tr>
       <td style="padding:18px 40px;border-top:1px solid #1f1f1f;text-align:center;">
-        <div style="color:#737373;font-size:11px;">Rooted in Ridgway. Ready to carry the load.</div>
+        <div style="color:#737373;font-size:11px;">Real people. Clear responses.</div>
+        <div style="color:#525252;font-size:10px;margin-top:6px;">Neon Burro · Powered by The Burroship, LLC</div>
         <div style="margin-top:4px;"><a href="https://neonburro.com/" style="color:#00E5E5;font-size:11px;text-decoration:none;font-weight:600;">neonburro.com</a></div>
       </td>
     </tr>
   `);
 };
 
-// Admin notification email
 const buildAdminEmail = ({ invoice, client, project, lineItems, totalAmount, totalDueNow }) => {
   const itemsHTML = lineItems.map((item) => {
     const amount = parseFloat(item.amount || 0);
@@ -260,11 +290,7 @@ const buildAdminEmail = ({ invoice, client, project, lineItems, totalAmount, tot
   }).join('');
 
   return emailShell(`
-    <tr>
-      <td style="line-height:0;">
-        <img src="${HERO_IMG}" alt="NeonBurro" width="600" style="display:block;width:100%;height:auto;max-height:160px;object-fit:cover;" />
-      </td>
-    </tr>
+    <tr><td style="line-height:0;"><img src="${HERO_IMG}" alt="NeonBurro" width="600" style="display:block;width:100%;height:auto;max-height:160px;object-fit:cover;" /></td></tr>
     <tr>
       <td style="background:#141414;border-bottom:2px solid #00E5E5;padding:20px 32px;">
         <table width="100%" cellpadding="0" cellspacing="0"><tr>
@@ -316,7 +342,7 @@ const buildAdminEmail = ({ invoice, client, project, lineItems, totalAmount, tot
           </td></tr>
         </table>
         <table width="100%" cellpadding="0" cellspacing="0"><tr><td style="text-align:center;">
-          <a href="${PULSE_URL}/invoicing/" style="display:inline-block;background:#00E5E5;color:#0A0A0A;text-decoration:none;padding:12px 28px;border-radius:100px;font-weight:800;font-size:13px;">View in Pulse</a>
+          <a href="https://pulse.neonburro.com/invoicing/" style="display:inline-block;background:#00E5E5;color:#0A0A0A;text-decoration:none;padding:12px 28px;border-radius:100px;font-weight:800;font-size:13px;">View in Pulse</a>
         </td></tr></table>
       </td>
     </tr>
@@ -326,7 +352,6 @@ const buildAdminEmail = ({ invoice, client, project, lineItems, totalAmount, tot
   `);
 };
 
-// Handler
 export const handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -337,31 +362,32 @@ export const handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
   if (event.httpMethod !== 'POST') return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
   if (!RESEND_API_KEY) return { statusCode: 500, headers, body: JSON.stringify({ error: 'Email not configured' }) };
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return { statusCode: 500, headers, body: JSON.stringify({ error: 'Database not configured' }) };
 
   try {
     const { invoiceId } = JSON.parse(event.body);
     if (!invoiceId) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Invoice ID required' }) };
 
-    // Fetch invoice with items
-    const { data: invoice, error: invError } = await supabase
-      .from('invoices').select('*').eq('id', invoiceId).single();
-    if (invError || !invoice) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Invoice not found' }) };
+    // Fetch invoice
+    const invoices = await sbGet('invoices', `id=eq.${invoiceId}&select=*`);
+    const invoice = invoices?.[0];
+    if (!invoice) return { statusCode: 404, headers, body: JSON.stringify({ error: 'Invoice not found' }) };
 
-    const { data: lineItems } = await supabase
-      .from('invoice_items').select('*').eq('invoice_id', invoiceId).order('sort_order');
+    // Fetch line items
+    const lineItems = await sbGet('invoice_items', `invoice_id=eq.${invoiceId}&order=sort_order`);
 
     // Fetch client
     let client = { name: 'Client', email: '' };
     if (invoice.client_id) {
-      const { data: c } = await supabase.from('clients').select('*').eq('id', invoice.client_id).single();
-      if (c) client = c;
+      const clients = await sbGet('clients', `id=eq.${invoice.client_id}&select=*`);
+      if (clients?.[0]) client = clients[0];
     }
 
     // Fetch project
     let project = null;
     if (invoice.project_id) {
-      const { data: p } = await supabase.from('projects').select('*').eq('id', invoice.project_id).single();
-      if (p) project = p;
+      const projects = await sbGet('projects', `id=eq.${invoice.project_id}&select=*`);
+      if (projects?.[0]) project = projects[0];
     }
 
     if (!client.email) {
@@ -373,16 +399,29 @@ export const handler = async (event) => {
     const totalDueNow = items.reduce((sum, i) => sum + getDueNow(i), 0);
     const invoiceDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
+    // Generate pay token for magic link
+    const payToken = generatePayToken();
+    const payUrl = `${PAY_BASE}/?token=${payToken}`;
+
+    const now = new Date().toISOString();
+
+    // Update invoice with pay_token and status
+    await sbUpdate('invoices', invoiceId, {
+      status: 'sent',
+      sent_at: now,
+      total: totalAmount,
+      pay_token: payToken,
+      updated_at: now,
+    });
+
     // Send client email
-    const clientHtml = buildClientEmail({ invoice, client, project, lineItems: items, totalAmount, totalDueNow, invoiceDate });
+    const clientHtml = buildClientEmail({ invoice, client, project, lineItems: items, totalAmount, totalDueNow, invoiceDate, payUrl });
     const clientResult = await sendEmail(
       FROM_EMAIL,
       [client.email],
       `Invoice ${invoice.invoice_number} - ${project?.name || client.name}`,
       clientHtml
     );
-
-    const now = new Date().toISOString();
 
     // Save snapshot
     const snapshot = {
@@ -400,9 +439,10 @@ export const handler = async (event) => {
         due_now: getDueNow(item),
       })),
       totals: { total: totalAmount, due_now: totalDueNow },
+      pay_url: payUrl,
     };
 
-    await supabase.from('invoice_history').insert({
+    await sbInsert('invoice_history', {
       invoice_id: invoice.id,
       invoice_number: invoice.invoice_number,
       sent_at: now,
@@ -413,16 +453,8 @@ export const handler = async (event) => {
       notes: `Sent via Resend (ID: ${clientResult.id})`,
     });
 
-    // Update invoice status
-    await supabase.from('invoices').update({
-      status: 'sent',
-      sent_at: now,
-      total: totalAmount,
-      updated_at: now,
-    }).eq('id', invoice.id);
-
     // Activity log
-    await supabase.from('activity_log').insert({
+    await sbInsert('activity_log', {
       action: 'invoice_sent',
       entity_type: 'invoice',
       entity_id: invoice.id,
@@ -455,6 +487,7 @@ export const handler = async (event) => {
         invoiceNumber: invoice.invoice_number,
         totalAmount,
         totalDueNow,
+        payUrl,
       }),
     };
 
