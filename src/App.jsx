@@ -1,6 +1,7 @@
 // src/App.jsx
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider } from './hooks/useAuth';
+import { PresenceProvider } from './hooks/usePresence';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import AppShell from './components/Layout/AppShell';
 
@@ -16,6 +17,15 @@ import Calendar      from './pages/Calendar';
 import Analytics     from './pages/Analytics';
 import Settings      from './pages/Settings';
 
+// Wraps protected routes with PresenceProvider so all pages can use usePresence()
+const PresenceWrappedShell = () => (
+  <PresenceProvider>
+    <AppShell>
+      <Outlet />
+    </AppShell>
+  </PresenceProvider>
+);
+
 function App() {
   return (
     <AuthProvider>
@@ -25,7 +35,7 @@ function App() {
         <Route path="/accept-invite/" element={<AcceptInvite />} />
 
         <Route element={<ProtectedRoute />}>
-          <Route element={<AppShell />}>
+          <Route element={<PresenceWrappedShell />}>
             <Route index element={<Navigate to="/dashboard/" replace />} />
             <Route path="dashboard/" element={<Dashboard />} />
             <Route path="clients/" element={<Clients />} />
