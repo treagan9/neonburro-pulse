@@ -6,6 +6,7 @@ import AppShell from './components/Layout/AppShell';
 
 import Login         from './pages/Auth/Login';
 import ResetPassword from './pages/Auth/ResetPassword';
+import AcceptInvite  from './pages/Auth/AcceptInvite';
 import Dashboard     from './pages/Dashboard';
 import Clients       from './pages/Clients';
 import Projects      from './pages/Projects';
@@ -21,6 +22,7 @@ function App() {
       <Routes>
         <Route path="/login/" element={<Login />} />
         <Route path="/reset-password/" element={<ResetPassword />} />
+        <Route path="/accept-invite/" element={<AcceptInvite />} />
 
         <Route element={<ProtectedRoute />}>
           <Route element={<AppShell />}>

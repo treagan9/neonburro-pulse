@@ -3,9 +3,10 @@ import { useState } from 'react';
 import {
   Box, VStack, Text, Input, Button, FormControl,
   Center, Image, Icon, HStack, Collapse,
+  InputGroup, InputRightElement,
 } from '@chakra-ui/react';
 import { GiBananaPeeled } from 'react-icons/gi';
-import { TbLock, TbAlertTriangle } from 'react-icons/tb';
+import { TbLock, TbAlertTriangle, TbEye, TbEyeOff } from 'react-icons/tb';
 import { useAuth } from '../../hooks/useAuth';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
@@ -13,6 +14,7 @@ import { supabase } from '../../lib/supabase';
 const Login = () => {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showForgot, setShowForgot] = useState(false);
@@ -133,24 +135,48 @@ const Login = () => {
               </FormControl>
 
               <FormControl>
-                <Input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  bg="transparent"
-                  border="1px solid"
-                  borderColor="surface.700"
-                  color="white"
-                  fontSize="sm"
-                  h="48px"
-                  borderRadius="xl"
-                  _hover={{ borderColor: 'surface.500' }}
-                  _focus={{ borderColor: 'brand.500', boxShadow: '0 0 0 1px var(--chakra-colors-brand-500)' }}
-                  _placeholder={{ color: 'surface.600', fontSize: 'sm' }}
-                  placeholder="password"
-                  required
-                  autoComplete="current-password"
-                />
+                <InputGroup>
+                  <Input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    bg="transparent"
+                    border="1px solid"
+                    borderColor="surface.700"
+                    color="white"
+                    fontSize="sm"
+                    h="48px"
+                    borderRadius="xl"
+                    pr="44px"
+                    _hover={{ borderColor: 'surface.500' }}
+                    _focus={{ borderColor: 'brand.500', boxShadow: '0 0 0 1px var(--chakra-colors-brand-500)' }}
+                    _placeholder={{ color: 'surface.600', fontSize: 'sm' }}
+                    placeholder="password"
+                    required
+                    autoComplete="current-password"
+                  />
+                  <InputRightElement h="48px" w="44px">
+                    <Box
+                      as="button"
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      display="flex"
+                      alignItems="center"
+                      justifyContent="center"
+                      w="32px"
+                      h="32px"
+                      borderRadius="md"
+                      color="surface.500"
+                      opacity={0.6}
+                      transition="all 0.15s"
+                      _hover={{ color: 'brand.500', opacity: 1 }}
+                      tabIndex={-1}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      <Icon as={showPassword ? TbEyeOff : TbEye} boxSize={4} />
+                    </Box>
+                  </InputRightElement>
+                </InputGroup>
               </FormControl>
 
               <Button
