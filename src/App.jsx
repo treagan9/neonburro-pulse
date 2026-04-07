@@ -5,9 +5,12 @@ import { PresenceProvider } from './hooks/usePresence';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import AppShell from './components/Layout/AppShell';
 
+// Auth pages (public)
 import Login         from './pages/Auth/Login';
 import ResetPassword from './pages/Auth/ResetPassword';
 import AcceptInvite  from './pages/Auth/AcceptInvite';
+
+// Protected pages
 import Dashboard     from './pages/Dashboard';
 import Clients       from './pages/Clients';
 import Projects      from './pages/Projects';
@@ -30,10 +33,12 @@ function App() {
   return (
     <AuthProvider>
       <Routes>
+        {/* Public auth routes */}
         <Route path="/login/" element={<Login />} />
         <Route path="/reset-password/" element={<ResetPassword />} />
         <Route path="/accept-invite/" element={<AcceptInvite />} />
 
+        {/* Protected admin routes */}
         <Route element={<ProtectedRoute />}>
           <Route element={<PresenceWrappedShell />}>
             <Route index element={<Navigate to="/dashboard/" replace />} />

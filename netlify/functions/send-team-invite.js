@@ -25,8 +25,8 @@ exports.handler = async (event) => {
       return { statusCode: 400, body: JSON.stringify({ error: 'Email required' }) };
     }
 
-    const validRoles = ['admin', 'staff', 'team'];
-    const userRole = validRoles.includes(role) ? role : 'staff';
+    const validRoles = ['admin', 'team'];
+    const userRole = validRoles.includes(role) ? role : 'team';
 
     // Check if user already exists
     const { data: existing } = await supabase

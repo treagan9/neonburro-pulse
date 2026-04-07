@@ -60,6 +60,7 @@ const ClientModal = ({ isOpen, onClose, client, onSave }) => {
   const [portalPin, setPortalPin] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const [sendingInvite, setSendingInvite] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const toast = useToast();
@@ -184,6 +185,38 @@ const ClientModal = ({ isOpen, onClose, client, onSave }) => {
     } finally {
       setDeleting(false);
       setConfirmDelete(false);
+    }
+  };
+
+  const handleSendPortalInvite = async () => {
+    if (!client?.id) return;
+    setSendingInvite(true);
+    try {
+      const res = await fetch('/.netlify/functions/send-client-invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId: client.id }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Invite failed');
+      }
+      toast({
+        title: 'Portal invite sent',
+        description: `${client.email} will receive an email`,
+        status: 'success',
+        duration: 3000,
+      });
+      onSave(); // refresh client data so portal_invite_sent_at shows
+    } catch (err) {
+      toast({
+        title: 'Invite failed',
+        description: err.message,
+        status: 'error',
+        duration: 4000,
+      });
+    } finally {
+      setSendingInvite(false);
     }
   };
 
@@ -438,6 +471,56 @@ const ClientModal = ({ isOpen, onClose, client, onSave }) => {
                   Client uses this PIN to look up their projects on the portal
                 </Text>
               </FormControl>
+
+              {/* Portal invite button - only available on existing clients with email */}
+              {isEditing && client?.email && (
+                <Box
+                  bg="surface.850"
+                  border="1px solid"
+                  borderColor={client.portal_invite_sent_at ? 'rgba(57,255,20,0.25)' : 'surface.800'}
+                  borderRadius="xl"
+                  p={3}
+                >
+                  <HStack justify="space-between" align="center">
+                    <Box flex={1}>
+                      <Text color="white" fontSize="xs" fontWeight="700">
+                        Client Portal
+                      </Text>
+                      <Text color="surface.500" fontSize="2xs" mt={0.5}>
+                        {client.portal_account_created_at
+                          ? `Account active · joined ${new Date(client.portal_account_created_at).toLocaleDateString()}`
+                          : client.portal_invite_sent_at
+                          ? `Invite sent ${new Date(client.portal_invite_sent_at).toLocaleDateString()}`
+                          : 'Send an invite to give this client portal access'}
+                      </Text>
+                    </Box>
+                    {!client.portal_account_created_at && (
+                      <Button
+                        size="xs"
+                        leftIcon={<TbMail size={12} />}
+                        bg={client.portal_invite_sent_at ? 'transparent' : '#8B5CF6'}
+                        color={client.portal_invite_sent_at ? '#8B5CF6' : 'white'}
+                        border={client.portal_invite_sent_at ? '1px solid #8B5CF6' : 'none'}
+                        fontWeight="700"
+                        onClick={handleSendPortalInvite}
+                        isLoading={sendingInvite}
+                        loadingText="Sending"
+                        _hover={{
+                          bg: client.portal_invite_sent_at ? 'rgba(139,92,246,0.1)' : '#7C3AED',
+                          transform: 'translateY(-1px)',
+                        }}
+                      >
+                        {client.portal_invite_sent_at ? 'Resend Invite' : 'Send Invite'}
+                      </Button>
+                    )}
+                  </HStack>
+                </Box>
+              )}
+              {!isEditing && (
+                <Text fontSize="2xs" color="surface.600" px={1}>
+                  💡 Save this client first, then you can send them a portal invite
+                </Text>
+              )}
             </VStack>
 
             {/* NOTES SECTION */}

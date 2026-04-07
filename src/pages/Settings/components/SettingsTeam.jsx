@@ -14,7 +14,6 @@ import { usePresence } from '../../../hooks/usePresence';
 const ROLE_CONFIG = {
   owner: { icon: TbCrown,  color: '#FFE500', label: 'Owner' },
   admin: { icon: TbShield, color: '#00E5E5', label: 'Admin' },
-  staff: { icon: TbUser,   color: '#39FF14', label: 'Staff' },
   team:  { icon: TbUser,   color: '#8B5CF6', label: 'Team' },
 };
 
@@ -32,7 +31,7 @@ const inputProps = {
 };
 
 const TeamMemberRow = ({ member, currentUserId, onRoleChange }) => {
-  const config = ROLE_CONFIG[member.role] || ROLE_CONFIG.staff;
+  const config = ROLE_CONFIG[member.role] || ROLE_CONFIG.team;
   const { getStatus } = usePresence();
   const status = getStatus(member.id);
   const isMe = member.id === currentUserId;
@@ -105,7 +104,6 @@ const TeamMemberRow = ({ member, currentUserId, onRoleChange }) => {
           cursor="pointer"
         >
           <option value="admin" style={{ background: '#0a0a0a' }}>Admin</option>
-          <option value="staff" style={{ background: '#0a0a0a' }}>Staff</option>
           <option value="team" style={{ background: '#0a0a0a' }}>Team</option>
         </Select>
       )}
@@ -117,7 +115,7 @@ const InviteModal = ({ isOpen, onClose, onInvited }) => {
   const toast = useToast();
   const [email, setEmail] = useState('');
   const [displayName, setDisplayName] = useState('');
-  const [role, setRole] = useState('staff');
+  const [role, setRole] = useState('team');
   const [sending, setSending] = useState(false);
 
   const handleInvite = async () => {
@@ -152,7 +150,7 @@ const InviteModal = ({ isOpen, onClose, onInvited }) => {
 
       setEmail('');
       setDisplayName('');
-      setRole('staff');
+      setRole('team');
       onInvited();
       onClose();
     } catch (err) {
@@ -209,7 +207,7 @@ const InviteModal = ({ isOpen, onClose, onInvited }) => {
                 Role
               </FormLabel>
               <HStack spacing={2}>
-                {['admin', 'staff', 'team'].map((r) => (
+                {['admin', 'team'].map((r) => (
                   <Box
                     key={r}
                     flex={1}
@@ -229,6 +227,9 @@ const InviteModal = ({ isOpen, onClose, onInvited }) => {
                   </Box>
                 ))}
               </HStack>
+              <Text fontSize="2xs" color="surface.600" mt={2}>
+                Admin has full Pulse access. Team has limited access.
+              </Text>
             </FormControl>
           </VStack>
         </ModalBody>
@@ -263,9 +264,11 @@ const SettingsTeam = ({ currentUserId }) => {
 
   const fetchMembers = async () => {
     setLoading(true);
+    // Only team-side roles - exclude clients
     const { data } = await supabase
       .from('profiles')
       .select('*')
+      .in('role', ['owner', 'admin', 'team'])
       .order('role', { ascending: true });
     setMembers(data || []);
     setLoading(false);

@@ -7,7 +7,6 @@ import SettingsHeader from './components/SettingsHeader';
 import SettingsAvatar from './components/SettingsAvatar';
 import SettingsProfile from './components/SettingsProfile';
 import SettingsPassword from './components/SettingsPassword';
-import SettingsNotifications from './components/SettingsNotifications';
 import SettingsTeam from './components/SettingsTeam';
 import SettingsAccountInfo from './components/SettingsAccountInfo';
 import SettingsFooter from './components/SettingsFooter';
@@ -87,10 +86,6 @@ const Settings = () => {
           <SectionDivider />
 
           <SettingsPassword user={user} />
-
-          <SectionDivider />
-
-          <SettingsNotifications user={user} />
 
           {isOwner && (
             <>
