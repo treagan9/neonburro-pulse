@@ -4,10 +4,18 @@ import {
   Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody,
   ModalFooter, ModalCloseButton, VStack, HStack, Text,
   Input, Button, FormControl, FormLabel, Textarea, Select,
-  Icon, useToast,
+  Icon, useToast, Box, Wrap, WrapItem, InputGroup, InputRightElement,
 } from '@chakra-ui/react';
-import { TbEdit, TbPlus, TbTrash, TbAlertTriangle } from 'react-icons/tb';
+import {
+  TbEdit, TbPlus, TbTrash, TbAlertTriangle, TbCheck,
+  TbUser, TbBuilding, TbMail, TbPhone, TbWorld, TbTag,
+  TbKey, TbRefresh,
+} from 'react-icons/tb';
 import { supabase } from '../../../lib/supabase';
+import {
+  formatPhoneDisplay, formatPhoneStorage, isValidEmail, isValidPhone,
+  generatePortalPin, getInitials, getAvatarColor,
+} from '../../../utils/phone';
 
 const inputProps = {
   bg: 'transparent',
@@ -22,12 +30,34 @@ const inputProps = {
   _placeholder: { color: 'surface.600' },
 };
 
+const SECTION_LABEL_PROPS = {
+  fontSize: '2xs',
+  fontWeight: '700',
+  color: 'accent.neon',
+  textTransform: 'uppercase',
+  letterSpacing: '0.1em',
+  fontFamily: 'mono',
+};
+
+const PRESET_TAGS = [
+  { value: 'local', label: 'Local', color: '#00E5E5' },
+  { value: 'recurring', label: 'Recurring', color: '#39FF14' },
+  { value: 'vip', label: 'VIP', color: '#FFE500' },
+  { value: 'lab', label: 'Lab Project', color: '#8B5CF6' },
+  { value: 'hosting', label: 'Hosting', color: '#06B6D4' },
+  { value: 'web3', label: 'Web3', color: '#EC4899' },
+  { value: 'subscription', label: 'Subscription', color: '#FF6B35' },
+];
+
 const ClientModal = ({ isOpen, onClose, client, onSave }) => {
   const [name, setName] = useState('');
+  const [company, setCompany] = useState('');
+  const [website, setWebsite] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [company, setCompany] = useState('');
   const [status, setStatus] = useState('active');
+  const [tags, setTags] = useState([]);
+  const [portalPin, setPortalPin] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -35,20 +65,50 @@ const ClientModal = ({ isOpen, onClose, client, onSave }) => {
   const toast = useToast();
 
   const isEditing = !!client?.id;
+  const emailValid = email ? isValidEmail(email) : null;
+  const phoneValid = phone ? isValidPhone(phone) : null;
 
   useEffect(() => {
     if (client) {
       setName(client.name || '');
-      setEmail(client.email || '');
-      setPhone(client.phone || '');
       setCompany(client.company || '');
+      setWebsite(client.website || '');
+      setEmail(client.email || '');
+      setPhone(formatPhoneDisplay(client.phone || ''));
       setStatus(client.status || 'active');
+      setTags(client.tags || []);
+      setPortalPin(client.portal_pin || client.lookup_pin || '');
       setNotes(client.notes || '');
     } else {
-      setName(''); setEmail(''); setPhone(''); setCompany(''); setStatus('active'); setNotes('');
+      setName('');
+      setCompany('');
+      setWebsite('');
+      setEmail('');
+      setPhone('');
+      setStatus('active');
+      setTags([]);
+      setPortalPin(generatePortalPin());
+      setNotes('');
     }
     setConfirmDelete(false);
   }, [client, isOpen]);
+
+  const handlePhoneChange = (e) => {
+    setPhone(formatPhoneDisplay(e.target.value));
+  };
+
+  const toggleTag = (tagValue) => {
+    if (tags.includes(tagValue)) {
+      setTags(tags.filter((t) => t !== tagValue));
+    } else {
+      setTags([...tags, tagValue]);
+    }
+  };
+
+  const regeneratePin = () => {
+    setPortalPin(generatePortalPin());
+    toast({ title: 'New PIN generated', status: 'info', duration: 1500 });
+  };
 
   const logActivity = async (action, entityId, metadata) => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -67,15 +127,25 @@ const ClientModal = ({ isOpen, onClose, client, onSave }) => {
       toast({ title: 'Name is required', status: 'warning', duration: 2000 });
       return;
     }
+    if (email && !isValidEmail(email)) {
+      toast({ title: 'Email looks invalid', status: 'warning', duration: 2000 });
+      return;
+    }
+
     setSaving(true);
     try {
       const payload = {
         name: name.trim(),
-        email: email.trim() || null,
-        phone: phone.trim() || null,
         company: company.trim() || null,
+        website: website.trim() || null,
+        email: email.trim().toLowerCase() || null,
+        phone: formatPhoneStorage(phone) || null,
         status,
+        tags: tags.length > 0 ? tags : null,
+        portal_pin: portalPin || null,
+        lookup_pin: portalPin || null, // keep both in sync
         notes: notes.trim() || null,
+        last_activity_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
 
@@ -117,52 +187,266 @@ const ClientModal = ({ isOpen, onClose, client, onSave }) => {
     }
   };
 
+  const initials = getInitials(name);
+  const avatarColor = getAvatarColor(name);
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="md">
+    <Modal isOpen={isOpen} onClose={onClose} size="lg" scrollBehavior="inside">
       <ModalOverlay bg="blackAlpha.800" />
       <ModalContent bg="surface.900" border="1px solid" borderColor="surface.800" mx={4}>
         <ModalHeader color="white" fontSize="md" pb={2}>
-          <HStack spacing={2}>
-            <Icon as={isEditing ? TbEdit : TbPlus} color="brand.500" boxSize={5} />
-            <Text>{isEditing ? 'Edit Client' : 'Add Client'}</Text>
+          <HStack spacing={3}>
+            {/* Avatar preview */}
+            <Box
+              w="36px"
+              h="36px"
+              borderRadius="full"
+              bg={name ? avatarColor : 'surface.800'}
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+              border="2px solid"
+              borderColor={name ? avatarColor : 'surface.700'}
+              transition="all 0.2s"
+            >
+              <Text color={name ? 'surface.950' : 'surface.500'} fontSize="xs" fontWeight="800">
+                {initials}
+              </Text>
+            </Box>
+            <VStack align="start" spacing={0}>
+              <Text>{isEditing ? 'Edit Client' : 'Add Client'}</Text>
+              {name && <Text fontSize="2xs" color="surface.500" fontWeight="500">{company || 'No company'}</Text>}
+            </VStack>
           </HStack>
         </ModalHeader>
         <ModalCloseButton color="surface.400" />
 
         <ModalBody>
-          <VStack spacing={4}>
-            <FormControl isRequired>
-              <FormLabel fontSize="xs" fontWeight="600" color="surface.500">Name</FormLabel>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name or business name" {...inputProps} />
-            </FormControl>
-            <FormControl>
-              <FormLabel fontSize="xs" fontWeight="600" color="surface.500">Email</FormLabel>
-              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@company.com" {...inputProps} />
-            </FormControl>
-            <HStack spacing={3} w="100%">
+          <VStack spacing={6} align="stretch">
+
+            {/* IDENTITY SECTION */}
+            <VStack align="stretch" spacing={3}>
+              <HStack spacing={2}>
+                <Box w="6px" h="6px" borderRadius="full" bg="accent.neon" />
+                <Text {...SECTION_LABEL_PROPS}>Identity</Text>
+              </HStack>
+
+              <FormControl isRequired>
+                <FormLabel fontSize="xs" fontWeight="600" color="surface.500">Name</FormLabel>
+                <InputGroup>
+                  <Input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Full name or business"
+                    {...inputProps}
+                  />
+                </InputGroup>
+              </FormControl>
+
+              <HStack spacing={3} align="flex-start">
+                <FormControl flex={1}>
+                  <FormLabel fontSize="xs" fontWeight="600" color="surface.500">Company</FormLabel>
+                  <Input
+                    value={company}
+                    onChange={(e) => setCompany(e.target.value)}
+                    placeholder="Company name"
+                    {...inputProps}
+                  />
+                </FormControl>
+                <FormControl flex={1}>
+                  <FormLabel fontSize="xs" fontWeight="600" color="surface.500">Website</FormLabel>
+                  <Input
+                    value={website}
+                    onChange={(e) => setWebsite(e.target.value)}
+                    placeholder="example.com"
+                    {...inputProps}
+                  />
+                </FormControl>
+              </HStack>
+            </VStack>
+
+            {/* CONTACT SECTION */}
+            <VStack align="stretch" spacing={3}>
+              <HStack spacing={2}>
+                <Box w="6px" h="6px" borderRadius="full" bg="brand.500" />
+                <Text {...SECTION_LABEL_PROPS} color="brand.500">Contact</Text>
+              </HStack>
+
+              <FormControl>
+                <FormLabel fontSize="xs" fontWeight="600" color="surface.500">Email</FormLabel>
+                <InputGroup>
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="email@company.com"
+                    {...inputProps}
+                  />
+                  {emailValid !== null && (
+                    <InputRightElement h="44px">
+                      <Icon
+                        as={emailValid ? TbCheck : TbAlertTriangle}
+                        color={emailValid ? 'accent.neon' : 'accent.banana'}
+                        boxSize={4}
+                      />
+                    </InputRightElement>
+                  )}
+                </InputGroup>
+              </FormControl>
+
               <FormControl>
                 <FormLabel fontSize="xs" fontWeight="600" color="surface.500">Phone</FormLabel>
-                <Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(970) 555-1234" {...inputProps} />
+                <InputGroup>
+                  <Input
+                    type="tel"
+                    value={phone}
+                    onChange={handlePhoneChange}
+                    placeholder="(970) 555-1234"
+                    {...inputProps}
+                  />
+                  {phoneValid !== null && (
+                    <InputRightElement h="44px">
+                      <Icon
+                        as={phoneValid ? TbCheck : TbAlertTriangle}
+                        color={phoneValid ? 'accent.neon' : 'accent.banana'}
+                        boxSize={4}
+                      />
+                    </InputRightElement>
+                  )}
+                </InputGroup>
               </FormControl>
+            </VStack>
+
+            {/* META SECTION - Status & Tags */}
+            <VStack align="stretch" spacing={3}>
+              <HStack spacing={2}>
+                <Box w="6px" h="6px" borderRadius="full" bg="accent.banana" />
+                <Text {...SECTION_LABEL_PROPS} color="accent.banana">Classify</Text>
+              </HStack>
+
               <FormControl>
                 <FormLabel fontSize="xs" fontWeight="600" color="surface.500">Status</FormLabel>
-                <Select value={status} onChange={(e) => setStatus(e.target.value)} {...inputProps}>
-                  <option value="active" style={{ background: '#0a0a0a' }}>Active</option>
-                  <option value="lead" style={{ background: '#0a0a0a' }}>Lead</option>
-                  <option value="inactive" style={{ background: '#0a0a0a' }}>Inactive</option>
-                </Select>
+                <HStack spacing={2}>
+                  {[
+                    { value: 'active', label: 'Active', color: '#39FF14' },
+                    { value: 'lead', label: 'Lead', color: '#FFE500' },
+                    { value: 'inactive', label: 'Inactive', color: '#737373' },
+                  ].map((s) => (
+                    <Box
+                      key={s.value}
+                      flex={1}
+                      py={2.5}
+                      borderRadius="lg"
+                      border="1px solid"
+                      borderColor={status === s.value ? s.color : 'surface.700'}
+                      bg={status === s.value ? `${s.color}12` : 'transparent'}
+                      cursor="pointer"
+                      onClick={() => setStatus(s.value)}
+                      transition="all 0.15s"
+                      textAlign="center"
+                      _hover={status !== s.value ? { borderColor: 'surface.500' } : {}}
+                    >
+                      <Text
+                        fontSize="xs"
+                        fontWeight="700"
+                        color={status === s.value ? s.color : 'surface.500'}
+                        letterSpacing="0.02em"
+                      >
+                        {s.label}
+                      </Text>
+                    </Box>
+                  ))}
+                </HStack>
               </FormControl>
-            </HStack>
-            <FormControl>
-              <FormLabel fontSize="xs" fontWeight="600" color="surface.500">Company</FormLabel>
-              <Input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Company or business name" {...inputProps} />
-            </FormControl>
+
+              <FormControl>
+                <FormLabel fontSize="xs" fontWeight="600" color="surface.500">Tags</FormLabel>
+                <Wrap spacing={1.5}>
+                  {PRESET_TAGS.map((t) => {
+                    const active = tags.includes(t.value);
+                    return (
+                      <WrapItem key={t.value}>
+                        <Box
+                          px={2.5}
+                          py={1}
+                          borderRadius="full"
+                          border="1px solid"
+                          borderColor={active ? t.color : 'surface.700'}
+                          bg={active ? `${t.color}15` : 'transparent'}
+                          cursor="pointer"
+                          onClick={() => toggleTag(t.value)}
+                          transition="all 0.15s"
+                          _hover={!active ? { borderColor: 'surface.500' } : {}}
+                        >
+                          <Text
+                            fontSize="2xs"
+                            fontWeight="700"
+                            color={active ? t.color : 'surface.500'}
+                            letterSpacing="0.02em"
+                          >
+                            {t.label}
+                          </Text>
+                        </Box>
+                      </WrapItem>
+                    );
+                  })}
+                </Wrap>
+              </FormControl>
+            </VStack>
+
+            {/* PORTAL ACCESS SECTION */}
+            <VStack align="stretch" spacing={3}>
+              <HStack spacing={2}>
+                <Box w="6px" h="6px" borderRadius="full" bg="#8B5CF6" />
+                <Text {...SECTION_LABEL_PROPS} color="#8B5CF6">Portal Access</Text>
+              </HStack>
+
+              <FormControl>
+                <FormLabel fontSize="xs" fontWeight="600" color="surface.500">Lookup PIN</FormLabel>
+                <HStack spacing={2}>
+                  <Box
+                    flex={1}
+                    bg="surface.850"
+                    border="1px solid"
+                    borderColor="surface.700"
+                    borderRadius="xl"
+                    h="44px"
+                    px={4}
+                    display="flex"
+                    alignItems="center"
+                    fontFamily="mono"
+                    fontSize="md"
+                    fontWeight="700"
+                    color="white"
+                    letterSpacing="0.15em"
+                  >
+                    {portalPin || '——————'}
+                  </Box>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    color="surface.500"
+                    h="44px"
+                    leftIcon={<TbRefresh size={14} />}
+                    onClick={regeneratePin}
+                    _hover={{ color: 'brand.500', bg: 'surface.850' }}
+                  >
+                    New
+                  </Button>
+                </HStack>
+                <Text fontSize="2xs" color="surface.600" mt={1.5}>
+                  Client uses this PIN to look up their projects on the portal
+                </Text>
+              </FormControl>
+            </VStack>
+
+            {/* NOTES SECTION */}
             <FormControl>
               <FormLabel fontSize="xs" fontWeight="600" color="surface.500">Notes</FormLabel>
               <Textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="Internal notes about this client"
+                placeholder="Internal notes, context, anything to remember"
                 bg="transparent"
                 border="1px solid"
                 borderColor="surface.700"
@@ -195,7 +479,7 @@ const ClientModal = ({ isOpen, onClose, client, onSave }) => {
               <Button size="sm" variant="ghost" color="surface.400" onClick={onClose}>Cancel</Button>
               <Button
                 size="sm" bg="brand.500" color="surface.950" fontWeight="700"
-                _hover={{ bg: 'brand.400' }}
+                _hover={{ bg: 'brand.400', transform: 'translateY(-1px)' }}
                 onClick={handleSave} isLoading={saving} loadingText="Saving..."
               >
                 {isEditing ? 'Save Changes' : 'Add Client'}
