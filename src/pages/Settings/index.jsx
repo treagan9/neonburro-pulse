@@ -1,6 +1,6 @@
 // src/pages/Settings/index.jsx
 import { useState, useEffect } from 'react';
-import { Box, VStack, Container, Text, Spinner, Center, HStack } from '@chakra-ui/react';
+import { Box, VStack, Container, Spinner, Divider } from '@chakra-ui/react';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
 import SettingsHeader from './components/SettingsHeader';
@@ -11,6 +11,10 @@ import SettingsNotifications from './components/SettingsNotifications';
 import SettingsTeam from './components/SettingsTeam';
 import SettingsAccountInfo from './components/SettingsAccountInfo';
 import SettingsFooter from './components/SettingsFooter';
+
+const SectionDivider = () => (
+  <Divider borderColor="surface.850" my={2} />
+);
 
 const Settings = () => {
   const { user } = useAuth();
@@ -44,19 +48,26 @@ const Settings = () => {
 
   return (
     <Box position="relative" minH="100%">
-      {/* Ambient background */}
+      {/* Ambient background - same as login */}
       <Box
         position="absolute"
-        top={0}
-        left={0}
-        right={0}
-        h="400px"
-        bg="radial-gradient(ellipse at top center, rgba(0,229,229,0.025), transparent 70%)"
+        top="-200px"
+        left="50%"
+        transform="translateX(-50%)"
+        w="800px"
+        h="800px"
+        borderRadius="full"
+        bg="radial-gradient(circle, rgba(0,229,229,0.04) 0%, transparent 60%)"
         pointerEvents="none"
       />
 
-      <Container maxW="540px" px={{ base: 4, md: 6 }} py={{ base: 6, md: 8 }} position="relative">
-        <VStack spacing={{ base: 6, md: 8 }} align="stretch">
+      <Container
+        maxW={{ base: '100%', md: '640px' }}
+        px={{ base: 4, md: 8 }}
+        py={{ base: 6, md: 12 }}
+        position="relative"
+      >
+        <VStack spacing={{ base: 8, md: 10 }} align="stretch">
           <SettingsHeader />
 
           <SettingsAvatar
@@ -65,17 +76,30 @@ const Settings = () => {
             setProfile={setProfile}
           />
 
+          <SectionDivider />
+
           <SettingsProfile
             user={user}
             profile={profile}
             setProfile={setProfile}
           />
 
+          <SectionDivider />
+
           <SettingsPassword user={user} />
+
+          <SectionDivider />
 
           <SettingsNotifications user={user} />
 
-          {isOwner && <SettingsTeam currentUserId={user.id} />}
+          {isOwner && (
+            <>
+              <SectionDivider />
+              <SettingsTeam currentUserId={user.id} />
+            </>
+          )}
+
+          <SectionDivider />
 
           <SettingsAccountInfo user={user} profile={profile} />
 

@@ -4,7 +4,7 @@ import {
   VStack, HStack, Text, Input, Button, FormControl,
   FormLabel, Icon, useToast, Box, InputGroup, InputRightElement,
 } from '@chakra-ui/react';
-import { TbLock, TbCheck, TbEye, TbEyeOff } from 'react-icons/tb';
+import { TbCheck, TbEye, TbEyeOff } from 'react-icons/tb';
 import { supabase } from '../../../lib/supabase';
 
 const inputProps = {
@@ -13,7 +13,7 @@ const inputProps = {
   borderColor: 'surface.700',
   color: 'white',
   fontSize: 'sm',
-  h: '44px',
+  h: '48px',
   borderRadius: 'xl',
   _hover: { borderColor: 'surface.500' },
   _focus: {
@@ -25,7 +25,7 @@ const inputProps = {
 
 const PasswordField = ({ label, value, onChange, autoComplete, show, onToggle }) => (
   <FormControl>
-    <FormLabel fontSize="xs" fontWeight="600" color="surface.500" mb={1.5}>
+    <FormLabel fontSize="2xs" fontWeight="700" color="surface.500" mb={2} textTransform="uppercase" letterSpacing="0.05em">
       {label}
     </FormLabel>
     <InputGroup>
@@ -38,7 +38,7 @@ const PasswordField = ({ label, value, onChange, autoComplete, show, onToggle })
         {...inputProps}
         pr={12}
       />
-      <InputRightElement h="44px" pr={2}>
+      <InputRightElement h="48px" pr={2}>
         <Box
           as="button"
           type="button"
@@ -46,7 +46,8 @@ const PasswordField = ({ label, value, onChange, autoComplete, show, onToggle })
           p={1.5}
           borderRadius="md"
           color="surface.500"
-          _hover={{ color: 'accent.banana', bg: 'surface.850' }}
+          opacity={0.6}
+          _hover={{ color: 'accent.banana', opacity: 1 }}
           transition="all 0.15s"
         >
           <Icon as={show ? TbEyeOff : TbEye} boxSize={4} />
@@ -116,97 +117,77 @@ const SettingsPassword = ({ user }) => {
   };
 
   return (
-    <Box
-      bg="surface.900"
-      border="1px solid"
-      borderColor="surface.800"
-      borderRadius="2xl"
-      p={5}
-      position="relative"
-      overflow="hidden"
-    >
-      <Box
-        position="absolute"
-        top={0}
-        right={0}
-        w="200px"
-        h="200px"
-        bg="radial-gradient(circle at top right, rgba(255,229,0,0.05), transparent 60%)"
-        pointerEvents="none"
+    <VStack spacing={5} align="stretch">
+      <HStack spacing={2.5} px={1}>
+        <Box w="6px" h="6px" borderRadius="full" bg="accent.banana" boxShadow="0 0 8px rgba(255,229,0,0.6)" />
+        <Text
+          fontSize="xs"
+          fontWeight="700"
+          letterSpacing="0.14em"
+          textTransform="uppercase"
+          color="accent.banana"
+          fontFamily="mono"
+        >
+          Password
+        </Text>
+      </HStack>
+
+      <PasswordField
+        label="Current password"
+        value={currentPassword}
+        onChange={(e) => setCurrentPassword(e.target.value)}
+        autoComplete="current-password"
+        show={showCurrent}
+        onToggle={() => setShowCurrent(!showCurrent)}
       />
 
-      <VStack spacing={5} align="stretch" position="relative">
-        <HStack spacing={2}>
-          <Box w="6px" h="6px" borderRadius="full" bg="accent.banana" boxShadow="0 0 8px rgba(255,229,0,0.6)" />
-          <Text
-            fontSize="xs"
-            fontWeight="700"
-            letterSpacing="0.12em"
-            textTransform="uppercase"
-            color="accent.banana"
-            fontFamily="mono"
-          >
-            Password
-          </Text>
-        </HStack>
+      <PasswordField
+        label="New password"
+        value={newPassword}
+        onChange={(e) => setNewPassword(e.target.value)}
+        autoComplete="new-password"
+        show={showNew}
+        onToggle={() => setShowNew(!showNew)}
+      />
 
-        <PasswordField
-          label="Current password"
-          value={currentPassword}
-          onChange={(e) => setCurrentPassword(e.target.value)}
-          autoComplete="current-password"
-          show={showCurrent}
-          onToggle={() => setShowCurrent(!showCurrent)}
-        />
+      <PasswordField
+        label="Confirm new password"
+        value={confirmPassword}
+        onChange={(e) => setConfirmPassword(e.target.value)}
+        autoComplete="new-password"
+        show={showConfirm}
+        onToggle={() => setShowConfirm(!showConfirm)}
+      />
 
-        <PasswordField
-          label="New password"
-          value={newPassword}
-          onChange={(e) => setNewPassword(e.target.value)}
-          autoComplete="new-password"
-          show={showNew}
-          onToggle={() => setShowNew(!showNew)}
-        />
-
-        <PasswordField
-          label="Confirm new password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          autoComplete="new-password"
-          show={showConfirm}
-          onToggle={() => setShowConfirm(!showConfirm)}
-        />
-
-        <Button
-          w="100%"
-          h="44px"
-          borderRadius="xl"
-          fontSize="sm"
-          fontWeight="700"
-          isLoading={changing}
-          loadingText="Updating..."
-          onClick={handleChange}
-          isDisabled={!currentPassword || !newPassword || !confirmPassword}
-          leftIcon={changed ? <TbCheck /> : undefined}
-          bg={changed ? 'accent.neon' : 'accent.banana'}
-          color="surface.950"
-          transition="all 0.2s"
-          _hover={{
-            bg: changed ? 'accent.neon' : '#E6CE00',
-            transform: 'translateY(-1px)',
-            boxShadow: '0 8px 20px rgba(255,229,0,0.25)',
-          }}
-          _active={{ transform: 'translateY(0)' }}
-          _disabled={{
-            opacity: 0.3,
-            cursor: 'not-allowed',
-            _hover: { transform: 'none', boxShadow: 'none' },
-          }}
-        >
-          {changed ? 'Password Updated' : 'Change Password'}
-        </Button>
-      </VStack>
-    </Box>
+      <Button
+        w="100%"
+        h="48px"
+        borderRadius="xl"
+        fontSize="sm"
+        fontWeight="700"
+        isLoading={changing}
+        loadingText="Updating..."
+        onClick={handleChange}
+        isDisabled={!currentPassword || !newPassword || !confirmPassword}
+        leftIcon={changed ? <TbCheck /> : undefined}
+        bg={changed ? 'accent.neon' : 'accent.banana'}
+        color="surface.950"
+        transition="all 0.2s"
+        _hover={{
+          bg: changed ? 'accent.neon' : '#E6CE00',
+          transform: 'translateY(-1px)',
+          boxShadow: '0 8px 20px rgba(255,229,0,0.25)',
+        }}
+        _active={{ transform: 'translateY(0)' }}
+        _disabled={{
+          opacity: 0.3,
+          cursor: 'not-allowed',
+          _hover: { transform: 'none', boxShadow: 'none' },
+        }}
+      >
+        {changed ? 'Password Updated' : 'Change Password'}
+      </Button>
+    </VStack>
   );
 };
 

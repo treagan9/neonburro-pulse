@@ -6,7 +6,7 @@ import {
   ModalHeader, ModalBody, ModalFooter, ModalCloseButton,
   FormControl, FormLabel, useDisclosure,
 } from '@chakra-ui/react';
-import { TbUsers, TbUserPlus, TbCrown, TbShield, TbUser, TbMail, TbDots } from 'react-icons/tb';
+import { TbUserPlus, TbCrown, TbShield, TbUser, TbMail } from 'react-icons/tb';
 import { supabase } from '../../../lib/supabase';
 import Avatar from '../../../components/common/Avatar';
 import { usePresence } from '../../../hooks/usePresence';
@@ -24,7 +24,7 @@ const inputProps = {
   borderColor: 'surface.700',
   color: 'white',
   fontSize: 'sm',
-  h: '44px',
+  h: '48px',
   borderRadius: 'xl',
   _hover: { borderColor: 'surface.500' },
   _focus: { borderColor: 'brand.500', boxShadow: '0 0 0 1px var(--chakra-colors-brand-500)' },
@@ -44,13 +44,14 @@ const TeamMemberRow = ({ member, currentUserId, onRoleChange }) => {
       px={3}
       borderRadius="lg"
       transition="all 0.15s"
-      _hover={{ bg: 'surface.850' }}
+      border="1px solid transparent"
+      _hover={{ bg: 'rgba(255,255,255,0.02)', borderColor: 'surface.850' }}
     >
       <HStack spacing={3} flex={1} minW={0}>
         <Avatar
           name={member.display_name || member.username || member.email}
           url={member.avatar_url}
-          size="sm"
+          size="md"
           presence={status}
         />
         <Box flex={1} minW={0}>
@@ -62,7 +63,7 @@ const TeamMemberRow = ({ member, currentUserId, onRoleChange }) => {
               <Text fontSize="2xs" color="surface.600" fontFamily="mono">you</Text>
             )}
           </HStack>
-          <HStack spacing={2}>
+          <HStack spacing={2} mt={0.5}>
             {member.username && (
               <Text color="surface.500" fontSize="2xs" fontFamily="mono">@{member.username}</Text>
             )}
@@ -96,9 +97,9 @@ const TeamMemberRow = ({ member, currentUserId, onRoleChange }) => {
           color="surface.300"
           fontSize="2xs"
           fontWeight="700"
-          h="28px"
+          h="32px"
           borderRadius="md"
-          w="80px"
+          w="90px"
           _hover={{ borderColor: 'surface.500' }}
           _focus={{ borderColor: 'brand.500', boxShadow: 'none' }}
           cursor="pointer"
@@ -169,7 +170,7 @@ const InviteModal = ({ isOpen, onClose, onInvited }) => {
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="md">
       <ModalOverlay bg="blackAlpha.800" />
-      <ModalContent bg="surface.900" border="1px solid" borderColor="surface.800" mx={4}>
+      <ModalContent bg="surface.950" border="1px solid" borderColor="surface.800" mx={4}>
         <ModalHeader color="white" fontSize="md">
           <HStack spacing={2}>
             <Icon as={TbUserPlus} color="brand.500" boxSize={5} />
@@ -180,7 +181,9 @@ const InviteModal = ({ isOpen, onClose, onInvited }) => {
         <ModalBody>
           <VStack spacing={4}>
             <FormControl isRequired>
-              <FormLabel fontSize="xs" fontWeight="600" color="surface.500">Email</FormLabel>
+              <FormLabel fontSize="2xs" fontWeight="700" color="surface.500" textTransform="uppercase" letterSpacing="0.05em">
+                Email
+              </FormLabel>
               <Input
                 type="email"
                 value={email}
@@ -191,7 +194,9 @@ const InviteModal = ({ isOpen, onClose, onInvited }) => {
               />
             </FormControl>
             <FormControl>
-              <FormLabel fontSize="xs" fontWeight="600" color="surface.500">Display name</FormLabel>
+              <FormLabel fontSize="2xs" fontWeight="700" color="surface.500" textTransform="uppercase" letterSpacing="0.05em">
+                Display name
+              </FormLabel>
               <Input
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
@@ -200,13 +205,15 @@ const InviteModal = ({ isOpen, onClose, onInvited }) => {
               />
             </FormControl>
             <FormControl>
-              <FormLabel fontSize="xs" fontWeight="600" color="surface.500">Role</FormLabel>
+              <FormLabel fontSize="2xs" fontWeight="700" color="surface.500" textTransform="uppercase" letterSpacing="0.05em">
+                Role
+              </FormLabel>
               <HStack spacing={2}>
                 {['admin', 'staff', 'team'].map((r) => (
                   <Box
                     key={r}
                     flex={1}
-                    py={2.5}
+                    py={3}
                     borderRadius="lg"
                     border="1px solid"
                     borderColor={role === r ? ROLE_CONFIG[r].color : 'surface.700'}
@@ -280,77 +287,58 @@ const SettingsTeam = ({ currentUserId }) => {
   };
 
   return (
-    <Box
-      bg="surface.900"
-      border="1px solid"
-      borderColor="surface.800"
-      borderRadius="2xl"
-      p={5}
-      position="relative"
-      overflow="hidden"
-    >
-      <Box
-        position="absolute"
-        top={0}
-        right={0}
-        w="200px"
-        h="200px"
-        bg="radial-gradient(circle at top right, rgba(255,229,0,0.06), transparent 60%)"
-        pointerEvents="none"
-      />
-
-      <VStack spacing={4} align="stretch" position="relative">
-        <HStack justify="space-between">
-          <HStack spacing={2}>
-            <Box w="6px" h="6px" borderRadius="full" bg="accent.banana" boxShadow="0 0 8px rgba(255,229,0,0.6)" />
-            <Text
-              fontSize="xs"
-              fontWeight="700"
-              letterSpacing="0.12em"
-              textTransform="uppercase"
-              color="accent.banana"
-              fontFamily="mono"
-            >
-              Team
-            </Text>
-            <Text fontSize="2xs" color="surface.600" fontFamily="mono">
-              · {members.length} member{members.length !== 1 ? 's' : ''}
-            </Text>
-          </HStack>
-          <Button
-            size="xs"
-            leftIcon={<TbUserPlus size={12} />}
-            bg="brand.500"
-            color="surface.950"
+    <VStack spacing={5} align="stretch">
+      <HStack justify="space-between" px={1}>
+        <HStack spacing={2.5}>
+          <Box w="6px" h="6px" borderRadius="full" bg="accent.banana" boxShadow="0 0 8px rgba(255,229,0,0.6)" />
+          <Text
+            fontSize="xs"
             fontWeight="700"
-            borderRadius="md"
-            onClick={onOpen}
-            _hover={{ bg: 'brand.400' }}
+            letterSpacing="0.14em"
+            textTransform="uppercase"
+            color="accent.banana"
+            fontFamily="mono"
           >
-            Invite
-          </Button>
+            Team
+          </Text>
+          <Text fontSize="2xs" color="surface.600" fontFamily="mono">
+            · {members.length} member{members.length !== 1 ? 's' : ''}
+          </Text>
         </HStack>
+        <Button
+          size="xs"
+          leftIcon={<TbUserPlus size={12} />}
+          bg="brand.500"
+          color="surface.950"
+          fontWeight="700"
+          borderRadius="md"
+          h="28px"
+          onClick={onOpen}
+          _hover={{ bg: 'brand.400' }}
+        >
+          Invite
+        </Button>
+      </HStack>
 
-        {loading ? (
-          <Center py={6}>
-            <Spinner size="sm" color="brand.500" thickness="2px" />
-          </Center>
-        ) : (
-          <VStack spacing={1} align="stretch">
-            {members.map((member) => (
-              <TeamMemberRow
-                key={member.id}
-                member={member}
-                currentUserId={currentUserId}
-                onRoleChange={handleRoleChange}
-              />
-            ))}
-          </VStack>
-        )}
-      </VStack>
+      {loading ? (
+        <Center py={6}>
+          <Spinner size="sm" color="brand.500" thickness="2px" />
+        </Center>
+      ) : (
+        <VStack spacing={1} align="stretch">
+          {members.map((member) => (
+            <TeamMemberRow
+              key={member.id}
+              member={member}
+              currentUserId={currentUserId}
+              onRoleChange={handleRoleChange}
+            />
+          ))}
+        </VStack>
+      )}
 
       <InviteModal isOpen={isOpen} onClose={onClose} onInvited={fetchMembers} />
-    </Box>
+    </VStack>
   );
 };
 
