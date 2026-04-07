@@ -130,7 +130,7 @@ const buildClientEmail = ({ invoice, client, project, lineItems, totalAmount, to
     return `
       <tr>
         <td style="padding:16px 20px;border-bottom:1px solid #1f1f1f;">
-          <div style="color:#737373;font-size:10px;font-family:monospace;font-weight:700;margin-bottom:4px;">SPRINT ${String(idx + 1).padStart(2, '0')}</div>
+          <div style="color:#737373;font-size:10px;font-family:monospace;font-weight:700;margin-bottom:4px;">${item.sprint_number || `SPRINT ${String(idx + 1).padStart(2, '0')}`}</div>
           <div style="color:#ffffff;font-weight:700;font-size:15px;line-height:1.3;margin-bottom:4px;">${item.title}</div>
           ${item.description ? `<div style="color:#a0a0a0;font-size:13px;line-height:1.6;margin-bottom:8px;">${item.description}</div>` : ''}
           <div style="display:inline-block;background:${modeBg};color:${modeColor};font-size:10px;font-weight:700;padding:3px 10px;border-radius:100px;border:1px solid ${modeColor}40;margin-bottom:10px;">${getFundingLabel(mode)}</div>
@@ -432,6 +432,7 @@ export const handler = async (event) => {
       project_name: project?.name,
       project_number: project?.project_number,
       line_items: items.map((item) => ({
+        sprint_number: item.sprint_number,
         title: item.title,
         description: item.description,
         amount: parseFloat(item.amount || 0),

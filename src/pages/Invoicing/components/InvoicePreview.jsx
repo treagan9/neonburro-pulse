@@ -189,7 +189,7 @@ const InvoicePreview = ({ isOpen, onClose, invoice, onSent }) => {
                           </Box>
                         )}
                         <Text color="surface.600" fontSize="2xs" fontFamily="mono" fontWeight="700" mb={0.5}>
-                          SPRINT {String(idx + 1).padStart(2, '0')}
+                          {sprint.sprint_number || `SPRINT ${String(idx + 1).padStart(2, '0')}`}
                         </Text>
                         <Text color="white" fontSize="sm" fontWeight="700" mb={1}>{sprint.title}</Text>
                         {sprint.description && (

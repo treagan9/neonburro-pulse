@@ -31,27 +31,16 @@ const inputProps = {
   _placeholder: { color: 'surface.600' },
 };
 
-const generateInvoiceNumber = async (projectNumber) => {
-  const now = new Date();
-  const year = now.getFullYear().toString().slice(-2);
-  const month = (now.getMonth() + 1).toString().padStart(2, '0');
-  const day = now.getDate().toString().padStart(2, '0');
-  const prefix = projectNumber || `NB-${year}${month}${day}`;
-
-  const { data } = await supabase
-    .from('invoices')
-    .select('invoice_number')
-    .like('invoice_number', `INV-${prefix}-%`)
-    .order('invoice_number', { ascending: false })
-    .limit(1);
-
-  let seq = 1;
-  if (data && data.length > 0 && data[0].invoice_number) {
-    const last = parseInt(data[0].invoice_number.split('-').pop()) || 0;
-    seq = last + 1;
-  }
-
-  return `INV-${prefix}-${seq.toString().padStart(3, '0')}`;
+// Sprint numbers are now generated atomically by the database
+// using the next_sprint_number() function. Each sprint gets its own
+// permanent number in format: NB + YYMM + sequence (e.g., NB260401)
+//
+// The "invoice number" stored on the invoices table is the FIRST
+// sprint number in the bundle, used as the parent reference.
+const generateNextSprintNumber = async () => {
+  const { data, error } = await supabase.rpc('next_sprint_number');
+  if (error) throw error;
+  return data;
 };
 
 // ============================================================
@@ -94,8 +83,13 @@ const SprintRow = ({ sprint, index, onChange, onRemove }) => {
       <HStack justify="space-between" mb={2}>
         <HStack spacing={2}>
           <Text color="accent.neon" fontSize="2xs" fontFamily="mono" fontWeight="700">
-            SPRINT {String(index + 1).padStart(2, '0')}
+            {sprint.sprint_number || `SPRINT ${String(index + 1).padStart(2, '0')}`}
           </Text>
+          {!sprint.sprint_number && (
+            <Text color="surface.600" fontSize="2xs" fontStyle="italic">
+              (number assigned on save)
+            </Text>
+          )}
         </HStack>
         {!isLocked && (
           <IconButton
@@ -435,6 +429,7 @@ const InvoiceModal = ({ isOpen, onClose, invoice, projects, clients, onSave }) =
       setSprints(
         (invoice.line_items || []).map((item) => ({
           id: item.id,
+          sprint_number: item.sprint_number || null,
           title: item.title || '',
           description: item.description || '',
           amount: item.amount || '',
@@ -537,18 +532,44 @@ const InvoiceModal = ({ isOpen, onClose, invoice, projects, clients, onSave }) =
         }).eq('id', invoice.id);
         if (error) throw error;
 
-        // Only delete unlocked items
+        // Only delete unlocked items that don't have a sprint_number yet
+        // (locked items keep their sprint_number permanently)
+        // Get all current items so we can preserve sprint_numbers on edit
+        const { data: existingItems } = await supabase
+          .from('invoice_items')
+          .select('id, sprint_number, locked')
+          .eq('invoice_id', invoice.id);
+
+        const lockedIds = new Set(
+          (existingItems || []).filter(i => i.locked).map(i => i.id)
+        );
+
+        // Delete only unlocked items
         await supabase.from('invoice_items').delete().eq('invoice_id', invoice.id).eq('locked', false);
 
-        // Insert non-locked items
-        const itemsToInsert = validSprints.filter(s => !s.locked).map((item, idx) => ({
-          invoice_id: invoice.id,
-          title: item.title.trim(),
-          description: item.description?.trim() || null,
-          amount: parseFloat(item.amount || 0),
-          payment_mode: item.payment_mode,
-          sort_order: idx,
-        }));
+        // Build items to insert - assign new sprint numbers ONLY to brand new items
+        // Existing items being re-saved keep their sprint_number
+        const itemsToInsert = [];
+        for (let idx = 0; idx < validSprints.length; idx++) {
+          const item = validSprints[idx];
+          if (item.locked) continue; // skip locked items, they're untouched
+          
+          // If this item already had a sprint_number, keep it; otherwise generate new
+          let sprintNum = item.sprint_number;
+          if (!sprintNum) {
+            sprintNum = await generateNextSprintNumber();
+          }
+          
+          itemsToInsert.push({
+            invoice_id: invoice.id,
+            sprint_number: sprintNum,
+            title: item.title.trim(),
+            description: item.description?.trim() || null,
+            amount: parseFloat(item.amount || 0),
+            payment_mode: item.payment_mode,
+            sort_order: idx,
+          });
+        }
 
         if (itemsToInsert.length > 0) {
           const { error: itemsError } = await supabase.from('invoice_items').insert(itemsToInsert);
@@ -557,7 +578,14 @@ const InvoiceModal = ({ isOpen, onClose, invoice, projects, clients, onSave }) =
 
         toast({ title: 'Invoice updated', status: 'success', duration: 2000 });
       } else {
-        const invoiceNumber = await generateInvoiceNumber(selectedProject?.project_number);
+        // NEW INVOICE: Generate sprint numbers for all sprints
+        // The invoice_number will be the FIRST sprint number (acts as the parent reference)
+        const sprintNumbers = [];
+        for (let i = 0; i < validSprints.length; i++) {
+          const num = await generateNextSprintNumber();
+          sprintNumbers.push(num);
+        }
+        const invoiceNumber = sprintNumbers[0]; // First sprint is the invoice ref
 
         const { data: newInvoice, error } = await supabase.from('invoices').insert({
           project_id: projectId || null,
@@ -572,6 +600,7 @@ const InvoiceModal = ({ isOpen, onClose, invoice, projects, clients, onSave }) =
         const { error: itemsError } = await supabase.from('invoice_items').insert(
           validSprints.map((item, idx) => ({
             invoice_id: newInvoice.id,
+            sprint_number: sprintNumbers[idx],
             title: item.title.trim(),
             description: item.description?.trim() || null,
             amount: parseFloat(item.amount || 0),
@@ -589,6 +618,7 @@ const InvoiceModal = ({ isOpen, onClose, invoice, projects, clients, onSave }) =
           entity_id: newInvoice.id,
           metadata: {
             invoice_number: invoiceNumber,
+            sprint_numbers: sprintNumbers,
             total,
             sprints_count: validSprints.length,
             client_name: localClients.find((c) => c.id === clientId)?.name,
@@ -596,7 +626,12 @@ const InvoiceModal = ({ isOpen, onClose, invoice, projects, clients, onSave }) =
           created_at: new Date().toISOString(),
         });
 
-        toast({ title: 'Invoice created', description: invoiceNumber, status: 'success', duration: 3000 });
+        toast({ 
+          title: 'Invoice created', 
+          description: `${sprintNumbers.length} sprint${sprintNumbers.length > 1 ? 's' : ''}: ${sprintNumbers.join(', ')}`, 
+          status: 'success', 
+          duration: 4000 
+        });
       }
 
       onSave();
