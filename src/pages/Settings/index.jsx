@@ -1,11 +1,15 @@
 // src/pages/Settings/index.jsx
 import { useState, useEffect } from 'react';
-import { Box, VStack, Text, Divider } from '@chakra-ui/react';
+import { Box, VStack, Container, Text, Spinner, Center, HStack } from '@chakra-ui/react';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
+import SettingsHeader from './components/SettingsHeader';
 import SettingsAvatar from './components/SettingsAvatar';
 import SettingsProfile from './components/SettingsProfile';
 import SettingsPassword from './components/SettingsPassword';
+import SettingsNotifications from './components/SettingsNotifications';
+import SettingsTeam from './components/SettingsTeam';
+import SettingsAccountInfo from './components/SettingsAccountInfo';
 import SettingsFooter from './components/SettingsFooter';
 
 const Settings = () => {
@@ -28,46 +32,56 @@ const Settings = () => {
     setLoading(false);
   };
 
+  const isOwner = profile?.role === 'owner';
+
   if (loading) {
     return (
-      <Box p={{ base: 4, md: 6 }}>
-        <Text color="surface.500" fontSize="sm">Loading settings...</Text>
+      <Box minH="60vh" display="flex" alignItems="center" justifyContent="center">
+        <Spinner size="md" color="brand.500" thickness="2px" />
       </Box>
     );
   }
 
   return (
-    <Box p={{ base: 4, md: 6 }}>
-      <VStack spacing={8} align="stretch" maxW="400px">
-        <Box>
-          <Text fontSize="2xl" fontWeight="700" color="white">Settings</Text>
-          <Text color="surface.500" fontSize="sm" mt={0.5}>
-            Manage your profile and account
-          </Text>
-        </Box>
+    <Box position="relative" minH="100%">
+      {/* Ambient background */}
+      <Box
+        position="absolute"
+        top={0}
+        left={0}
+        right={0}
+        h="400px"
+        bg="radial-gradient(ellipse at top center, rgba(0,229,229,0.025), transparent 70%)"
+        pointerEvents="none"
+      />
 
-        <SettingsAvatar
-          user={user}
-          profile={profile}
-          setProfile={setProfile}
-        />
+      <Container maxW="540px" px={{ base: 4, md: 6 }} py={{ base: 6, md: 8 }} position="relative">
+        <VStack spacing={{ base: 6, md: 8 }} align="stretch">
+          <SettingsHeader />
 
-        <Divider borderColor="surface.800" />
+          <SettingsAvatar
+            user={user}
+            profile={profile}
+            setProfile={setProfile}
+          />
 
-        <SettingsProfile
-          user={user}
-          profile={profile}
-          setProfile={setProfile}
-        />
+          <SettingsProfile
+            user={user}
+            profile={profile}
+            setProfile={setProfile}
+          />
 
-        <Divider borderColor="surface.800" />
+          <SettingsPassword user={user} />
 
-        <SettingsPassword user={user} />
+          <SettingsNotifications user={user} />
 
-        <Divider borderColor="surface.800" />
+          {isOwner && <SettingsTeam currentUserId={user.id} />}
 
-        <SettingsFooter user={user} />
-      </VStack>
+          <SettingsAccountInfo user={user} profile={profile} />
+
+          <SettingsFooter user={user} />
+        </VStack>
+      </Container>
     </Box>
   );
 };
