@@ -266,6 +266,17 @@ const buildClientEmail = ({ invoice, client, project, lineItems, totalAmount, to
       </td>
     </tr>
     <tr>
+      <td style="padding:20px 40px;background:#0a0a0a;border-top:1px solid #1f1f1f;">
+        <div style="background:#141414;border:1px solid #1f1f1f;border-radius:10px;padding:14px 16px;text-align:center;">
+          <div style="color:#525252;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px;">Lost this email?</div>
+          <div style="color:#a0a0a0;font-size:11px;line-height:1.5;">
+            Look up your invoices anytime at <a href="https://neonburro.com/account/lookup/" style="color:#00E5E5;text-decoration:none;font-weight:600;">neonburro.com/account/lookup</a>
+            ${client?.portal_pin || client?.lookup_pin ? `<br>Your PIN: <strong style="color:#00E5E5;font-family:monospace;letter-spacing:2px;">${client.portal_pin || client.lookup_pin}</strong>` : ''}
+          </div>
+        </div>
+      </td>
+    </tr>
+    <tr>
       <td style="padding:18px 40px;border-top:1px solid #1f1f1f;text-align:center;">
         <div style="color:#737373;font-size:11px;">Real people. Clear responses.</div>
         <div style="color:#525252;font-size:10px;margin-top:6px;">Neon Burro · Powered by The Burroship, LLC</div>

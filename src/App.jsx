@@ -10,6 +10,9 @@ import Login         from './pages/Auth/Login';
 import ResetPassword from './pages/Auth/ResetPassword';
 import AcceptInvite  from './pages/Auth/AcceptInvite';
 
+// PIN approval (public - validated by one-time token from email)
+import PinApproval   from './pages/PinApproval';
+
 // Protected pages
 import Dashboard     from './pages/Dashboard';
 import Clients       from './pages/Clients';
@@ -37,6 +40,10 @@ function App() {
         <Route path="/login/" element={<Login />} />
         <Route path="/reset-password/" element={<ResetPassword />} />
         <Route path="/accept-invite/" element={<AcceptInvite />} />
+
+        {/* Public PIN approval route - validated by one-time token */}
+        <Route path="/pin-approval/" element={<PinApproval />} />
+        <Route path="/pin-approval" element={<PinApproval />} />
 
         {/* Protected admin routes */}
         <Route element={<ProtectedRoute />}>
