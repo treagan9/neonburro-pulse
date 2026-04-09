@@ -1,5 +1,5 @@
 // src/components/Layout/Sidebar.jsx
-// Icon-free nav - cleaner, type-led
+// Icon-free nav, Projects removed - clients are the source of truth
 import { useState, useEffect } from 'react';
 import {
   Box, VStack, HStack, Text, Divider, Avatar,
@@ -11,7 +11,6 @@ import { supabase } from '../../lib/supabase';
 const NAV_ITEMS = [
   { path: '/dashboard/', label: 'Dashboard' },
   { path: '/clients/', label: 'Clients' },
-  { path: '/projects/', label: 'Projects' },
   { path: '/invoicing/', label: 'Invoicing' },
   { path: '/forms/', label: 'Forms' },
   { path: '/calendar/', label: 'Calendar' },
@@ -56,7 +55,6 @@ const Sidebar = () => {
       display={{ base: 'none', lg: 'flex' }}
       flexDirection="column"
     >
-      {/* Logo + user */}
       <HStack px={5} py={4} spacing={3}>
         <Avatar
           size="sm"
@@ -76,7 +74,6 @@ const Sidebar = () => {
 
       <Divider borderColor="surface.800" />
 
-      {/* Nav items - text only, no icons */}
       <VStack spacing={0.5} px={3} py={3} align="stretch" flex={1}>
         {NAV_ITEMS.map((item) => {
           const active = isActive(item.path);
@@ -119,7 +116,6 @@ const Sidebar = () => {
         })}
       </VStack>
 
-      {/* Footer */}
       <Box px={5} py={3} borderTop="1px solid" borderColor="surface.800">
         <Text color="surface.700" fontSize="2xs" fontFamily="mono">PULSE v1.0</Text>
       </Box>

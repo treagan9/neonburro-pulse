@@ -1,12 +1,13 @@
 // src/pages/Clients/components/ClientGrid.jsx
-// Row-based list view - Linear/Stripe DNA
-// Each row is a single line with avatar, name, company, stats, tags
+// Row-based list. Click row -> /clients/:id/ detail page
+// Hover shows an edit icon that opens the modal for quick edits
 
 import {
   Box, VStack, HStack, Text, Icon, Center, Spinner, Button,
 } from '@chakra-ui/react';
-import { TbUsers, TbBolt, TbFolder } from 'react-icons/tb';
-import { formatPhoneDisplay, getInitials, getAvatarColor, timeAgo } from '../../../utils/phone';
+import { useNavigate } from 'react-router-dom';
+import { TbUsers, TbBolt, TbFolder, TbEdit } from 'react-icons/tb';
+import { getInitials, getAvatarColor, timeAgo } from '../../../utils/phone';
 
 const STATUS_DOT = {
   active:   '#39FF14',
@@ -32,6 +33,7 @@ const currency = (val) => {
 };
 
 const ClientRow = ({ client, onEdit }) => {
+  const navigate = useNavigate();
   const initials = getInitials(client.name);
   const avatarColor = getAvatarColor(client.name);
   const statusColor = STATUS_DOT[client.status] || STATUS_DOT.active;
@@ -39,6 +41,11 @@ const ClientRow = ({ client, onEdit }) => {
   const projectCount = client.project_count || 0;
   const totalFunded = client.total_funded || 0;
   const tags = client.tags || [];
+
+  const handleEditClick = (e) => {
+    e.stopPropagation();
+    onEdit(client);
+  };
 
   return (
     <Box
@@ -52,7 +59,7 @@ const ClientRow = ({ client, onEdit }) => {
       cursor="pointer"
       transition="all 0.15s ease-out"
       role="group"
-      onClick={() => onEdit(client)}
+      onClick={() => navigate(`/clients/${client.id}/`)}
       _hover={{
         borderLeftColor: avatarColor,
         bg: 'rgba(255,255,255,0.015)',
@@ -88,13 +95,12 @@ const ClientRow = ({ client, onEdit }) => {
           </Text>
         </Box>
 
-        {/* Name + company */}
+        {/* Name + company + tags */}
         <VStack align="start" spacing={0} flex={1} minW={0}>
           <HStack spacing={2}>
             <Text color="white" fontSize="sm" fontWeight="700" noOfLines={1}>
               {client.name}
             </Text>
-            {/* Tag dots - just colored circles, no text */}
             {tags.length > 0 && (
               <HStack spacing={1}>
                 {tags.slice(0, 3).map((tag) => (
@@ -120,7 +126,7 @@ const ClientRow = ({ client, onEdit }) => {
                 {client.company}
               </Text>
             )}
-            {client.email && !client.company && (
+            {!client.company && client.email && (
               <Text color="surface.500" fontSize="xs" noOfLines={1}>
                 {client.email}
               </Text>
@@ -128,7 +134,7 @@ const ClientRow = ({ client, onEdit }) => {
           </HStack>
         </VStack>
 
-        {/* Stats - mono inline */}
+        {/* Stats */}
         <HStack spacing={5} display={{ base: 'none', md: 'flex' }}>
           {projectCount > 0 && (
             <HStack spacing={1.5}>
@@ -167,6 +173,21 @@ const ClientRow = ({ client, onEdit }) => {
         >
           {timeAgo(client.last_activity_at || client.created_at)}
         </Text>
+
+        {/* Edit icon - only visible on hover */}
+        <Box
+          as="button"
+          onClick={handleEditClick}
+          opacity={0}
+          color="surface.600"
+          p={1}
+          borderRadius="md"
+          transition="all 0.15s"
+          _groupHover={{ opacity: 0.6 }}
+          _hover={{ opacity: '1 !important', color: 'brand.500', bg: 'surface.850' }}
+        >
+          <Icon as={TbEdit} boxSize={3.5} />
+        </Box>
       </HStack>
     </Box>
   );
@@ -196,9 +217,7 @@ const ClientGrid = ({ clients, loading, onEdit, onAdd, isEmpty }) => {
               {isEmpty ? 'No clients yet' : 'No matches'}
             </Text>
             <Text color="surface.500" fontSize="xs">
-              {isEmpty
-                ? 'Add your first client to the herd'
-                : 'Try a different search or filter'}
+              {isEmpty ? 'Add your first client to the herd' : 'Try a different search or filter'}
             </Text>
           </VStack>
           {isEmpty && (
@@ -222,10 +241,7 @@ const ClientGrid = ({ clients, loading, onEdit, onAdd, isEmpty }) => {
   }
 
   return (
-    <Box
-      borderTop="1px solid"
-      borderColor="surface.900"
-    >
+    <Box borderTop="1px solid" borderColor="surface.900">
       {clients.map((client) => (
         <ClientRow key={client.id} client={client} onEdit={onEdit} />
       ))}

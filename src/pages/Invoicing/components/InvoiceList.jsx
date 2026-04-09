@@ -1,175 +1,195 @@
 // src/pages/Invoicing/components/InvoiceList.jsx
-import {
-  Box, VStack, HStack, Text, Icon, Badge, Center,
-  Spinner, Divider, Button, IconButton, Tooltip,
-} from '@chakra-ui/react';
-import {
-  TbFileInvoice, TbMail, TbCheck, TbClock,
-  TbAlertTriangle, TbEye, TbSend,
-} from 'react-icons/tb';
-import { format } from 'date-fns';
+// Row-based list of invoices, clean and scannable
 
-const STATUS_CONFIG = {
-  draft:     { label: 'Draft',     icon: TbFileInvoice,   color: 'surface.500', bg: 'rgba(128,128,128,0.08)', border: 'rgba(128,128,128,0.25)' },
-  sent:      { label: 'Sent',      icon: TbMail,          color: 'brand.500',   bg: 'rgba(0,229,229,0.08)',   border: 'rgba(0,229,229,0.25)' },
-  viewed:    { label: 'Viewed',    icon: TbEye,           color: 'accent.banana', bg: 'rgba(255,229,0,0.08)', border: 'rgba(255,229,0,0.25)' },
-  paid:      { label: 'Paid',      icon: TbCheck,         color: 'accent.neon', bg: 'rgba(57,255,20,0.08)',   border: 'rgba(57,255,20,0.25)' },
-  overdue:   { label: 'Overdue',   icon: TbAlertTriangle, color: 'status.red',  bg: 'rgba(255,51,102,0.08)', border: 'rgba(255,51,102,0.25)' },
-  cancelled: { label: 'Cancelled', icon: TbFileInvoice,   color: 'surface.600', bg: 'rgba(128,128,128,0.06)', border: 'rgba(128,128,128,0.15)' },
+import {
+  Box, HStack, VStack, Text, Icon, Center, Spinner, Button,
+} from '@chakra-ui/react';
+import { TbCash, TbBolt } from 'react-icons/tb';
+import { getInitials, getAvatarColor, timeAgo } from '../../../utils/phone';
+
+const STATUS_COLORS = {
+  draft:   { color: '#737373', label: 'DRAFT' },
+  sent:    { color: '#00E5E5', label: 'SENT' },
+  viewed:  { color: '#FFE500', label: 'VIEWED' },
+  partial: { color: '#FFE500', label: 'PARTIAL' },
+  overdue: { color: '#FF3366', label: 'OVERDUE' },
+  paid:    { color: '#39FF14', label: 'PAID' },
 };
 
-const InvoiceRow = ({ invoice, onEdit, onPreview }) => {
-  const config = STATUS_CONFIG[invoice.status] || STATUS_CONFIG.draft;
-  const total = parseFloat(invoice.total || 0);
-  const paid = parseFloat(invoice.total_paid || 0);
-  const itemCount = invoice.line_items?.length || 0;
-  const canSend = invoice.status === 'draft' && invoice.client_email;
+const currency = (val) => {
+  const num = parseFloat(val || 0);
+  if (num === 0) return '$0';
+  if (num >= 1000) return `$${(num / 1000).toFixed(1)}k`;
+  return `$${num.toLocaleString()}`;
+};
+
+const InvoiceRow = ({ invoice, onSelect }) => {
+  const client = invoice.clients;
+  const status = STATUS_COLORS[invoice.status] || STATUS_COLORS.draft;
+  const avatarColor = getAvatarColor(client?.name || '');
+  const initials = getInitials(client?.name || '?');
+  const sprintCount = invoice.invoice_items?.length || 0;
+  const paidCount = (invoice.invoice_items || []).filter(
+    (i) => i.payment_status === 'paid' || i.locked
+  ).length;
+  const outstanding = parseFloat(invoice.total || 0) - parseFloat(invoice.total_paid || 0);
 
   return (
-    <HStack
+    <Box
       py={3.5}
-      px={4}
-      spacing={4}
-      transition="all 0.15s"
-      borderRadius="lg"
-      _hover={{ bg: 'surface.850' }}
+      pl={4}
+      pr={4}
+      borderBottom="1px solid"
+      borderColor="surface.900"
+      borderLeft="2px solid"
+      borderLeftColor="transparent"
+      cursor="pointer"
+      transition="all 0.15s ease-out"
+      role="group"
+      onClick={() => onSelect(invoice.id)}
+      _hover={{
+        borderLeftColor: status.color,
+        bg: 'rgba(255,255,255,0.015)',
+        transform: 'translateX(2px)',
+      }}
     >
-      <Box
-        w="6px"
-        h="6px"
-        borderRadius="full"
-        bg={config.color}
-        flexShrink={0}
-        boxShadow={invoice.status === 'paid' ? '0 0 6px rgba(57,255,20,0.5)' : 'none'}
-      />
-
-      <VStack
-        align="start"
-        spacing={0}
-        flex={1}
-        minW={0}
-        cursor="pointer"
-        onClick={() => onEdit(invoice)}
-      >
-        <HStack spacing={2}>
-          <Text color="white" fontSize="sm" fontWeight="700" noOfLines={1}>
-            {invoice.invoice_number || 'Draft Invoice'}
-          </Text>
-          <Badge
-            fontSize="2xs"
-            fontWeight="700"
-            textTransform="uppercase"
-            letterSpacing="0.05em"
-            px={2}
-            py={0.5}
-            borderRadius="full"
-            bg={config.bg}
-            color={config.color}
-            border="1px solid"
-            borderColor={config.border}
-          >
-            {config.label}
-          </Badge>
-        </HStack>
-        <HStack spacing={2}>
-          {invoice.client_name && (
-            <Text color="surface.400" fontSize="xs" noOfLines={1}>{invoice.client_name}</Text>
-          )}
-          {invoice.project_name && (
-            <>
-              <Text color="surface.700" fontSize="xs">·</Text>
-              <Text color="surface.500" fontSize="xs" noOfLines={1}>{invoice.project_name}</Text>
-            </>
-          )}
-          {itemCount > 0 && (
-            <>
-              <Text color="surface.700" fontSize="xs">·</Text>
-              <Text color="surface.600" fontSize="xs">{itemCount} item{itemCount !== 1 ? 's' : ''}</Text>
-            </>
-          )}
-        </HStack>
-      </VStack>
-
-      <VStack align="end" spacing={0} flexShrink={0}>
-        <Text color="white" fontSize="sm" fontWeight="700" fontFamily="mono">
-          ${total.toLocaleString()}
-        </Text>
-        {paid > 0 && paid < total && (
-          <Text color="accent.neon" fontSize="2xs" fontFamily="mono">
-            ${paid.toLocaleString()} paid
-          </Text>
-        )}
-        {paid >= total && total > 0 && (
-          <Text color="accent.neon" fontSize="2xs" fontWeight="600">Paid</Text>
-        )}
-      </VStack>
-
-      {/* Preview/Send button */}
-      <Tooltip label={canSend ? 'Preview and send' : 'Preview invoice'} placement="top">
-        <IconButton
-          icon={canSend ? <TbSend /> : <TbEye />}
-          size="xs"
-          variant="ghost"
-          color={canSend ? 'brand.500' : 'surface.500'}
-          _hover={{ color: canSend ? 'brand.400' : 'white', bg: 'surface.800' }}
-          onClick={(e) => { e.stopPropagation(); onPreview(invoice); }}
-          aria-label="Preview"
+      <HStack spacing={4} align="center">
+        {/* Status dot */}
+        <Box
+          w="6px"
+          h="6px"
+          borderRadius="full"
+          bg={status.color}
+          boxShadow={invoice.status === 'paid' ? `0 0 8px ${status.color}80` : 'none'}
+          flexShrink={0}
         />
-      </Tooltip>
 
-      <Text color="surface.600" fontSize="2xs" fontFamily="mono" flexShrink={0} w="70px" textAlign="right">
-        {invoice.created_at ? format(new Date(invoice.created_at), 'MMM d') : '--'}
-      </Text>
-    </HStack>
+        {/* Avatar */}
+        <Box
+          w="32px"
+          h="32px"
+          borderRadius="full"
+          bg={avatarColor}
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+          flexShrink={0}
+        >
+          <Text color="surface.950" fontSize="2xs" fontWeight="800">
+            {initials}
+          </Text>
+        </Box>
+
+        {/* Invoice number + client */}
+        <VStack align="start" spacing={0} flex={1} minW={0}>
+          <HStack spacing={2}>
+            <Text color="white" fontSize="sm" fontWeight="700" fontFamily="mono">
+              {invoice.invoice_number || 'NEW'}
+            </Text>
+            <Text
+              fontSize="2xs"
+              fontWeight="700"
+              color={status.color}
+              letterSpacing="0.05em"
+              fontFamily="mono"
+            >
+              {status.label}
+            </Text>
+          </HStack>
+          <Text color="surface.500" fontSize="xs" noOfLines={1}>
+            {client?.name || 'No client'}
+            {client?.company && ` · ${client.company}`}
+          </Text>
+        </VStack>
+
+        {/* Sprint stats */}
+        <HStack spacing={1.5} display={{ base: 'none', md: 'flex' }}>
+          <Icon as={TbBolt} boxSize={3} color="surface.600" />
+          <Text color="surface.400" fontSize="xs" fontFamily="mono" fontWeight="700">
+            {paidCount}/{sprintCount}
+          </Text>
+        </HStack>
+
+        {/* Total */}
+        <VStack align="end" spacing={0} minW="80px">
+          <Text color="white" fontSize="sm" fontFamily="mono" fontWeight="700">
+            {currency(invoice.total)}
+          </Text>
+          {outstanding > 0 && invoice.status !== 'draft' && (
+            <Text color="accent.banana" fontSize="2xs" fontFamily="mono">
+              {currency(outstanding)} due
+            </Text>
+          )}
+        </VStack>
+
+        {/* Timestamp */}
+        <Text
+          color="surface.700"
+          fontSize="2xs"
+          fontFamily="mono"
+          minW="60px"
+          textAlign="right"
+          display={{ base: 'none', lg: 'block' }}
+        >
+          {timeAgo(invoice.sent_at || invoice.created_at)}
+        </Text>
+      </HStack>
+    </Box>
   );
 };
 
-const InvoiceList = ({ invoices, loading, onEdit, onPreview, onCreate }) => (
-  <Box bg="surface.900" border="1px solid" borderColor="surface.800" borderRadius="xl">
-    <HStack px={4} py={3} borderBottom="1px solid" borderColor="surface.800">
-      <Box w="6px" h="6px" borderRadius="full" bg="accent.neon" boxShadow="0 0 6px rgba(57,255,20,0.4)" />
-      <Text
-        color="accent.neon"
-        fontSize="xs"
-        fontWeight="700"
-        textTransform="uppercase"
-        letterSpacing="0.1em"
-        fontFamily="mono"
-      >
-        All Invoices
-      </Text>
-    </HStack>
-
-    {loading ? (
-      <Center py={12}>
-        <Spinner size="md" color="accent.neon" thickness="2px" />
-      </Center>
-    ) : invoices.length === 0 ? (
-      <Center py={12}>
+const InvoiceList = ({ invoices, loading, onSelect, onNew }) => {
+  if (loading) {
+    return (
+      <Center py={16}>
         <VStack spacing={3}>
-          <Icon as={TbFileInvoice} boxSize={8} color="surface.600" />
-          <Text color="surface.400" fontSize="sm">No invoices yet</Text>
-          <Text color="surface.600" fontSize="xs">Create a project first, then generate an invoice</Text>
+          <Spinner size="md" color="brand.500" thickness="2px" />
+          <Text color="surface.600" fontSize="xs" fontFamily="mono">
+            Loading invoices
+          </Text>
+        </VStack>
+      </Center>
+    );
+  }
+
+  if (invoices.length === 0) {
+    return (
+      <Box py={20} textAlign="center">
+        <VStack spacing={4}>
+          <Icon as={TbCash} boxSize={10} color="surface.700" />
+          <VStack spacing={1}>
+            <Text color="white" fontSize="md" fontWeight="700">
+              No invoices yet
+            </Text>
+            <Text color="surface.500" fontSize="xs">
+              Create your first invoice to start billing
+            </Text>
+          </VStack>
           <Button
             size="sm"
             variant="outline"
-            borderColor="accent.neon"
-            color="accent.neon"
-            onClick={onCreate}
-            mt={1}
+            borderColor="brand.500"
+            color="brand.500"
+            fontWeight="700"
+            borderRadius="full"
+            onClick={onNew}
+            mt={2}
+            _hover={{ bg: 'rgba(0,229,229,0.08)' }}
           >
-            Create your first invoice
+            Create Invoice
           </Button>
         </VStack>
-      </Center>
-    ) : (
-      <VStack align="stretch" spacing={0} divider={<Divider borderColor="surface.850" />}>
-        {invoices.map((invoice) => (
-          <InvoiceRow key={invoice.id} invoice={invoice} onEdit={onEdit} onPreview={onPreview} />
-        ))}
-      </VStack>
-    )}
-  </Box>
-);
+      </Box>
+    );
+  }
+
+  return (
+    <Box borderTop="1px solid" borderColor="surface.900">
+      {invoices.map((inv) => (
+        <InvoiceRow key={inv.id} invoice={inv} onSelect={onSelect} />
+      ))}
+    </Box>
+  );
+};
 
 export default InvoiceList;

@@ -16,14 +16,13 @@ import PinApproval   from './pages/PinApproval';
 // Protected pages
 import Dashboard     from './pages/Dashboard';
 import Clients       from './pages/Clients';
-import Projects      from './pages/Projects';
+import ClientDetail  from './pages/Clients/ClientDetail';
 import Invoicing     from './pages/Invoicing';
 import Forms         from './pages/Forms';
 import Calendar      from './pages/Calendar';
 import Analytics     from './pages/Analytics';
 import Settings      from './pages/Settings';
 
-// Wraps protected routes with PresenceProvider so all pages can use usePresence()
 const PresenceWrappedShell = () => (
   <PresenceProvider>
     <AppShell>
@@ -36,12 +35,10 @@ function App() {
   return (
     <AuthProvider>
       <Routes>
-        {/* Public auth routes */}
+        {/* Public */}
         <Route path="/login/" element={<Login />} />
         <Route path="/reset-password/" element={<ResetPassword />} />
         <Route path="/accept-invite/" element={<AcceptInvite />} />
-
-        {/* Public PIN approval route - validated by one-time token */}
         <Route path="/pin-approval/" element={<PinApproval />} />
         <Route path="/pin-approval" element={<PinApproval />} />
 
@@ -51,12 +48,15 @@ function App() {
             <Route index element={<Navigate to="/dashboard/" replace />} />
             <Route path="dashboard/" element={<Dashboard />} />
             <Route path="clients/" element={<Clients />} />
-            <Route path="projects/" element={<Projects />} />
+            <Route path="clients/:clientId/" element={<ClientDetail />} />
             <Route path="invoicing/" element={<Invoicing />} />
             <Route path="forms/" element={<Forms />} />
             <Route path="calendar/" element={<Calendar />} />
             <Route path="analytics/" element={<Analytics />} />
             <Route path="settings/" element={<Settings />} />
+            {/* Projects redirect to clients - the source of truth now */}
+            <Route path="projects/" element={<Navigate to="/clients/" replace />} />
+            <Route path="projects/*" element={<Navigate to="/clients/" replace />} />
             <Route path="*" element={<Navigate to="/dashboard/" replace />} />
           </Route>
         </Route>
