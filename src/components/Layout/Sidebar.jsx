@@ -1,25 +1,22 @@
 // src/components/Layout/Sidebar.jsx
+// Icon-free nav - cleaner, type-led
 import { useState, useEffect } from 'react';
 import {
-  Box, VStack, HStack, Text, Icon, Divider, Avatar,
+  Box, VStack, HStack, Text, Divider, Avatar,
 } from '@chakra-ui/react';
-import {
-  TbHome, TbUsers, TbRocket, TbFileInvoice,
-  TbInbox, TbCalendar, TbChartBar, TbSettings,
-} from 'react-icons/tb';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
 
 const NAV_ITEMS = [
-  { path: '/dashboard/', label: 'Dashboard', icon: TbHome },
-  { path: '/clients/', label: 'Clients', icon: TbUsers },
-  { path: '/projects/', label: 'Projects', icon: TbRocket },
-  { path: '/invoicing/', label: 'Invoicing', icon: TbFileInvoice },
-  { path: '/forms/', label: 'Forms', icon: TbInbox },
-  { path: '/calendar/', label: 'Calendar', icon: TbCalendar },
-  { path: '/analytics/', label: 'Analytics', icon: TbChartBar },
-  { path: '/settings/', label: 'Settings', icon: TbSettings },
+  { path: '/dashboard/', label: 'Dashboard' },
+  { path: '/clients/', label: 'Clients' },
+  { path: '/projects/', label: 'Projects' },
+  { path: '/invoicing/', label: 'Invoicing' },
+  { path: '/forms/', label: 'Forms' },
+  { path: '/calendar/', label: 'Calendar' },
+  { path: '/analytics/', label: 'Analytics' },
+  { path: '/settings/', label: 'Settings' },
 ];
 
 const Sidebar = () => {
@@ -79,19 +76,19 @@ const Sidebar = () => {
 
       <Divider borderColor="surface.800" />
 
-      {/* Nav items */}
+      {/* Nav items - text only, no icons */}
       <VStack spacing={0.5} px={3} py={3} align="stretch" flex={1}>
         {NAV_ITEMS.map((item) => {
           const active = isActive(item.path);
           return (
-            <HStack
+            <Box
               key={item.path}
-              px={3}
-              py={2}
+              px={4}
+              py={2.5}
               borderRadius="lg"
               cursor="pointer"
-              bg={active ? 'surface.800' : 'transparent'}
-              color={active ? 'white' : 'surface.400'}
+              bg={active ? 'surface.850' : 'transparent'}
+              color={active ? 'white' : 'surface.500'}
               _hover={{ bg: 'surface.850', color: 'white' }}
               onClick={() => navigate(item.path)}
               transition="all 0.15s"
@@ -104,14 +101,20 @@ const Sidebar = () => {
                   top="50%"
                   transform="translateY(-50%)"
                   w="3px"
-                  h="16px"
+                  h="18px"
                   borderRadius="full"
                   bg="brand.500"
+                  boxShadow="0 0 8px rgba(0,229,229,0.6)"
                 />
               )}
-              <Icon as={item.icon} boxSize={4.5} color={active ? 'brand.500' : 'inherit'} />
-              <Text fontSize="sm" fontWeight={active ? '600' : '500'}>{item.label}</Text>
-            </HStack>
+              <Text
+                fontSize="sm"
+                fontWeight={active ? '700' : '500'}
+                letterSpacing={active ? '-0.01em' : '0'}
+              >
+                {item.label}
+              </Text>
+            </Box>
           );
         })}
       </VStack>

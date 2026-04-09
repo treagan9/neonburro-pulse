@@ -1,7 +1,9 @@
 // src/theme/index.js
 // NeonBurro Pulse - Chakra UI v2 theme
+// Uses Inter + JetBrains Mono matching neonburro.com public site
 import { extendTheme } from '@chakra-ui/react';
 import colors from './colors';
+import typography from './typography';
 
 const theme = extendTheme({
   config: {
@@ -9,11 +11,14 @@ const theme = extendTheme({
     useSystemColorMode: false,
   },
   colors,
-  fonts: {
-    heading: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-    body: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-    mono: "'JetBrains Mono', 'Fira Code', monospace",
-  },
+
+  // Typography from shared module - Inter + JetBrains Mono
+  fonts: typography.fonts,
+  fontSizes: typography.fontSizes,
+  fontWeights: typography.fontWeights,
+  lineHeights: typography.lineHeights,
+  letterSpacings: typography.letterSpacings,
+
   styles: {
     global: {
       'html, body': {
@@ -21,6 +26,10 @@ const theme = extendTheme({
         color: 'white',
         fontFamily: 'body',
         lineHeight: 1.5,
+        fontFeatureSettings: '"cv11", "ss01", "ss03"',
+        fontOpticalSizing: 'auto',
+        WebkitFontSmoothing: 'antialiased',
+        MozOsxFontSmoothing: 'grayscale',
       },
       '*::selection': {
         bg: 'rgba(0, 229, 229, 0.3)',
@@ -36,6 +45,9 @@ const theme = extendTheme({
         '&:hover': {
           bg: 'surface.600',
         },
+      },
+      'code, kbd, pre, samp': {
+        fontFamily: 'mono',
       },
       a: {
         textDecoration: 'none',

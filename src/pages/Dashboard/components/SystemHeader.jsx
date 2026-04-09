@@ -1,6 +1,6 @@
 // src/pages/Dashboard/components/SystemHeader.jsx
-// Clean header: pulsing online indicator, team online strip, live time, refresh
-// Command Center title removed per design direction
+// Clean header: pulsing online indicator with count, team online strip, live time, refresh
+// No "ONLINE" text, no Command Center title
 
 import { useState, useEffect } from 'react';
 import { Box, HStack, Text, IconButton, Tooltip } from '@chakra-ui/react';
@@ -30,23 +30,23 @@ const SystemHeader = ({ onRefresh, refreshing, onlineCount }) => {
 
   return (
     <HStack justify="space-between" align="center" flexWrap="wrap" spacing={4}>
-      {/* Left: status dot + online count + team strip */}
+      {/* Left: dot + count + team strip */}
       <HStack spacing={4} flex={1} minW={0}>
-        <HStack spacing={2.5}>
+        <HStack spacing={2}>
           {/* Pulsing online dot */}
           <Box position="relative" w="8px" h="8px">
             <Box
               position="absolute"
               inset={0}
               borderRadius="full"
-              bg="accent.lime"
+              bg="accent.neon"
               boxShadow="0 0 12px rgba(57,255,20,0.7)"
             />
             <Box
               position="absolute"
               inset={0}
               borderRadius="full"
-              bg="accent.lime"
+              bg="accent.neon"
               opacity={0.4}
               sx={{
                 animation: 'pingSys 2s cubic-bezier(0, 0, 0.2, 1) infinite',
@@ -57,14 +57,13 @@ const SystemHeader = ({ onRefresh, refreshing, onlineCount }) => {
             />
           </Box>
           <Text
-            color="accent.lime"
+            color="accent.neon"
             fontSize="xs"
             fontWeight="700"
-            letterSpacing="0.12em"
-            textTransform="uppercase"
             fontFamily="mono"
+            lineHeight="1"
           >
-            {onlineCount} online
+            {onlineCount}
           </Text>
         </HStack>
 
