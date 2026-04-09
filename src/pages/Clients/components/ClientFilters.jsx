@@ -1,15 +1,22 @@
 // src/pages/Clients/components/ClientFilters.jsx
-import { HStack, Box, Input, Button, Icon, Select, Text } from '@chakra-ui/react';
-import { TbSearch, TbArrowsSort } from 'react-icons/tb';
+// Naked filters - no boxes, text-only toggles, login DNA
 
-const STATUS_LABELS = { all: 'All', active: 'Active', lead: 'Lead', inactive: 'Inactive' };
+import { HStack, Box, Input, Text, Icon, InputGroup, InputLeftElement } from '@chakra-ui/react';
+import { TbSearch } from 'react-icons/tb';
+
+const STATUS_OPTIONS = [
+  { value: 'all', label: 'All' },
+  { value: 'active', label: 'Active' },
+  { value: 'lead', label: 'Leads' },
+  { value: 'inactive', label: 'Inactive' },
+];
 
 const SORT_OPTIONS = [
-  { value: 'recent', label: 'Recently Added' },
-  { value: 'activity', label: 'Recent Activity' },
+  { value: 'recent', label: 'Recent' },
+  { value: 'activity', label: 'Activity' },
   { value: 'alphabetical', label: 'A → Z' },
-  { value: 'most_funded', label: 'Most Funded' },
-  { value: 'most_sprints', label: 'Most Sprints' },
+  { value: 'most_funded', label: 'Funded' },
+  { value: 'most_sprints', label: 'Sprints' },
 ];
 
 const ClientFilters = ({
@@ -18,84 +25,102 @@ const ClientFilters = ({
   sortBy, onSortBy,
   counts,
 }) => (
-  <HStack spacing={3} flexWrap="wrap">
-    {/* Search */}
-    <Box position="relative" flex={1} minW="240px">
-      <Icon
-        as={TbSearch}
-        position="absolute"
-        left={3}
-        top="50%"
-        transform="translateY(-50%)"
-        color="surface.600"
-        boxSize={4}
-        zIndex={1}
-      />
+  <HStack spacing={6} flexWrap="wrap" align="center">
+    {/* Search - naked, no container */}
+    <InputGroup flex={1} minW="240px" maxW="400px">
+      <InputLeftElement h="40px" pl={0} pointerEvents="none">
+        <Icon as={TbSearch} boxSize={3.5} color="surface.600" />
+      </InputLeftElement>
       <Input
         value={search}
         onChange={(e) => onSearch(e.target.value)}
-        placeholder="search by name, email, phone, company"
-        pl={9}
+        placeholder="Search clients"
+        pl={7}
         bg="transparent"
-        border="1px solid"
-        borderColor="surface.700"
+        border="none"
+        borderBottom="1px solid"
+        borderColor="surface.800"
+        borderRadius={0}
         color="white"
         fontSize="sm"
         h="40px"
-        borderRadius="lg"
-        _hover={{ borderColor: 'surface.500' }}
-        _focus={{ borderColor: 'brand.500', boxShadow: '0 0 0 1px var(--chakra-colors-brand-500)' }}
+        _hover={{ borderColor: 'surface.700' }}
+        _focus={{ borderColor: 'brand.500', boxShadow: 'none' }}
         _placeholder={{ color: 'surface.600' }}
       />
-    </Box>
+    </InputGroup>
 
-    {/* Status filter chips */}
-    <HStack spacing={1}>
-      {Object.entries(STATUS_LABELS).map(([key, label]) => (
-        <Button
-          key={key}
-          size="xs"
-          variant="ghost"
-          color={filterStatus === key ? 'white' : 'surface.500'}
-          bg={filterStatus === key ? 'surface.800' : 'transparent'}
-          fontWeight="700"
-          borderRadius="md"
-          onClick={() => onFilterStatus(key)}
-          _hover={{ bg: 'surface.850', color: 'white' }}
-          h="32px"
-        >
-          {label} <Text as="span" color="surface.600" ml={1}>{counts[key] || 0}</Text>
-        </Button>
-      ))}
+    {/* Status filter - text only */}
+    <HStack spacing={4}>
+      {STATUS_OPTIONS.map((opt) => {
+        const active = filterStatus === opt.value;
+        const count = counts[opt.value] || 0;
+        return (
+          <Box
+            key={opt.value}
+            cursor="pointer"
+            onClick={() => onFilterStatus(opt.value)}
+            transition="all 0.15s"
+            position="relative"
+            pb={1}
+          >
+            <HStack spacing={1.5}>
+              <Text
+                fontSize="xs"
+                fontWeight="700"
+                color={active ? 'white' : 'surface.600'}
+                letterSpacing="0.02em"
+                _hover={!active ? { color: 'surface.400' } : {}}
+              >
+                {opt.label}
+              </Text>
+              <Text
+                fontSize="2xs"
+                color={active ? 'brand.500' : 'surface.700'}
+                fontFamily="mono"
+                fontWeight="700"
+              >
+                {count}
+              </Text>
+            </HStack>
+            {active && (
+              <Box
+                position="absolute"
+                bottom={0}
+                left={0}
+                right={0}
+                h="2px"
+                bg="brand.500"
+                borderRadius="full"
+                boxShadow="0 0 8px rgba(0,229,229,0.6)"
+              />
+            )}
+          </Box>
+        );
+      })}
     </HStack>
 
-    {/* Sort dropdown */}
-    <HStack spacing={1.5}>
-      <Icon as={TbArrowsSort} boxSize={3.5} color="surface.500" />
-      <Select
-        value={sortBy}
-        onChange={(e) => onSortBy(e.target.value)}
-        size="xs"
-        bg="transparent"
-        border="1px solid"
-        borderColor="surface.700"
-        color="surface.300"
-        fontSize="xs"
-        fontWeight="600"
-        h="32px"
-        borderRadius="md"
-        w="auto"
-        minW="140px"
-        _hover={{ borderColor: 'surface.500' }}
-        _focus={{ borderColor: 'brand.500', boxShadow: 'none' }}
-        cursor="pointer"
-      >
-        {SORT_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value} style={{ background: '#0a0a0a' }}>
+    {/* Sort - text with arrow */}
+    <HStack spacing={3}>
+      {SORT_OPTIONS.map((opt, idx) => {
+        const active = sortBy === opt.value;
+        return (
+          <Text
+            key={opt.value}
+            fontSize="2xs"
+            fontWeight="700"
+            color={active ? 'accent.banana' : 'surface.700'}
+            letterSpacing="0.05em"
+            textTransform="uppercase"
+            cursor="pointer"
+            onClick={() => onSortBy(opt.value)}
+            transition="color 0.15s"
+            _hover={!active ? { color: 'surface.500' } : {}}
+          >
             {opt.label}
-          </option>
-        ))}
-      </Select>
+          </Text>
+        );
+      })}
     </HStack>
   </HStack>
 );

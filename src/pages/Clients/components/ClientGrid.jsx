@@ -1,19 +1,17 @@
 // src/pages/Clients/components/ClientGrid.jsx
+// Row-based list view - Linear/Stripe DNA
+// Each row is a single line with avatar, name, company, stats, tags
+
 import {
-  Box, VStack, HStack, Text, SimpleGrid, Icon, Badge,
-  Center, Spinner, Divider, Button, Wrap, WrapItem,
+  Box, VStack, HStack, Text, Icon, Center, Spinner, Button,
 } from '@chakra-ui/react';
-import {
-  TbUsers, TbMail, TbPhone, TbBuilding, TbBolt,
-  TbCash, TbWorld,
-} from 'react-icons/tb';
-import { format } from 'date-fns';
+import { TbUsers, TbBolt, TbFolder } from 'react-icons/tb';
 import { formatPhoneDisplay, getInitials, getAvatarColor, timeAgo } from '../../../utils/phone';
 
-const STATUS_CONFIG = {
-  active:   { label: 'Active',   bg: 'rgba(57,255,20,0.08)',    border: 'rgba(57,255,20,0.25)',   color: '#39FF14',    accent: '#39FF14' },
-  lead:     { label: 'Lead',     bg: 'rgba(255,229,0,0.08)',    border: 'rgba(255,229,0,0.25)',   color: '#FFE500',    accent: '#FFE500' },
-  inactive: { label: 'Inactive', bg: 'rgba(128,128,128,0.08)',  border: 'rgba(128,128,128,0.25)', color: '#737373',    accent: '#737373' },
+const STATUS_DOT = {
+  active:   '#39FF14',
+  lead:     '#FFE500',
+  inactive: '#737373',
 };
 
 const TAG_COLORS = {
@@ -26,198 +24,150 @@ const TAG_COLORS = {
   subscription: '#FF6B35',
 };
 
-const currency = (val) => `$${parseFloat(val || 0).toLocaleString()}`;
+const currency = (val) => {
+  const num = parseFloat(val || 0);
+  if (num === 0) return '$0';
+  if (num >= 1000) return `$${(num / 1000).toFixed(1)}k`;
+  return `$${num.toLocaleString()}`;
+};
 
-const ClientCard = ({ client, onEdit }) => {
-  const config = STATUS_CONFIG[client.status] || STATUS_CONFIG.active;
+const ClientRow = ({ client, onEdit }) => {
   const initials = getInitials(client.name);
   const avatarColor = getAvatarColor(client.name);
-
+  const statusColor = STATUS_DOT[client.status] || STATUS_DOT.active;
   const sprintCount = client.sprint_count || 0;
+  const projectCount = client.project_count || 0;
   const totalFunded = client.total_funded || 0;
-  const lastActivity = client.last_activity_at || client.created_at;
+  const tags = client.tags || [];
 
   return (
     <Box
-      bg="surface.900"
-      border="1px solid"
-      borderColor="surface.800"
-      borderRadius="xl"
-      overflow="hidden"
-      transition="all 0.2s"
+      py={3.5}
+      pl={4}
+      pr={4}
+      borderBottom="1px solid"
+      borderColor="surface.900"
+      borderLeft="2px solid"
+      borderLeftColor="transparent"
       cursor="pointer"
+      transition="all 0.15s ease-out"
+      role="group"
       onClick={() => onEdit(client)}
       _hover={{
-        borderColor: avatarColor,
-        transform: 'translateY(-2px)',
-        boxShadow: `0 8px 24px ${avatarColor}15`,
+        borderLeftColor: avatarColor,
+        bg: 'rgba(255,255,255,0.015)',
+        transform: 'translateX(2px)',
       }}
-      position="relative"
     >
-      {/* Status accent line */}
-      <Box h="2px" bg={config.accent} />
+      <HStack spacing={4} align="center">
+        {/* Status dot */}
+        <Box
+          w="6px"
+          h="6px"
+          borderRadius="full"
+          bg={statusColor}
+          boxShadow={client.status === 'active' ? `0 0 8px ${statusColor}80` : 'none'}
+          flexShrink={0}
+        />
 
-      <Box p={4}>
-        {/* Header: Avatar + Name + Status */}
-        <HStack spacing={3} align="start" mb={3}>
-          <Box
-            w="44px"
-            h="44px"
-            borderRadius="full"
-            bg={avatarColor}
-            display="flex"
-            alignItems="center"
-            justifyContent="center"
-            flexShrink={0}
-            border="2px solid"
-            borderColor={`${avatarColor}40`}
-            boxShadow={`0 0 20px ${avatarColor}20`}
-          >
-            <Text color="surface.950" fontSize="sm" fontWeight="800" letterSpacing="-0.02em">
-              {initials}
+        {/* Avatar */}
+        <Box
+          w="36px"
+          h="36px"
+          borderRadius="full"
+          bg={avatarColor}
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+          flexShrink={0}
+          transition="all 0.15s"
+          _groupHover={{ boxShadow: `0 0 16px ${avatarColor}40` }}
+        >
+          <Text color="surface.950" fontSize="xs" fontWeight="800" letterSpacing="-0.02em">
+            {initials}
+          </Text>
+        </Box>
+
+        {/* Name + company */}
+        <VStack align="start" spacing={0} flex={1} minW={0}>
+          <HStack spacing={2}>
+            <Text color="white" fontSize="sm" fontWeight="700" noOfLines={1}>
+              {client.name}
             </Text>
-          </Box>
-          <VStack align="start" spacing={0} flex={1} minW={0}>
-            <HStack w="100%" justify="space-between" align="start">
-              <Text color="white" fontSize="sm" fontWeight="800" noOfLines={1} flex={1}>
-                {client.name}
-              </Text>
-              <Badge
-                fontSize="2xs"
-                fontWeight="700"
-                textTransform="uppercase"
-                letterSpacing="0.05em"
-                px={2}
-                py={0.5}
-                borderRadius="full"
-                bg={config.bg}
-                color={config.color}
-                border="1px solid"
-                borderColor={config.border}
-                flexShrink={0}
-                ml={2}
-              >
-                {config.label}
-              </Badge>
-            </HStack>
-            {client.company && (
-              <HStack spacing={1.5} mt={0.5}>
-                <Icon as={TbBuilding} boxSize={3} color="surface.500" />
-                <Text color="surface.400" fontSize="xs" noOfLines={1}>{client.company}</Text>
+            {/* Tag dots - just colored circles, no text */}
+            {tags.length > 0 && (
+              <HStack spacing={1}>
+                {tags.slice(0, 3).map((tag) => (
+                  <Box
+                    key={tag}
+                    w="5px"
+                    h="5px"
+                    borderRadius="full"
+                    bg={TAG_COLORS[tag] || '#737373'}
+                  />
+                ))}
+                {tags.length > 3 && (
+                  <Text fontSize="2xs" color="surface.600" fontFamily="mono">
+                    +{tags.length - 3}
+                  </Text>
+                )}
               </HStack>
             )}
-          </VStack>
-        </HStack>
-
-        {/* Sprint stats row */}
-        <HStack
-          spacing={3}
-          py={2.5}
-          px={3}
-          bg="surface.850"
-          border="1px solid"
-          borderColor="surface.800"
-          borderRadius="lg"
-          mb={3}
-        >
-          <HStack spacing={1.5} flex={1}>
-            <Icon as={TbBolt} boxSize={3.5} color="accent.neon" />
-            <VStack align="start" spacing={0}>
-              <Text color="white" fontSize="sm" fontWeight="800" lineHeight="1" fontFamily="mono">
-                {sprintCount}
-              </Text>
-              <Text color="surface.600" fontSize="2xs" fontWeight="600">
-                sprint{sprintCount !== 1 ? 's' : ''}
-              </Text>
-            </VStack>
           </HStack>
-          <Divider orientation="vertical" h="24px" borderColor="surface.700" />
-          <HStack spacing={1.5} flex={1}>
-            <Icon as={TbCash} boxSize={3.5} color="accent.banana" />
-            <VStack align="start" spacing={0}>
-              <Text color="white" fontSize="sm" fontWeight="800" lineHeight="1" fontFamily="mono">
-                {currency(totalFunded)}
+          <HStack spacing={1.5}>
+            {client.company && (
+              <Text color="surface.500" fontSize="xs" noOfLines={1}>
+                {client.company}
               </Text>
-              <Text color="surface.600" fontSize="2xs" fontWeight="600">
-                funded
+            )}
+            {client.email && !client.company && (
+              <Text color="surface.500" fontSize="xs" noOfLines={1}>
+                {client.email}
               </Text>
-            </VStack>
+            )}
           </HStack>
-        </HStack>
-
-        {/* Contact details */}
-        <VStack align="start" spacing={1.5} mb={3}>
-          {client.email && (
-            <HStack spacing={1.5}>
-              <Icon as={TbMail} boxSize={3} color="surface.600" />
-              <Text color="surface.400" fontSize="xs" noOfLines={1}>{client.email}</Text>
-            </HStack>
-          )}
-          {client.phone && (
-            <HStack spacing={1.5}>
-              <Icon as={TbPhone} boxSize={3} color="surface.600" />
-              <Text color="surface.400" fontSize="xs" fontFamily="mono">
-                {formatPhoneDisplay(client.phone)}
-              </Text>
-            </HStack>
-          )}
-          {client.website && (
-            <HStack spacing={1.5}>
-              <Icon as={TbWorld} boxSize={3} color="surface.600" />
-              <Text color="surface.400" fontSize="xs" noOfLines={1}>{client.website}</Text>
-            </HStack>
-          )}
         </VStack>
 
-        {/* Tags / Signal stickers */}
-        {client.tags && client.tags.length > 0 && (
-          <Wrap spacing={1} mb={3}>
-            {client.tags.slice(0, 4).map((tag) => {
-              const color = TAG_COLORS[tag] || '#737373';
-              return (
-                <WrapItem key={tag}>
-                  <Box
-                    px={1.5}
-                    py={0.5}
-                    borderRadius="full"
-                    bg={`${color}12`}
-                    border="1px solid"
-                    borderColor={`${color}30`}
-                  >
-                    <Text fontSize="2xs" color={color} fontWeight="700" textTransform="uppercase" letterSpacing="0.02em">
-                      {tag}
-                    </Text>
-                  </Box>
-                </WrapItem>
-              );
-            })}
-            {client.tags.length > 4 && (
-              <WrapItem>
-                <Text fontSize="2xs" color="surface.600" px={1.5} py={0.5}>
-                  +{client.tags.length - 4}
-                </Text>
-              </WrapItem>
-            )}
-          </Wrap>
-        )}
-
-        {/* Footer: Last activity */}
-        <HStack
-          justify="space-between"
-          pt={2.5}
-          borderTop="1px solid"
-          borderColor="surface.800"
-        >
-          <Text color="surface.600" fontSize="2xs" fontFamily="mono">
-            Active {timeAgo(lastActivity)}
-          </Text>
-          {client.portal_pin && (
-            <Text color="surface.700" fontSize="2xs" fontFamily="mono" letterSpacing="0.1em">
-              PIN · {client.portal_pin}
-            </Text>
+        {/* Stats - mono inline */}
+        <HStack spacing={5} display={{ base: 'none', md: 'flex' }}>
+          {projectCount > 0 && (
+            <HStack spacing={1.5}>
+              <Icon as={TbFolder} boxSize={3} color="surface.600" />
+              <Text color="surface.400" fontSize="xs" fontFamily="mono" fontWeight="700">
+                {projectCount}
+              </Text>
+            </HStack>
           )}
+          <HStack spacing={1.5}>
+            <Icon as={TbBolt} boxSize={3} color="surface.600" />
+            <Text color="surface.400" fontSize="xs" fontFamily="mono" fontWeight="700">
+              {sprintCount}
+            </Text>
+          </HStack>
+          <Text
+            color={totalFunded > 0 ? 'white' : 'surface.700'}
+            fontSize="xs"
+            fontFamily="mono"
+            fontWeight="700"
+            minW="60px"
+            textAlign="right"
+          >
+            {currency(totalFunded)}
+          </Text>
         </HStack>
-      </Box>
+
+        {/* Timestamp */}
+        <Text
+          color="surface.700"
+          fontSize="2xs"
+          fontFamily="mono"
+          minW="60px"
+          textAlign="right"
+          display={{ base: 'none', lg: 'block' }}
+        >
+          {timeAgo(client.last_activity_at || client.created_at)}
+        </Text>
+      </HStack>
     </Box>
   );
 };
@@ -225,10 +175,12 @@ const ClientCard = ({ client, onEdit }) => {
 const ClientGrid = ({ clients, loading, onEdit, onAdd, isEmpty }) => {
   if (loading) {
     return (
-      <Center py={12}>
+      <Center py={16}>
         <VStack spacing={3}>
-          <Spinner size="lg" color="brand.500" thickness="3px" />
-          <Text color="surface.500" fontSize="xs">Loading clients</Text>
+          <Spinner size="md" color="brand.500" thickness="2px" />
+          <Text color="surface.600" fontSize="xs" fontFamily="mono">
+            Loading clients
+          </Text>
         </VStack>
       </Center>
     );
@@ -236,46 +188,30 @@ const ClientGrid = ({ clients, loading, onEdit, onAdd, isEmpty }) => {
 
   if (clients.length === 0) {
     return (
-      <Box
-        bg="surface.900"
-        border="1px dashed"
-        borderColor="surface.700"
-        borderRadius="xl"
-        p={12}
-        textAlign="center"
-      >
-        <VStack spacing={3}>
-          <Box
-            w="60px"
-            h="60px"
-            borderRadius="full"
-            bg="surface.850"
-            display="flex"
-            alignItems="center"
-            justifyContent="center"
-          >
-            <Icon as={TbUsers} boxSize={7} color="surface.600" />
-          </Box>
+      <Box py={20} textAlign="center">
+        <VStack spacing={4}>
+          <Icon as={TbUsers} boxSize={10} color="surface.700" />
           <VStack spacing={1}>
             <Text color="white" fontSize="md" fontWeight="700">
               {isEmpty ? 'No clients yet' : 'No matches'}
             </Text>
             <Text color="surface.500" fontSize="xs">
               {isEmpty
-                ? 'Start by adding your first client to the herd'
+                ? 'Add your first client to the herd'
                 : 'Try a different search or filter'}
             </Text>
           </VStack>
           {isEmpty && (
             <Button
               size="sm"
-              bg="brand.500"
-              color="surface.950"
+              variant="outline"
+              borderColor="brand.500"
+              color="brand.500"
               fontWeight="700"
-              borderRadius="lg"
+              borderRadius="full"
               onClick={onAdd}
               mt={2}
-              _hover={{ bg: 'brand.400', transform: 'translateY(-1px)' }}
+              _hover={{ bg: 'rgba(0,229,229,0.08)' }}
             >
               Add your first client
             </Button>
@@ -286,11 +222,14 @@ const ClientGrid = ({ clients, loading, onEdit, onAdd, isEmpty }) => {
   }
 
   return (
-    <SimpleGrid columns={{ base: 1, sm: 2, lg: 3 }} spacing={3}>
+    <Box
+      borderTop="1px solid"
+      borderColor="surface.900"
+    >
       {clients.map((client) => (
-        <ClientCard key={client.id} client={client} onEdit={onEdit} />
+        <ClientRow key={client.id} client={client} onEdit={onEdit} />
       ))}
-    </SimpleGrid>
+    </Box>
   );
 };
 
