@@ -1,13 +1,16 @@
 // src/pages/Invoicing/components/InvoiceList.jsx
-// Row-based invoice list. Hover trash icon for drafts (hard delete with two-click confirm).
-// Sent invoices need to be opened in editor for soft cancel.
+// Row-based invoice list. Eye icon for snapshot viewing (sent invoices).
+// Trash icon for drafts (hard delete with two-click confirm).
 
 import { useState } from 'react';
 import {
   Box, HStack, VStack, Text, Icon, Center, Spinner, Button,
 } from '@chakra-ui/react';
-import { TbCash, TbBolt, TbTrash, TbAlertTriangle } from 'react-icons/tb';
+import {
+  TbCash, TbBolt, TbTrash, TbAlertTriangle, TbEye,
+} from 'react-icons/tb';
 import { getInitials, getAvatarColor, timeAgo } from '../../../utils/phone';
+import InvoiceSnapshotModal from './InvoiceSnapshotModal';
 
 const STATUS_COLORS = {
   draft:   { color: '#737373', label: 'DRAFT' },
@@ -18,6 +21,8 @@ const STATUS_COLORS = {
   paid:    { color: '#39FF14', label: 'PAID' },
 };
 
+const SENT_LIKE_STATUSES = ['sent', 'viewed', 'partial', 'overdue', 'paid'];
+
 const currency = (val) => {
   const num = parseFloat(val || 0);
   if (num === 0) return '$0';
@@ -25,7 +30,7 @@ const currency = (val) => {
   return `$${num.toLocaleString()}`;
 };
 
-const InvoiceRow = ({ invoice, onSelect, onQuickDelete }) => {
+const InvoiceRow = ({ invoice, onSelect, onQuickDelete, onViewSnapshot }) => {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const client = invoice.clients;
   const status = STATUS_COLORS[invoice.status] || STATUS_COLORS.draft;
@@ -37,16 +42,21 @@ const InvoiceRow = ({ invoice, onSelect, onQuickDelete }) => {
   ).length;
   const outstanding = parseFloat(invoice.total || 0) - parseFloat(invoice.total_paid || 0);
   const isDraft = invoice.status === 'draft';
+  const wasSent = SENT_LIKE_STATUSES.includes(invoice.status);
 
   const handleTrashClick = (e) => {
     e.stopPropagation();
     if (!confirmDelete) {
       setConfirmDelete(true);
-      // Auto-reset after 3 seconds if not clicked again
       setTimeout(() => setConfirmDelete(false), 3000);
       return;
     }
     onQuickDelete(invoice.id);
+  };
+
+  const handleEyeClick = (e) => {
+    e.stopPropagation();
+    onViewSnapshot(invoice.id);
   };
 
   return (
@@ -143,36 +153,64 @@ const InvoiceRow = ({ invoice, onSelect, onQuickDelete }) => {
           {timeAgo(invoice.sent_at || invoice.created_at)}
         </Text>
 
-        {/* Trash icon - drafts only, hover-revealed */}
-        {isDraft ? (
-          <Box
-            as="button"
-            onClick={handleTrashClick}
-            opacity={confirmDelete ? 1 : 0}
-            color={confirmDelete ? 'red.400' : 'surface.600'}
-            p={1.5}
-            borderRadius="md"
-            transition="all 0.15s"
-            _groupHover={{ opacity: confirmDelete ? 1 : 0.6 }}
-            _hover={{
-              opacity: '1 !important',
-              color: 'red.400',
-              bg: 'rgba(255,51,102,0.08)',
-            }}
-            title={confirmDelete ? 'Click again to confirm' : 'Delete draft'}
-          >
-            <Icon as={confirmDelete ? TbAlertTriangle : TbTrash} boxSize={3.5} />
-          </Box>
-        ) : (
-          // Spacer for non-drafts to keep alignment consistent
-          <Box w="28px" />
-        )}
+        {/* Action icons - eye + trash, hover-revealed */}
+        <HStack spacing={0.5}>
+          {/* Eye icon - sent invoices only */}
+          {wasSent ? (
+            <Box
+              as="button"
+              onClick={handleEyeClick}
+              opacity={0}
+              color="surface.600"
+              p={1.5}
+              borderRadius="md"
+              transition="all 0.15s"
+              _groupHover={{ opacity: 0.6 }}
+              _hover={{
+                opacity: '1 !important',
+                color: 'brand.500',
+                bg: 'rgba(0,229,229,0.08)',
+              }}
+              title="View sent email"
+            >
+              <Icon as={TbEye} boxSize={3.5} />
+            </Box>
+          ) : (
+            <Box w="28px" />
+          )}
+
+          {/* Trash icon - drafts only */}
+          {isDraft ? (
+            <Box
+              as="button"
+              onClick={handleTrashClick}
+              opacity={confirmDelete ? 1 : 0}
+              color={confirmDelete ? 'red.400' : 'surface.600'}
+              p={1.5}
+              borderRadius="md"
+              transition="all 0.15s"
+              _groupHover={{ opacity: confirmDelete ? 1 : 0.6 }}
+              _hover={{
+                opacity: '1 !important',
+                color: 'red.400',
+                bg: 'rgba(255,51,102,0.08)',
+              }}
+              title={confirmDelete ? 'Click again to confirm' : 'Delete draft'}
+            >
+              <Icon as={confirmDelete ? TbAlertTriangle : TbTrash} boxSize={3.5} />
+            </Box>
+          ) : (
+            <Box w="28px" />
+          )}
+        </HStack>
       </HStack>
     </Box>
   );
 };
 
 const InvoiceList = ({ invoices, loading, onSelect, onNew, onQuickDelete }) => {
+  const [snapshotInvoiceId, setSnapshotInvoiceId] = useState(null);
+
   if (loading) {
     return (
       <Center py={16}>
@@ -218,16 +256,25 @@ const InvoiceList = ({ invoices, loading, onSelect, onNew, onQuickDelete }) => {
   }
 
   return (
-    <Box borderTop="1px solid" borderColor="surface.900">
-      {invoices.map((inv) => (
-        <InvoiceRow
-          key={inv.id}
-          invoice={inv}
-          onSelect={onSelect}
-          onQuickDelete={onQuickDelete}
-        />
-      ))}
-    </Box>
+    <>
+      <Box borderTop="1px solid" borderColor="surface.900">
+        {invoices.map((inv) => (
+          <InvoiceRow
+            key={inv.id}
+            invoice={inv}
+            onSelect={onSelect}
+            onQuickDelete={onQuickDelete}
+            onViewSnapshot={setSnapshotInvoiceId}
+          />
+        ))}
+      </Box>
+
+      <InvoiceSnapshotModal
+        isOpen={!!snapshotInvoiceId}
+        onClose={() => setSnapshotInvoiceId(null)}
+        invoiceId={snapshotInvoiceId}
+      />
+    </>
   );
 };
 

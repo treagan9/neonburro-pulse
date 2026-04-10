@@ -3,11 +3,12 @@
 // - Drafts: hard delete via two-click subtle link
 // - Sent/viewed/partial/overdue: soft cancel via modal with typed confirmation
 // - Paid: cannot delete (button hidden)
+// - Eye icon next to status badge: opens snapshot modal showing exact email sent
 
 import { useState, useEffect } from 'react';
 import {
   Box, VStack, HStack, Text, Container, Icon, Spinner, Center,
-  Button, Input, Textarea, Select, useToast, Divider,
+  Button, Input, Textarea, Select, useToast, Divider, Tooltip,
   Modal, ModalOverlay, ModalContent, ModalBody, ModalHeader, ModalFooter, ModalCloseButton,
 } from '@chakra-ui/react';
 import {
@@ -16,6 +17,7 @@ import {
 } from 'react-icons/tb';
 import { supabase } from '../../../lib/supabase';
 import InvoicePreview from './InvoicePreview';
+import InvoiceSnapshotModal from './InvoiceSnapshotModal';
 
 const currency = (val) => {
   const num = parseFloat(val || 0);
@@ -386,12 +388,14 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
   const [deleting, setDeleting] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [showSnapshot, setShowSnapshot] = useState(false);
 
   const isNew = !invoiceId;
   const client = clients.find((c) => c.id === clientId);
   const isPaid = invoice?.status === 'paid';
   const isSentish = SENT_STATUSES.includes(invoice?.status);
   const isDraft = invoice?.status === 'draft' || isNew;
+  const wasSent = !isNew && invoice?.status && invoice.status !== 'draft';
 
   useEffect(() => { loadData(); }, [invoiceId]);
   useEffect(() => {
@@ -601,7 +605,6 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
     }
   };
 
-  // Hard delete - drafts only
   const handleHardDelete = async () => {
     if (!confirmDelete) {
       setConfirmDelete(true);
@@ -635,21 +638,19 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
     }
   };
 
-  // Soft cancel - sent/viewed/partial/overdue
   const handleSoftCancel = async (reason) => {
     setCancelling(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       const now = new Date().toISOString();
 
-      // Mark cancelled + invalidate pay token
       const { error } = await supabase
         .from('invoices')
         .update({
           cancelled_at: now,
           cancelled_by: user?.id,
           cancellation_reason: reason || null,
-          pay_token: null, // Kills the magic link in the email
+          pay_token: null,
           status: 'cancelled',
           updated_at: now,
         })
@@ -657,7 +658,6 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
 
       if (error) throw error;
 
-      // Activity log
       await supabase.from('activity_log').insert({
         user_id: user?.id,
         action: 'invoice_cancelled',
@@ -746,20 +746,42 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                   {isNew ? 'New Invoice' : invoice?.invoice_number || 'Invoice'}
                 </Text>
                 {!isNew && invoice?.status && (
-                  <Text
-                    fontSize="2xs"
-                    fontWeight="700"
-                    color={
-                      invoice.status === 'paid' ? 'accent.neon' :
-                      invoice.status === 'draft' ? 'surface.500' :
-                      'brand.500'
-                    }
-                    textTransform="uppercase"
-                    letterSpacing="0.08em"
-                    fontFamily="mono"
-                  >
-                    {invoice.status}
-                  </Text>
+                  <HStack spacing={2}>
+                    <Text
+                      fontSize="2xs"
+                      fontWeight="700"
+                      color={
+                        invoice.status === 'paid' ? 'accent.neon' :
+                        invoice.status === 'draft' ? 'surface.500' :
+                        'brand.500'
+                      }
+                      textTransform="uppercase"
+                      letterSpacing="0.08em"
+                      fontFamily="mono"
+                    >
+                      {invoice.status}
+                    </Text>
+                    {wasSent && (
+                      <Tooltip
+                        label="View sent email"
+                        placement="top"
+                        hasArrow
+                        bg="surface.800"
+                        fontSize="xs"
+                      >
+                        <Box
+                          as="button"
+                          onClick={() => setShowSnapshot(true)}
+                          color="surface.600"
+                          _hover={{ color: 'brand.500' }}
+                          transition="color 0.15s"
+                          p={0.5}
+                        >
+                          <Icon as={TbEye} boxSize={3.5} />
+                        </Box>
+                      </Tooltip>
+                    )}
+                  </HStack>
                 )}
               </HStack>
               <Text color="surface.500" fontSize="sm">
@@ -997,10 +1019,8 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
               </Box>
             </HStack>
 
-            {/* Delete / Cancel actions at bottom */}
             {!isNew && (
               <Box pt={6}>
-                {/* Drafts: subtle two-click hard delete */}
                 {isDraft && (
                   <HStack
                     spacing={1.5}
@@ -1020,7 +1040,6 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                   </HStack>
                 )}
 
-                {/* Sent/viewed/partial/overdue: heavyweight cancel modal */}
                 {isSentish && (
                   <HStack
                     spacing={1.5}
@@ -1040,7 +1059,6 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                   </HStack>
                 )}
 
-                {/* Paid: explicit message */}
                 {isPaid && (
                   <Text
                     fontSize="2xs"
@@ -1067,13 +1085,18 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
         )}
       </Container>
 
-      {/* Cancel modal */}
       <CancelInvoiceModal
         isOpen={showCancelModal}
         onClose={() => setShowCancelModal(false)}
         invoice={invoice}
         onConfirm={handleSoftCancel}
         processing={cancelling}
+      />
+
+      <InvoiceSnapshotModal
+        isOpen={showSnapshot}
+        onClose={() => setShowSnapshot(false)}
+        invoiceId={invoiceId}
       />
     </Box>
   );
