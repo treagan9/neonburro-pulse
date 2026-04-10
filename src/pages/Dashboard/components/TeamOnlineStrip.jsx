@@ -1,12 +1,5 @@
 // src/pages/Dashboard/components/TeamOnlineStrip.jsx
-// ============================================
-// TEAM ONLINE STRIP (Pulse version)
-// - Shows only team members currently online (via usePresence)
-// - Hidden when nobody is online
-// - Small naked avatars with green presence dot
-// - Click avatar navigates to /projects/?assigned={id}
-// - No container, naked inline
-// ============================================
+// Naked avatars of online team members. Click navigates to /clients/.
 
 import { useState, useEffect } from 'react';
 import { HStack, Tooltip, Box } from '@chakra-ui/react';
@@ -32,9 +25,7 @@ const TeamOnlineStrip = () => {
     fetchProfiles();
   }, []);
 
-  // Filter to only online members using presenceMap from the hook
   const onlineMembers = profiles.filter((p) => presenceMap[p.id]?.status === 'online');
-
   if (onlineMembers.length === 0) return null;
 
   return (
@@ -52,7 +43,7 @@ const TeamOnlineStrip = () => {
         >
           <Box
             cursor="pointer"
-            onClick={() => navigate(`/projects/?assigned=${member.id}`)}
+            onClick={() => navigate('/clients/')}
             transition="all 0.15s"
             _hover={{ transform: 'translateY(-1px)' }}
           >

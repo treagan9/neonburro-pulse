@@ -1,5 +1,5 @@
 // src/pages/Dashboard/components/ActivityStream.jsx
-// Slim activity stream - no heavy badges, plain colored text inline
+// Slim activity stream - naked section (no card frame)
 // "System" actions render as "Neon Burro" with the logo image
 // Payment activities show subtle method icons (card brand, ACH, check, wallet)
 
@@ -7,7 +7,7 @@ import {
   Box, VStack, HStack, Text, Icon, Center, Spinner, Image, Tooltip,
 } from '@chakra-ui/react';
 import {
-  TbActivity, TbCreditCard, TbBuildingBank, TbWallet, TbWriting, TbArrowsTransferUp,
+  TbActivity, TbCreditCard, TbBuildingBank, TbWriting, TbArrowsTransferUp,
 } from 'react-icons/tb';
 import {
   FaCcVisa, FaCcMastercard, FaCcAmex, FaCcDiscover, FaApplePay, FaGooglePay,
@@ -52,11 +52,9 @@ const ENTITY_COLORS = {
   form_submitted:   '#8B5CF6',
 };
 
-// Maps Stripe payment_method.type and brand to a subtle icon
 const PaymentMethodIcon = ({ type, brand, wallet }) => {
   if (wallet === 'apple_pay') return <Icon as={FaApplePay} boxSize={4} color="surface.500" />;
   if (wallet === 'google_pay') return <Icon as={FaGooglePay} boxSize={4} color="surface.500" />;
-
   if (type === 'card') {
     if (brand === 'visa') return <Icon as={FaCcVisa} boxSize={3.5} color="surface.500" />;
     if (brand === 'mastercard') return <Icon as={FaCcMastercard} boxSize={3.5} color="surface.500" />;
@@ -64,17 +62,9 @@ const PaymentMethodIcon = ({ type, brand, wallet }) => {
     if (brand === 'discover') return <Icon as={FaCcDiscover} boxSize={3.5} color="surface.500" />;
     return <Icon as={TbCreditCard} boxSize={3} color="surface.500" />;
   }
-
-  if (type === 'us_bank_account' || type === 'ach') {
-    return <Icon as={TbBuildingBank} boxSize={3} color="surface.500" />;
-  }
-  if (type === 'check') {
-    return <Icon as={TbWriting} boxSize={3} color="surface.500" />;
-  }
-  if (type === 'wire') {
-    return <Icon as={TbArrowsTransferUp} boxSize={3} color="surface.500" />;
-  }
-
+  if (type === 'us_bank_account' || type === 'ach') return <Icon as={TbBuildingBank} boxSize={3} color="surface.500" />;
+  if (type === 'check') return <Icon as={TbWriting} boxSize={3} color="surface.500" />;
+  if (type === 'wire') return <Icon as={TbArrowsTransferUp} boxSize={3} color="surface.500" />;
   return null;
 };
 
@@ -99,7 +89,6 @@ const ActivityItem = ({ activity, profileMap }) => {
   const { getStatus } = usePresence();
   const status = activity.user_id ? getStatus(activity.user_id) : null;
 
-  // System actions (no user_id) render as Neon Burro with logo
   const isSystem = !activity.user_id;
   const displayName = isSystem ? 'Neon Burro' : (profile?.display_name || 'Unknown');
 
@@ -116,7 +105,6 @@ const ActivityItem = ({ activity, profileMap }) => {
     ? `$${parseFloat(amount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
     : null;
 
-  // Payment method details for payment activities
   const pmType = activity.metadata?.payment_method_type;
   const pmBrand = activity.metadata?.payment_method_brand;
   const pmLast4 = activity.metadata?.payment_method_last4;
@@ -129,15 +117,16 @@ const ActivityItem = ({ activity, profileMap }) => {
   return (
     <HStack
       spacing={3}
-      py={3}
-      px={3}
+      py={2.5}
       align="center"
-      borderRadius="lg"
-      transition="all 0.15s"
-      _hover={{ bg: 'rgba(255,255,255,0.015)' }}
       role="group"
+      borderBottom="1px solid"
+      borderColor="surface.900"
+      transition="all 0.15s"
+      _hover={{ bg: 'rgba(255,255,255,0.012)' }}
+      pl={3}
+      pr={3}
     >
-      {/* Avatar - Neon Burro logo for system, profile pic for users */}
       {isSystem ? (
         <Box
           w="32px"
@@ -170,19 +159,12 @@ const ActivityItem = ({ activity, profileMap }) => {
       )}
 
       <Box flex={1} minW={0}>
-        {/* Single line: name verb [entity] [amount] [method] */}
         <HStack spacing={1.5} flexWrap="wrap" align="baseline">
-          <Text
-            color="white"
-            fontSize="sm"
-            fontWeight="700"
-            letterSpacing="-0.005em"
-          >
+          <Text color="white" fontSize="sm" fontWeight="700" letterSpacing="-0.005em">
             {displayName}
           </Text>
           <Text color="surface.500" fontSize="sm">{verb}</Text>
 
-          {/* Slim entity reference - just colored text, no badge */}
           {entityName && (
             <Text
               color={entityColor}
@@ -195,7 +177,6 @@ const ActivityItem = ({ activity, profileMap }) => {
             </Text>
           )}
 
-          {/* Slim amount - just colored mono text */}
           {amountDisplay && (
             <Text
               color={
@@ -211,7 +192,6 @@ const ActivityItem = ({ activity, profileMap }) => {
             </Text>
           )}
 
-          {/* Payment method icon + label - inline, subtle */}
           {showPaymentMethod && (
             <Tooltip
               label={PaymentMethodLabel({ type: pmType, brand: pmBrand, last4: pmLast4, wallet: pmWallet })}
@@ -233,7 +213,6 @@ const ActivityItem = ({ activity, profileMap }) => {
           )}
         </HStack>
 
-        {/* Timestamp on its own line, super subtle */}
         <Text color="surface.700" fontSize="2xs" fontFamily="mono" mt={0.5}>
           {timeAgo}
         </Text>
@@ -244,26 +223,9 @@ const ActivityItem = ({ activity, profileMap }) => {
 
 const ActivityStream = ({ activities, profileMap = {}, loading }) => {
   return (
-    <Box
-      bg="surface.900"
-      border="1px solid"
-      borderColor="surface.800"
-      borderRadius="2xl"
-      p={{ base: 4, md: 5 }}
-      position="relative"
-      overflow="hidden"
-    >
-      <Box
-        position="absolute"
-        top={0}
-        left={0}
-        right={0}
-        h="120px"
-        bg="radial-gradient(ellipse at top left, rgba(0,229,229,0.04), transparent 60%)"
-        pointerEvents="none"
-      />
-
-      <HStack spacing={2} mb={4} position="relative">
+    <Box position="relative">
+      {/* Header label - matches the rest of the app */}
+      <HStack spacing={2} mb={4}>
         <Box
           w="6px"
           h="6px"
@@ -284,11 +246,11 @@ const ActivityStream = ({ activities, profileMap = {}, loading }) => {
       </HStack>
 
       {loading ? (
-        <Center py={10} position="relative">
+        <Center py={10}>
           <Spinner size="sm" color="brand.500" thickness="2px" />
         </Center>
       ) : activities.length === 0 ? (
-        <VStack py={10} spacing={2} position="relative">
+        <VStack py={10} spacing={2}>
           <Icon as={TbActivity} boxSize={6} color="surface.700" />
           <Text color="surface.500" fontSize="xs" fontFamily="mono">
             No signals yet
@@ -298,7 +260,7 @@ const ActivityStream = ({ activities, profileMap = {}, loading }) => {
           </Text>
         </VStack>
       ) : (
-        <VStack align="stretch" spacing={0} position="relative">
+        <Box borderTop="1px solid" borderColor="surface.900">
           {activities.map((activity) => (
             <ActivityItem
               key={activity.id}
@@ -306,7 +268,7 @@ const ActivityStream = ({ activities, profileMap = {}, loading }) => {
               profileMap={profileMap}
             />
           ))}
-        </VStack>
+        </Box>
       )}
     </Box>
   );

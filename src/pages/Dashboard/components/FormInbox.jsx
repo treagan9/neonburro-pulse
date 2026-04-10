@@ -1,5 +1,5 @@
 // src/pages/Dashboard/components/FormInbox.jsx
-// Collapsable form submission inbox for the dashboard
+// Collapsable form submission inbox - naked section, no card frame
 // - Shows unread count when collapsed
 // - Click row to expand and see all fields
 // - Mark read / archive actions
@@ -8,16 +8,14 @@
 import { useState, useEffect } from 'react';
 import {
   Box, VStack, HStack, Text, Icon, Center, Spinner, Collapse,
-  Button, useToast, Tooltip,
+  useToast, Tooltip,
 } from '@chakra-ui/react';
 import {
-  TbInbox, TbChevronDown, TbChevronRight, TbArchive,
-  TbCheck, TbExternalLink, TbMail, TbMessage,
+  TbInbox, TbChevronDown, TbChevronRight, TbArchive, TbMail,
 } from 'react-icons/tb';
 import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '../../../lib/supabase';
 
-// Friendly labels for each form type
 const FORM_TYPE_LABELS = {
   contact: 'Contact',
   application: 'Application',
@@ -38,8 +36,6 @@ const FORM_TYPE_COLORS = {
   wild_request: '#FF6B35',
 };
 
-// Walk an arbitrary JSONB object and render it as label/value pairs
-// Skips internal fields, renders nested objects as JSON
 const renderFormFields = (data) => {
   if (!data || typeof data !== 'object') return null;
   const skipKeys = ['form_type', 'submitted_at', 'ip', 'user_agent', '_internal'];
@@ -49,15 +45,10 @@ const renderFormFields = (data) => {
   return entries.map(([key, value]) => {
     const label = key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
     let display;
-    if (value === null || value === undefined || value === '') {
-      display = '—';
-    } else if (typeof value === 'object') {
-      display = JSON.stringify(value, null, 2);
-    } else if (typeof value === 'boolean') {
-      display = value ? 'Yes' : 'No';
-    } else {
-      display = String(value);
-    }
+    if (value === null || value === undefined || value === '') display = '—';
+    else if (typeof value === 'object') display = JSON.stringify(value, null, 2);
+    else if (typeof value === 'boolean') display = value ? 'Yes' : 'No';
+    else display = String(value);
 
     return (
       <HStack key={key} align="start" spacing={4} py={1.5}>
@@ -89,33 +80,22 @@ const renderFormFields = (data) => {
 
 const FormRow = ({ submission, onMarkRead, onArchive }) => {
   const [expanded, setExpanded] = useState(false);
-  const toast = useToast();
 
   const formType = submission.form_type || submission.data?.form_type || 'contact';
   const typeLabel = FORM_TYPE_LABELS[formType] || formType.replace(/_/g, ' ');
   const typeColor = FORM_TYPE_COLORS[formType] || '#737373';
 
-  // Pull common fields from the data payload
   const data = submission.data || submission;
   const senderName = data.name || data.full_name || data.contact_name || 'Anonymous';
   const senderEmail = data.email || data.contact_email || null;
   const previewMessage =
-    data.message ||
-    data.description ||
-    data.brief ||
-    data.request ||
-    data.notes ||
-    data.details ||
-    '';
+    data.message || data.description || data.brief || data.request || data.notes || data.details || '';
 
   const isUnread = submission.status === 'unread';
   const timeAgo = formatDistanceToNow(new Date(submission.created_at), { addSuffix: true });
 
   const handleToggle = async () => {
-    if (!expanded && isUnread) {
-      // Auto-mark read on first expand
-      await onMarkRead(submission.id);
-    }
+    if (!expanded && isUnread) await onMarkRead(submission.id);
     setExpanded(!expanded);
   };
 
@@ -144,7 +124,6 @@ const FormRow = ({ submission, onMarkRead, onArchive }) => {
           flexShrink={0}
         />
 
-        {/* Type label */}
         <Box minW="90px" flexShrink={0}>
           <Text
             fontSize="2xs"
@@ -158,7 +137,6 @@ const FormRow = ({ submission, onMarkRead, onArchive }) => {
           </Text>
         </Box>
 
-        {/* Sender + preview */}
         <Box flex={1} minW={0}>
           <HStack spacing={2} align="baseline">
             <Text
@@ -182,7 +160,6 @@ const FormRow = ({ submission, onMarkRead, onArchive }) => {
           )}
         </Box>
 
-        {/* Timestamp */}
         <Text
           color="surface.700"
           fontSize="2xs"
@@ -193,7 +170,6 @@ const FormRow = ({ submission, onMarkRead, onArchive }) => {
           {timeAgo}
         </Text>
 
-        {/* Unread indicator dot */}
         {isUnread && (
           <Box
             w="6px"
@@ -206,7 +182,6 @@ const FormRow = ({ submission, onMarkRead, onArchive }) => {
         )}
       </HStack>
 
-      {/* Expanded details */}
       <Collapse in={expanded} animateOpacity>
         <Box pl={12} pr={4} pb={4} pt={1}>
           <Box
@@ -216,13 +191,10 @@ const FormRow = ({ submission, onMarkRead, onArchive }) => {
             borderRadius="lg"
             p={4}
           >
-            <VStack align="stretch" spacing={0} divider={
-              <Box h="1px" bg="surface.900" />
-            }>
+            <VStack align="stretch" spacing={0} divider={<Box h="1px" bg="surface.900" />}>
               {renderFormFields(data)}
             </VStack>
 
-            {/* Footer with metadata + actions */}
             <HStack
               justify="space-between"
               pt={3}
@@ -255,26 +227,24 @@ const FormRow = ({ submission, onMarkRead, onArchive }) => {
                 )}
               </HStack>
 
-              <HStack spacing={3}>
-                <Box
-                  as="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onArchive(submission.id);
-                  }}
-                  color="surface.600"
-                  _hover={{ color: 'red.400' }}
-                  fontSize="2xs"
-                  fontWeight="700"
-                  textTransform="uppercase"
-                  letterSpacing="0.05em"
-                >
-                  <HStack spacing={1}>
-                    <Icon as={TbArchive} boxSize={3} />
-                    <Text>Archive</Text>
-                  </HStack>
-                </Box>
-              </HStack>
+              <Box
+                as="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onArchive(submission.id);
+                }}
+                color="surface.600"
+                _hover={{ color: 'red.400' }}
+                fontSize="2xs"
+                fontWeight="700"
+                textTransform="uppercase"
+                letterSpacing="0.05em"
+              >
+                <HStack spacing={1}>
+                  <Icon as={TbArchive} boxSize={3} />
+                  <Text>Archive</Text>
+                </HStack>
+              </Box>
             </HStack>
           </Box>
         </Box>
@@ -286,7 +256,7 @@ const FormRow = ({ submission, onMarkRead, onArchive }) => {
 const FormInbox = () => {
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [expanded, setExpanded] = useState(true); // Inbox itself is expanded by default
+  const [expanded, setExpanded] = useState(true);
   const toast = useToast();
 
   useEffect(() => { fetchSubmissions(); }, []);
@@ -345,36 +315,30 @@ const FormInbox = () => {
   const totalCount = submissions.length;
 
   return (
-    <Box
-      bg="surface.900"
-      border="1px solid"
-      borderColor="surface.800"
-      borderRadius="2xl"
-      overflow="hidden"
-    >
-      {/* Header - clickable to collapse */}
+    <Box position="relative">
+      {/* Header - clickable to collapse, matches Activity Stream label style */}
       <HStack
-        px={5}
-        py={4}
-        spacing={3}
+        spacing={2}
+        mb={4}
         cursor="pointer"
         onClick={() => setExpanded(!expanded)}
-        _hover={{ bg: 'rgba(255,255,255,0.01)' }}
-        transition="all 0.15s"
+        userSelect="none"
+        _hover={{ '& .label': { color: 'brand.400' } }}
       >
         <Icon
           as={expanded ? TbChevronDown : TbChevronRight}
-          boxSize={3.5}
-          color="surface.500"
+          boxSize={3}
+          color="brand.500"
         />
-        <Icon as={TbInbox} boxSize={4} color="brand.500" />
         <Text
+          className="label"
           color="brand.500"
           fontSize="xs"
           fontWeight="700"
           textTransform="uppercase"
           letterSpacing="0.12em"
           fontFamily="mono"
+          transition="color 0.15s"
         >
           Form Inbox
         </Text>
@@ -405,7 +369,6 @@ const FormInbox = () => {
         )}
       </HStack>
 
-      {/* Body */}
       <Collapse in={expanded} animateOpacity>
         {loading ? (
           <Center py={10}>
