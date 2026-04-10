@@ -1,16 +1,14 @@
 // src/pages/Invoicing/index.jsx
-// Split-pane layout: invoice list on left, inline editor on right
-// When nothing selected: shows filters + list
-// When invoice selected: shows editor with Compose/Preview tabs
-// Supports ?invoice=ID, ?client=ID, ?new=true query params
+// Split-pane invoicing with collapsed tabs:
+// All / Drafts / Sent (includes sent/viewed/partial/overdue) / Paid
+// Filters out cancelled invoices everywhere
 
 import { useState, useEffect } from 'react';
 import {
-  Box, VStack, HStack, Text, Container, Icon, Spinner, Center,
-  Button, Input, useToast,
+  Box, VStack, HStack, Text, Container, Icon, Input,
 } from '@chakra-ui/react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
-import { TbPlus, TbSearch, TbX } from 'react-icons/tb';
+import { useSearchParams } from 'react-router-dom';
+import { TbPlus, TbSearch } from 'react-icons/tb';
 import { supabase } from '../../lib/supabase';
 import InvoiceList from './components/InvoiceList';
 import InvoiceEditor from './components/InvoiceEditor';
@@ -22,11 +20,11 @@ const currency = (val) => {
   return `$${num.toLocaleString()}`;
 };
 
-const Invoicing = () => {
-  const navigate = useNavigate();
-  const toast = useToast();
-  const [searchParams, setSearchParams] = useSearchParams();
+// Status groups - "Sent" tab covers anything awaiting client action
+const SENT_STATUSES = ['sent', 'viewed', 'partial', 'overdue'];
 
+const Invoicing = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [invoices, setInvoices] = useState([]);
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -34,7 +32,6 @@ const Invoicing = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedInvoiceId, setSelectedInvoiceId] = useState(null);
 
-  // Load the selected invoice from URL on mount
   useEffect(() => {
     const invoiceParam = searchParams.get('invoice');
     if (invoiceParam) setSelectedInvoiceId(invoiceParam);
@@ -48,13 +45,13 @@ const Invoicing = () => {
       supabase
         .from('invoices')
         .select('*, invoice_items(*), clients(id, name, company, email, phone)')
+        .is('cancelled_at', null)  // Hide cancelled
         .order('created_at', { ascending: false }),
       supabase
         .from('clients')
         .select('id, name, company, email, phone, status')
         .order('name'),
     ]);
-
     setInvoices(invoicesRes.data || []);
     setClients(clientsRes.data || []);
     setLoading(false);
@@ -76,6 +73,31 @@ const Invoicing = () => {
     setSearchParams({});
   };
 
+  // Quick delete from row (drafts only - hard delete)
+  const handleQuickDelete = async (invoiceId) => {
+    try {
+      await supabase.from('invoice_items').delete().eq('invoice_id', invoiceId);
+      const { error } = await supabase.from('invoices').delete().eq('id', invoiceId);
+      if (error) throw error;
+
+      // Activity log
+      const { data: { user } } = await supabase.auth.getUser();
+      await supabase.from('activity_log').insert({
+        user_id: user?.id,
+        action: 'invoice_deleted',
+        entity_type: 'invoice',
+        entity_id: invoiceId,
+        metadata: { hard_delete: true },
+        created_at: new Date().toISOString(),
+      });
+
+      fetchData();
+    } catch (err) {
+      console.error('Delete failed:', err);
+      alert(`Delete failed: ${err.message}`);
+    }
+  };
+
   // Filter invoices
   const filtered = invoices.filter((inv) => {
     const matchSearch = search
@@ -83,14 +105,19 @@ const Invoicing = () => {
         inv.clients?.name?.toLowerCase().includes(search.toLowerCase()) ||
         inv.clients?.company?.toLowerCase().includes(search.toLowerCase())
       : true;
-    const matchStatus = filterStatus === 'all' || inv.status === filterStatus;
+
+    let matchStatus = true;
+    if (filterStatus === 'draft') matchStatus = inv.status === 'draft';
+    else if (filterStatus === 'sent') matchStatus = SENT_STATUSES.includes(inv.status);
+    else if (filterStatus === 'paid') matchStatus = inv.status === 'paid';
+
     return matchSearch && matchStatus;
   });
 
   // Stats
   const stats = {
     totalOutstanding: invoices
-      .filter((inv) => ['sent', 'viewed', 'overdue', 'partial'].includes(inv.status))
+      .filter((inv) => SENT_STATUSES.includes(inv.status))
       .reduce((sum, inv) => sum + (parseFloat(inv.total || 0) - parseFloat(inv.total_paid || 0)), 0),
     mtdRevenue: invoices
       .filter((inv) => {
@@ -107,13 +134,10 @@ const Invoicing = () => {
   const counts = {
     all: invoices.length,
     draft: invoices.filter((i) => i.status === 'draft').length,
-    sent: invoices.filter((i) => i.status === 'sent').length,
-    partial: invoices.filter((i) => i.status === 'partial').length,
+    sent: invoices.filter((i) => SENT_STATUSES.includes(i.status)).length,
     paid: invoices.filter((i) => i.status === 'paid').length,
-    overdue: invoices.filter((i) => i.status === 'overdue').length,
   };
 
-  // If an invoice is selected, show the editor
   if (selectedInvoiceId) {
     return (
       <InvoiceEditor
@@ -143,17 +167,15 @@ const Invoicing = () => {
           {/* Header */}
           <VStack align="stretch" spacing={4}>
             <HStack justify="space-between" align="flex-end" flexWrap="wrap" gap={3}>
-              <Box>
-                <Text
-                  fontSize={{ base: '2xl', md: '3xl' }}
-                  fontWeight="800"
-                  color="white"
-                  letterSpacing="-0.02em"
-                  lineHeight="1"
-                >
-                  Invoicing
-                </Text>
-              </Box>
+              <Text
+                fontSize={{ base: '2xl', md: '3xl' }}
+                fontWeight="800"
+                color="white"
+                letterSpacing="-0.02em"
+                lineHeight="1"
+              >
+                Invoicing
+              </Text>
               <HStack
                 spacing={1.5}
                 cursor="pointer"
@@ -162,6 +184,7 @@ const Invoicing = () => {
                 opacity={0.8}
                 _hover={{ opacity: 1, transform: 'translateY(-1px)' }}
                 transition="all 0.15s"
+                userSelect="none"
               >
                 <Icon as={TbPlus} boxSize={3.5} />
                 <Text fontSize="xs" fontWeight="700" letterSpacing="0.05em" textTransform="uppercase">
@@ -170,7 +193,7 @@ const Invoicing = () => {
               </HStack>
             </HStack>
 
-            {/* Inline stat strip */}
+            {/* Inline stats */}
             <HStack spacing={0} color="surface.500" fontSize="xs" fontFamily="mono" flexWrap="wrap">
               <Text color="white" fontWeight="700">{stats.totalCount}</Text>
               <Text color="surface.600" mx={1.5}>invoices</Text>
@@ -194,7 +217,7 @@ const Invoicing = () => {
             </HStack>
           </VStack>
 
-          {/* Filters */}
+          {/* Filters - collapsed to 4 tabs */}
           <HStack spacing={6} flexWrap="wrap" align="center">
             <Box flex={1} minW="240px" maxW="400px" position="relative">
               <Icon
@@ -226,14 +249,12 @@ const Invoicing = () => {
               />
             </Box>
 
-            <HStack spacing={4}>
+            <HStack spacing={5}>
               {[
                 { value: 'all', label: 'All' },
                 { value: 'draft', label: 'Drafts' },
                 { value: 'sent', label: 'Sent' },
-                { value: 'partial', label: 'Partial' },
                 { value: 'paid', label: 'Paid' },
-                { value: 'overdue', label: 'Overdue' },
               ].map((opt) => {
                 const active = filterStatus === opt.value;
                 const count = counts[opt.value] || 0;
@@ -287,6 +308,7 @@ const Invoicing = () => {
             loading={loading}
             onSelect={handleSelectInvoice}
             onNew={handleNewInvoice}
+            onQuickDelete={handleQuickDelete}
           />
         </VStack>
       </Container>

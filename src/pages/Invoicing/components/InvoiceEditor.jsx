@@ -1,20 +1,20 @@
 // src/pages/Invoicing/components/InvoiceEditor.jsx
-// Inline invoice editor with Compose and Preview tabs
-// - Compose: admin view, edit sprints, set amounts, funding modes, billable toggle
-// - Preview: exactly what the client sees in their portal/email
+// Inline invoice editor with Compose/Preview tabs.
+// - Drafts: hard delete via two-click subtle link
+// - Sent/viewed/partial/overdue: soft cancel via modal with typed confirmation
+// - Paid: cannot delete (button hidden)
 
 import { useState, useEffect } from 'react';
 import {
   Box, VStack, HStack, Text, Container, Icon, Spinner, Center,
-  Button, Input, Textarea, Select, useToast, Divider, Badge,
+  Button, Input, Textarea, Select, useToast, Divider,
+  Modal, ModalOverlay, ModalContent, ModalBody, ModalHeader, ModalFooter, ModalCloseButton,
 } from '@chakra-ui/react';
-import { useNavigate } from 'react-router-dom';
 import {
   TbArrowLeft, TbPlus, TbTrash, TbSend, TbEye, TbEdit,
-  TbCheck, TbBolt, TbAlertTriangle, TbMail, TbX,
+  TbCheck, TbBolt, TbAlertTriangle,
 } from 'react-icons/tb';
 import { supabase } from '../../../lib/supabase';
-import { getInitials, getAvatarColor } from '../../../utils/phone';
 import InvoicePreview from './InvoicePreview';
 
 const currency = (val) => {
@@ -27,6 +27,8 @@ const FUNDING_MODES = [
   { value: 'deposit_50', label: '50% to Start', color: '#FFE500' },
   { value: 'pay_full', label: 'Fund in Full', color: '#39FF14' },
 ];
+
+const SENT_STATUSES = ['sent', 'viewed', 'partial', 'overdue'];
 
 const nakedInput = {
   bg: 'transparent',
@@ -70,7 +72,6 @@ const SprintEditRow = ({ sprint, onUpdate, onDelete }) => {
       transition="opacity 0.15s"
     >
       <HStack spacing={3} align="start">
-        {/* Billable toggle */}
         <Box
           as="button"
           onClick={() => !isLocked && onUpdate({ ...sprint, is_billable: !isWip })}
@@ -87,13 +88,11 @@ const SprintEditRow = ({ sprint, onUpdate, onDelete }) => {
           cursor={isLocked ? 'not-allowed' : 'pointer'}
           flexShrink={0}
           transition="all 0.15s"
-          _hover={!isLocked ? { borderColor: 'brand.500' } : {}}
         >
           {!isWip && <Icon as={TbCheck} boxSize={2.5} color="surface.950" strokeWidth={3} />}
         </Box>
 
         <Box flex={1}>
-          {/* Title + amount row */}
           <HStack spacing={3} align="center" mb={1}>
             <Input
               value={sprint.title || ''}
@@ -134,13 +133,11 @@ const SprintEditRow = ({ sprint, onUpdate, onDelete }) => {
             <Text color="surface.600" fontSize="xs" fontFamily="mono">USD</Text>
           </HStack>
 
-          {/* Sprint meta + controls */}
           <HStack spacing={3} mt={1}>
             <Text color="surface.600" fontSize="2xs" fontFamily="mono" fontWeight="700">
               {sprint.sprint_number || '— not assigned yet —'}
             </Text>
 
-            {/* Funding mode selector */}
             <HStack spacing={1.5}>
               {FUNDING_MODES.map((mode) => {
                 const active = (sprint.payment_mode || 'approve_only') === mode.value;
@@ -157,14 +154,12 @@ const SprintEditRow = ({ sprint, onUpdate, onDelete }) => {
                     bg={active ? `${mode.color}12` : 'transparent'}
                     transition="all 0.15s"
                     cursor={isLocked ? 'not-allowed' : 'pointer'}
-                    _hover={!isLocked && !active ? { borderColor: 'surface.600' } : {}}
                   >
                     <Text
                       fontSize="2xs"
                       fontWeight="700"
                       color={active ? mode.color : 'surface.600'}
                       textTransform="uppercase"
-                      letterSpacing="0.03em"
                     >
                       {mode.label}
                     </Text>
@@ -195,7 +190,6 @@ const SprintEditRow = ({ sprint, onUpdate, onDelete }) => {
               fontFamily="mono"
               fontWeight="700"
               textTransform="uppercase"
-              letterSpacing="0.05em"
             >
               {expanded ? 'Less' : 'Details'}
             </Box>
@@ -206,14 +200,12 @@ const SprintEditRow = ({ sprint, onUpdate, onDelete }) => {
                 onClick={onDelete}
                 color="surface.700"
                 _hover={{ color: 'red.400' }}
-                transition="color 0.15s"
               >
                 <Icon as={TbTrash} boxSize={3.5} />
               </Box>
             )}
           </HStack>
 
-          {/* Expanded description */}
           {expanded && (
             <Textarea
               value={sprint.description || ''}
@@ -228,7 +220,6 @@ const SprintEditRow = ({ sprint, onUpdate, onDelete }) => {
               fontSize="xs"
               rows={2}
               isReadOnly={isLocked}
-              _hover={{ borderColor: 'surface.700' }}
               _focus={{ borderColor: 'brand.500', boxShadow: 'none' }}
               _placeholder={{ color: 'surface.700' }}
             />
@@ -240,11 +231,145 @@ const SprintEditRow = ({ sprint, onUpdate, onDelete }) => {
 };
 
 // ============================================================
+// CANCEL MODAL - heavyweight confirmation for sent invoices
+// ============================================================
+const CancelInvoiceModal = ({ isOpen, onClose, invoice, onConfirm, processing }) => {
+  const [typedConfirm, setTypedConfirm] = useState('');
+  const [reason, setReason] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) {
+      setTypedConfirm('');
+      setReason('');
+    }
+  }, [isOpen]);
+
+  const canConfirm = typedConfirm === 'CANCEL';
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} isCentered size="md">
+      <ModalOverlay bg="blackAlpha.900" backdropFilter="blur(8px)" />
+      <ModalContent
+        bg="surface.950"
+        border="1px solid"
+        borderColor="red.900"
+        borderRadius="2xl"
+        mx={4}
+      >
+        <ModalHeader pb={2} pt={6} px={6}>
+          <HStack spacing={3}>
+            <Box
+              w="40px"
+              h="40px"
+              borderRadius="full"
+              bg="rgba(255,51,102,0.1)"
+              border="1px solid rgba(255,51,102,0.3)"
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+            >
+              <Icon as={TbAlertTriangle} boxSize={4} color="red.400" />
+            </Box>
+            <VStack align="start" spacing={0}>
+              <Text color="white" fontSize="md" fontWeight="800">
+                Cancel Invoice
+              </Text>
+              <Text color="surface.500" fontSize="2xs" fontFamily="mono">
+                {invoice?.invoice_number}
+              </Text>
+            </VStack>
+          </HStack>
+        </ModalHeader>
+        <ModalCloseButton color="surface.500" top={5} right={5} />
+
+        <ModalBody px={6} py={5}>
+          <VStack spacing={5} align="stretch">
+            <Text color="surface.300" fontSize="sm" lineHeight="1.6">
+              This will mark the invoice as cancelled and invalidate the payment link in the client's email. The sprint history and snapshot will be preserved.
+            </Text>
+
+            <Box
+              bg="rgba(255,229,0,0.04)"
+              border="1px solid rgba(255,229,0,0.15)"
+              borderRadius="lg"
+              p={3}
+            >
+              <Text color="accent.banana" fontSize="2xs" fontWeight="700" textTransform="uppercase" letterSpacing="0.08em" mb={1}>
+                What happens
+              </Text>
+              <VStack align="start" spacing={1} fontSize="xs" color="surface.400">
+                <Text>· Invoice hidden from all lists</Text>
+                <Text>· Magic pay link in email is killed</Text>
+                <Text>· Snapshot preserved for records</Text>
+                <Text>· Activity log entry created</Text>
+              </VStack>
+            </Box>
+
+            <Box>
+              <Text {...FIELD_LABEL}>Reason (optional)</Text>
+              <Input
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Why are you cancelling?"
+                {...nakedInput}
+              />
+            </Box>
+
+            <Box>
+              <Text {...FIELD_LABEL}>Type CANCEL to confirm</Text>
+              <Input
+                value={typedConfirm}
+                onChange={(e) => setTypedConfirm(e.target.value.toUpperCase())}
+                placeholder="CANCEL"
+                {...nakedInput}
+                fontFamily="mono"
+                letterSpacing="0.1em"
+              />
+            </Box>
+          </VStack>
+        </ModalBody>
+
+        <ModalFooter borderTop="1px solid" borderColor="surface.900" pt={4} pb={6} px={6}>
+          <HStack spacing={2} w="100%">
+            <Button
+              flex={1}
+              size="md"
+              variant="outline"
+              borderColor="surface.800"
+              color="surface.400"
+              borderRadius="lg"
+              onClick={onClose}
+              _hover={{ borderColor: 'surface.700', color: 'white' }}
+            >
+              Keep Invoice
+            </Button>
+            <Button
+              flex={1}
+              size="md"
+              bg={canConfirm ? 'red.500' : 'surface.850'}
+              color={canConfirm ? 'white' : 'surface.700'}
+              fontWeight="700"
+              borderRadius="lg"
+              onClick={() => onConfirm(reason)}
+              isDisabled={!canConfirm}
+              isLoading={processing}
+              loadingText="Cancelling"
+              _hover={canConfirm ? { bg: 'red.600' } : {}}
+            >
+              Cancel Invoice
+            </Button>
+          </HStack>
+        </ModalFooter>
+      </ModalContent>
+    </Modal>
+  );
+};
+
+// ============================================================
 // MAIN COMPONENT
 // ============================================================
 const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose, onSaved }) => {
   const toast = useToast();
-  const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState('compose');
   const [loading, setLoading] = useState(true);
@@ -257,11 +382,16 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
   const [dueDate, setDueDate] = useState('');
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   const isNew = !invoiceId;
   const client = clients.find((c) => c.id === clientId);
+  const isPaid = invoice?.status === 'paid';
+  const isSentish = SENT_STATUSES.includes(invoice?.status);
+  const isDraft = invoice?.status === 'draft' || isNew;
 
   useEffect(() => { loadData(); }, [invoiceId]);
   useEffect(() => {
@@ -308,18 +438,20 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
   };
 
   const addSprint = () => {
-    const newSprint = {
-      id: `new-${Date.now()}`,
-      title: '',
-      description: '',
-      amount: 0,
-      payment_mode: 'approve_only',
-      payment_status: null,
-      is_billable: true,
-      sort_order: sprints.length,
-      _isNew: true,
-    };
-    setSprints([...sprints, newSprint]);
+    setSprints([
+      ...sprints,
+      {
+        id: `new-${Date.now()}`,
+        title: '',
+        description: '',
+        amount: 0,
+        payment_mode: 'approve_only',
+        payment_status: null,
+        is_billable: true,
+        sort_order: sprints.length,
+        _isNew: true,
+      },
+    ]);
   };
 
   const updateSprint = (updated) => {
@@ -359,7 +491,6 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
       let savedInvoiceId = invoiceId;
 
       if (isNew) {
-        // Generate a sprint number for this new invoice
         const { data: sprintNumData } = await supabase.rpc('next_sprint_number');
         const newInvoiceNumber = sprintNumData || `NB${Date.now().toString().slice(-6)}`;
 
@@ -396,7 +527,6 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
         if (error) throw error;
       }
 
-      // Save sprints
       for (const sprint of sprints) {
         const sprintPayload = {
           title: sprint.title || 'Untitled Sprint',
@@ -409,11 +539,9 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
         };
 
         if (sprint._isNew) {
-          // Assign a new sprint number
           const { data: sprintNumData } = await supabase.rpc('next_sprint_number');
           sprintPayload.sprint_number = sprintNumData;
           sprintPayload.created_at = new Date().toISOString();
-
           await supabase.from('invoice_items').insert(sprintPayload);
         } else if (sprint._dirty) {
           await supabase
@@ -473,18 +601,90 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
     }
   };
 
-  const handleDelete = async () => {
-    if (!confirmDelete) { setConfirmDelete(true); return; }
+  // Hard delete - drafts only
+  const handleHardDelete = async () => {
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      setTimeout(() => setConfirmDelete(false), 3000);
+      return;
+    }
     setDeleting(true);
     try {
       await supabase.from('invoice_items').delete().eq('invoice_id', invoiceId);
       await supabase.from('invoices').delete().eq('id', invoiceId);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      await supabase.from('activity_log').insert({
+        user_id: user?.id,
+        action: 'invoice_deleted',
+        entity_type: 'invoice',
+        entity_id: invoiceId,
+        metadata: {
+          invoice_number: invoice?.invoice_number,
+          hard_delete: true,
+        },
+        created_at: new Date().toISOString(),
+      });
+
       toast({ title: 'Invoice deleted', status: 'success', duration: 2000 });
       onSaved();
       onClose();
     } catch (err) {
       toast({ title: 'Delete failed', description: err.message, status: 'error' });
       setDeleting(false);
+    }
+  };
+
+  // Soft cancel - sent/viewed/partial/overdue
+  const handleSoftCancel = async (reason) => {
+    setCancelling(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const now = new Date().toISOString();
+
+      // Mark cancelled + invalidate pay token
+      const { error } = await supabase
+        .from('invoices')
+        .update({
+          cancelled_at: now,
+          cancelled_by: user?.id,
+          cancellation_reason: reason || null,
+          pay_token: null, // Kills the magic link in the email
+          status: 'cancelled',
+          updated_at: now,
+        })
+        .eq('id', invoiceId);
+
+      if (error) throw error;
+
+      // Activity log
+      await supabase.from('activity_log').insert({
+        user_id: user?.id,
+        action: 'invoice_cancelled',
+        entity_type: 'invoice',
+        entity_id: invoiceId,
+        metadata: {
+          invoice_number: invoice?.invoice_number,
+          client_name: client?.name,
+          reason: reason || null,
+          original_status: invoice?.status,
+        },
+        created_at: now,
+      });
+
+      toast({
+        title: 'Invoice cancelled',
+        description: 'Pay link invalidated, snapshot preserved',
+        status: 'success',
+        duration: 3000,
+      });
+      setShowCancelModal(false);
+      onSaved();
+      onClose();
+    } catch (err) {
+      toast({ title: 'Cancel failed', description: err.message, status: 'error', duration: 4000 });
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -516,7 +716,6 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
       />
 
       <Container maxW="900px" px={{ base: 4, md: 6 }} py={{ base: 6, md: 10 }} position="relative">
-        {/* Back button */}
         <HStack
           spacing={2}
           cursor="pointer"
@@ -533,7 +732,6 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
           </Text>
         </HStack>
 
-        {/* Header */}
         <VStack align="stretch" spacing={6} mb={8}>
           <HStack justify="space-between" align="flex-end" flexWrap="wrap" gap={3}>
             <VStack align="start" spacing={1}>
@@ -551,7 +749,11 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                   <Text
                     fontSize="2xs"
                     fontWeight="700"
-                    color={invoice.status === 'paid' ? 'accent.neon' : invoice.status === 'draft' ? 'surface.500' : 'brand.500'}
+                    color={
+                      invoice.status === 'paid' ? 'accent.neon' :
+                      invoice.status === 'draft' ? 'surface.500' :
+                      'brand.500'
+                    }
                     textTransform="uppercase"
                     letterSpacing="0.08em"
                     fontFamily="mono"
@@ -566,20 +768,22 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
             </VStack>
 
             <HStack spacing={2}>
-              <Button
-                size="sm"
-                variant="outline"
-                borderColor="surface.800"
-                color="surface.400"
-                borderRadius="lg"
-                onClick={() => handleSave(false)}
-                isLoading={saving && !sending}
-                loadingText="Saving"
-                _hover={{ borderColor: 'surface.700', color: 'white' }}
-              >
-                Save Draft
-              </Button>
-              {(invoice?.status === 'draft' || isNew) && billableCount > 0 && clientId && (
+              {!isPaid && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  borderColor="surface.800"
+                  color="surface.400"
+                  borderRadius="lg"
+                  onClick={() => handleSave(false)}
+                  isLoading={saving && !sending}
+                  loadingText="Saving"
+                  _hover={{ borderColor: 'surface.700', color: 'white' }}
+                >
+                  Save Draft
+                </Button>
+              )}
+              {isDraft && billableCount > 0 && clientId && (
                 <Button
                   size="sm"
                   bg="brand.500"
@@ -643,10 +847,8 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
           })}
         </HStack>
 
-        {/* ========== COMPOSE TAB ========== */}
         {activeTab === 'compose' && (
           <VStack spacing={8} align="stretch">
-            {/* Client + project selector */}
             <HStack spacing={6} align="start">
               <Box flex={1}>
                 <Text {...FIELD_LABEL}>Client</Text>
@@ -657,11 +859,9 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                   {...nakedInput}
                   fontFamily="body"
                   cursor="pointer"
+                  isDisabled={isPaid}
                   sx={{
-                    '& option': {
-                      bg: 'surface.950',
-                      color: 'white',
-                    },
+                    '& option': { bg: 'surface.950', color: 'white' },
                   }}
                 >
                   {clients.map((c) => (
@@ -681,6 +881,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                     {...nakedInput}
                     fontFamily="body"
                     cursor="pointer"
+                    isDisabled={isPaid}
                     sx={{
                       '& option': { bg: 'surface.950', color: 'white' },
                     }}
@@ -694,24 +895,24 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
               )}
             </HStack>
 
-            {/* Sprints section */}
             <Box>
               <HStack justify="space-between" align="center" mb={4}>
                 <Text {...FIELD_LABEL}>Sprints</Text>
-                <HStack
-                  spacing={1.5}
-                  cursor="pointer"
-                  onClick={addSprint}
-                  color="brand.500"
-                  opacity={0.8}
-                  _hover={{ opacity: 1 }}
-                  transition="opacity 0.15s"
-                >
-                  <Icon as={TbPlus} boxSize={3} />
-                  <Text fontSize="2xs" fontWeight="700" textTransform="uppercase" letterSpacing="0.05em">
-                    Add Sprint
-                  </Text>
-                </HStack>
+                {!isPaid && (
+                  <HStack
+                    spacing={1.5}
+                    cursor="pointer"
+                    onClick={addSprint}
+                    color="brand.500"
+                    opacity={0.8}
+                    _hover={{ opacity: 1 }}
+                  >
+                    <Icon as={TbPlus} boxSize={3} />
+                    <Text fontSize="2xs" fontWeight="700" textTransform="uppercase" letterSpacing="0.05em">
+                      Add Sprint
+                    </Text>
+                  </HStack>
+                )}
               </HStack>
 
               {sprints.length === 0 ? (
@@ -723,9 +924,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                   borderRadius="xl"
                 >
                   <Icon as={TbBolt} boxSize={8} color="surface.700" mb={2} />
-                  <Text color="surface.500" fontSize="sm" mb={3}>
-                    No sprints yet
-                  </Text>
+                  <Text color="surface.500" fontSize="sm" mb={3}>No sprints yet</Text>
                   <Button
                     size="sm"
                     variant="outline"
@@ -751,7 +950,6 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                 </Box>
               )}
 
-              {/* Totals */}
               {sprints.length > 0 && (
                 <HStack justify="flex-end" pt={5} spacing={6}>
                   <VStack align="end" spacing={1}>
@@ -766,7 +964,6 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
               )}
             </Box>
 
-            {/* Notes + due date */}
             <Divider borderColor="surface.900" />
 
             <HStack spacing={6} align="start">
@@ -783,7 +980,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                   color="white"
                   fontSize="sm"
                   rows={3}
-                  _hover={{ borderColor: 'surface.700' }}
+                  isReadOnly={isPaid}
                   _focus={{ borderColor: 'brand.500', boxShadow: 'none' }}
                   _placeholder={{ color: 'surface.700' }}
                 />
@@ -794,35 +991,73 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                   type="date"
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
+                  isDisabled={isPaid}
                   {...nakedInput}
                 />
               </Box>
             </HStack>
 
-            {/* Delete button - subtle, at bottom */}
-            {!isNew && invoice?.status === 'draft' && (
-              <HStack
-                spacing={1.5}
-                cursor="pointer"
-                onClick={handleDelete}
-                color={confirmDelete ? 'red.400' : 'surface.700'}
-                opacity={confirmDelete ? 1 : 0.4}
-                _hover={{ opacity: 1, color: 'red.400' }}
-                transition="all 0.15s"
-                justify="center"
-                pt={6}
-                userSelect="none"
-              >
-                <Icon as={confirmDelete ? TbAlertTriangle : TbTrash} boxSize={3} />
-                <Text fontSize="2xs" fontWeight="700" textTransform="uppercase" letterSpacing="0.05em">
-                  {deleting ? 'Deleting...' : confirmDelete ? 'Click again to confirm' : 'Delete invoice'}
-                </Text>
-              </HStack>
+            {/* Delete / Cancel actions at bottom */}
+            {!isNew && (
+              <Box pt={6}>
+                {/* Drafts: subtle two-click hard delete */}
+                {isDraft && (
+                  <HStack
+                    spacing={1.5}
+                    cursor="pointer"
+                    onClick={handleHardDelete}
+                    color={confirmDelete ? 'red.400' : 'surface.700'}
+                    opacity={confirmDelete ? 1 : 0.4}
+                    _hover={{ opacity: 1, color: 'red.400' }}
+                    transition="all 0.15s"
+                    justify="center"
+                    userSelect="none"
+                  >
+                    <Icon as={confirmDelete ? TbAlertTriangle : TbTrash} boxSize={3} />
+                    <Text fontSize="2xs" fontWeight="700" textTransform="uppercase" letterSpacing="0.05em">
+                      {deleting ? 'Deleting...' : confirmDelete ? 'Click again to confirm' : 'Delete draft'}
+                    </Text>
+                  </HStack>
+                )}
+
+                {/* Sent/viewed/partial/overdue: heavyweight cancel modal */}
+                {isSentish && (
+                  <HStack
+                    spacing={1.5}
+                    cursor="pointer"
+                    onClick={() => setShowCancelModal(true)}
+                    color="surface.700"
+                    opacity={0.4}
+                    _hover={{ opacity: 1, color: 'red.400' }}
+                    transition="all 0.15s"
+                    justify="center"
+                    userSelect="none"
+                  >
+                    <Icon as={TbAlertTriangle} boxSize={3} />
+                    <Text fontSize="2xs" fontWeight="700" textTransform="uppercase" letterSpacing="0.05em">
+                      Cancel invoice
+                    </Text>
+                  </HStack>
+                )}
+
+                {/* Paid: explicit message */}
+                {isPaid && (
+                  <Text
+                    fontSize="2xs"
+                    color="surface.700"
+                    textAlign="center"
+                    fontFamily="mono"
+                    textTransform="uppercase"
+                    letterSpacing="0.05em"
+                  >
+                    Paid invoices cannot be deleted
+                  </Text>
+                )}
+              </Box>
             )}
           </VStack>
         )}
 
-        {/* ========== PREVIEW TAB ========== */}
         {activeTab === 'preview' && (
           <InvoicePreview
             invoice={{ ...invoice, client_id: clientId, notes, due_date: dueDate }}
@@ -831,6 +1066,15 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
           />
         )}
       </Container>
+
+      {/* Cancel modal */}
+      <CancelInvoiceModal
+        isOpen={showCancelModal}
+        onClose={() => setShowCancelModal(false)}
+        invoice={invoice}
+        onConfirm={handleSoftCancel}
+        processing={cancelling}
+      />
     </Box>
   );
 };

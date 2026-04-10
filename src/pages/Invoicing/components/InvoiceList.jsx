@@ -1,10 +1,12 @@
 // src/pages/Invoicing/components/InvoiceList.jsx
-// Row-based list of invoices, clean and scannable
+// Row-based invoice list. Hover trash icon for drafts (hard delete with two-click confirm).
+// Sent invoices need to be opened in editor for soft cancel.
 
+import { useState } from 'react';
 import {
   Box, HStack, VStack, Text, Icon, Center, Spinner, Button,
 } from '@chakra-ui/react';
-import { TbCash, TbBolt } from 'react-icons/tb';
+import { TbCash, TbBolt, TbTrash, TbAlertTriangle } from 'react-icons/tb';
 import { getInitials, getAvatarColor, timeAgo } from '../../../utils/phone';
 
 const STATUS_COLORS = {
@@ -23,7 +25,8 @@ const currency = (val) => {
   return `$${num.toLocaleString()}`;
 };
 
-const InvoiceRow = ({ invoice, onSelect }) => {
+const InvoiceRow = ({ invoice, onSelect, onQuickDelete }) => {
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const client = invoice.clients;
   const status = STATUS_COLORS[invoice.status] || STATUS_COLORS.draft;
   const avatarColor = getAvatarColor(client?.name || '');
@@ -33,6 +36,18 @@ const InvoiceRow = ({ invoice, onSelect }) => {
     (i) => i.payment_status === 'paid' || i.locked
   ).length;
   const outstanding = parseFloat(invoice.total || 0) - parseFloat(invoice.total_paid || 0);
+  const isDraft = invoice.status === 'draft';
+
+  const handleTrashClick = (e) => {
+    e.stopPropagation();
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      // Auto-reset after 3 seconds if not clicked again
+      setTimeout(() => setConfirmDelete(false), 3000);
+      return;
+    }
+    onQuickDelete(invoice.id);
+  };
 
   return (
     <Box
@@ -54,7 +69,6 @@ const InvoiceRow = ({ invoice, onSelect }) => {
       }}
     >
       <HStack spacing={4} align="center">
-        {/* Status dot */}
         <Box
           w="6px"
           h="6px"
@@ -64,7 +78,6 @@ const InvoiceRow = ({ invoice, onSelect }) => {
           flexShrink={0}
         />
 
-        {/* Avatar */}
         <Box
           w="32px"
           h="32px"
@@ -80,7 +93,6 @@ const InvoiceRow = ({ invoice, onSelect }) => {
           </Text>
         </Box>
 
-        {/* Invoice number + client */}
         <VStack align="start" spacing={0} flex={1} minW={0}>
           <HStack spacing={2}>
             <Text color="white" fontSize="sm" fontWeight="700" fontFamily="mono">
@@ -102,7 +114,6 @@ const InvoiceRow = ({ invoice, onSelect }) => {
           </Text>
         </VStack>
 
-        {/* Sprint stats */}
         <HStack spacing={1.5} display={{ base: 'none', md: 'flex' }}>
           <Icon as={TbBolt} boxSize={3} color="surface.600" />
           <Text color="surface.400" fontSize="xs" fontFamily="mono" fontWeight="700">
@@ -110,7 +121,6 @@ const InvoiceRow = ({ invoice, onSelect }) => {
           </Text>
         </HStack>
 
-        {/* Total */}
         <VStack align="end" spacing={0} minW="80px">
           <Text color="white" fontSize="sm" fontFamily="mono" fontWeight="700">
             {currency(invoice.total)}
@@ -122,7 +132,6 @@ const InvoiceRow = ({ invoice, onSelect }) => {
           )}
         </VStack>
 
-        {/* Timestamp */}
         <Text
           color="surface.700"
           fontSize="2xs"
@@ -133,12 +142,37 @@ const InvoiceRow = ({ invoice, onSelect }) => {
         >
           {timeAgo(invoice.sent_at || invoice.created_at)}
         </Text>
+
+        {/* Trash icon - drafts only, hover-revealed */}
+        {isDraft ? (
+          <Box
+            as="button"
+            onClick={handleTrashClick}
+            opacity={confirmDelete ? 1 : 0}
+            color={confirmDelete ? 'red.400' : 'surface.600'}
+            p={1.5}
+            borderRadius="md"
+            transition="all 0.15s"
+            _groupHover={{ opacity: confirmDelete ? 1 : 0.6 }}
+            _hover={{
+              opacity: '1 !important',
+              color: 'red.400',
+              bg: 'rgba(255,51,102,0.08)',
+            }}
+            title={confirmDelete ? 'Click again to confirm' : 'Delete draft'}
+          >
+            <Icon as={confirmDelete ? TbAlertTriangle : TbTrash} boxSize={3.5} />
+          </Box>
+        ) : (
+          // Spacer for non-drafts to keep alignment consistent
+          <Box w="28px" />
+        )}
       </HStack>
     </Box>
   );
 };
 
-const InvoiceList = ({ invoices, loading, onSelect, onNew }) => {
+const InvoiceList = ({ invoices, loading, onSelect, onNew, onQuickDelete }) => {
   if (loading) {
     return (
       <Center py={16}>
@@ -186,7 +220,12 @@ const InvoiceList = ({ invoices, loading, onSelect, onNew }) => {
   return (
     <Box borderTop="1px solid" borderColor="surface.900">
       {invoices.map((inv) => (
-        <InvoiceRow key={inv.id} invoice={inv} onSelect={onSelect} />
+        <InvoiceRow
+          key={inv.id}
+          invoice={inv}
+          onSelect={onSelect}
+          onQuickDelete={onQuickDelete}
+        />
       ))}
     </Box>
   );

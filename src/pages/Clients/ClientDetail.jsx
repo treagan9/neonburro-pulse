@@ -1,23 +1,19 @@
 // src/pages/Clients/ClientDetail.jsx
 // path: /clients/:clientId/
 //
-// Full client view with tabs:
-// - Overview: stats, recent activity, notes
-// - Sprints: all sprints for this client, filterable
-// - Invoices: all invoices sent to this client
-// - Messages: two-way thread
-// - Projects: inline list
+// Tabs: Overview / Sprints / Invoices / Projects / Messages
+// All invoice queries filter cancelled_at IS NULL
 
 import { useState, useEffect } from 'react';
 import {
   Box, VStack, HStack, Text, Container, Icon, Spinner, Center,
-  Button, Badge, SimpleGrid, Divider, Input, useToast,
+  Button, SimpleGrid, Input, useToast,
 } from '@chakra-ui/react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  TbArrowLeft, TbMail, TbPhone, TbWorld, TbBuilding,
-  TbBolt, TbCheck, TbClock, TbCash, TbPlus, TbFolder,
-  TbMessageCircle, TbCalendar, TbTrash, TbX, TbEdit,
+  TbArrowLeft, TbMail, TbPhone, TbWorld,
+  TbBolt, TbCash, TbPlus, TbFolder,
+  TbMessageCircle, TbTrash, TbX, TbEdit,
 } from 'react-icons/tb';
 import { supabase } from '../../lib/supabase';
 import { formatPhoneDisplay, getInitials, getAvatarColor, timeAgo } from '../../utils/phone';
@@ -51,7 +47,6 @@ const currency = (val) => {
 // ============================================================
 const OverviewTab = ({ client, stats, activity }) => (
   <VStack spacing={8} align="stretch">
-    {/* Stat cards - minimal */}
     <SimpleGrid columns={{ base: 2, md: 4 }} spacing={6}>
       {[
         { label: 'Sprints', value: stats.totalSprints, color: '#00E5E5' },
@@ -86,7 +81,6 @@ const OverviewTab = ({ client, stats, activity }) => (
       ))}
     </SimpleGrid>
 
-    {/* Contact details */}
     <Box pt={4} borderTop="1px solid" borderColor="surface.900">
       <Text
         fontSize="2xs"
@@ -147,7 +141,6 @@ const OverviewTab = ({ client, stats, activity }) => (
       </VStack>
     </Box>
 
-    {/* Notes */}
     {client.notes && (
       <Box pt={4} borderTop="1px solid" borderColor="surface.900">
         <Text
@@ -167,7 +160,6 @@ const OverviewTab = ({ client, stats, activity }) => (
       </Box>
     )}
 
-    {/* Recent activity */}
     {activity.length > 0 && (
       <Box pt={4} borderTop="1px solid" borderColor="surface.900">
         <Text
@@ -203,7 +195,7 @@ const OverviewTab = ({ client, stats, activity }) => (
 // SPRINTS TAB
 // ============================================================
 const SprintsTab = ({ sprints, loading }) => {
-  const [filter, setFilter] = useState('all'); // all, billable, wip, paid
+  const [filter, setFilter] = useState('all');
 
   if (loading) return <Center py={16}><Spinner color="brand.500" /></Center>;
 
@@ -223,7 +215,6 @@ const SprintsTab = ({ sprints, loading }) => {
 
   return (
     <VStack spacing={5} align="stretch">
-      {/* Filter strip */}
       <HStack spacing={5} borderBottom="1px solid" borderColor="surface.900" pb={3}>
         {[
           { value: 'all', label: 'All' },
@@ -275,7 +266,6 @@ const SprintsTab = ({ sprints, loading }) => {
         })}
       </HStack>
 
-      {/* Sprint rows */}
       {filtered.length === 0 ? (
         <Center py={16}>
           <VStack spacing={2}>
@@ -298,7 +288,6 @@ const SprintsTab = ({ sprints, loading }) => {
                 borderColor="surface.900"
                 role="group"
                 _hover={{ bg: 'rgba(255,255,255,0.01)' }}
-                transition="all 0.15s"
               >
                 <Box
                   w="6px"
@@ -314,13 +303,7 @@ const SprintsTab = ({ sprints, loading }) => {
                       {s.sprint_number || '—'}
                     </Text>
                     {isWip && (
-                      <Text
-                        fontSize="2xs"
-                        fontFamily="mono"
-                        color="surface.600"
-                        textTransform="uppercase"
-                        letterSpacing="0.05em"
-                      >
+                      <Text fontSize="2xs" fontFamily="mono" color="surface.600" textTransform="uppercase">
                         WIP
                       </Text>
                     )}
@@ -572,7 +555,6 @@ const ProjectsTab = ({ clientId, toast }) => {
           color="brand.500"
           opacity={0.6}
           _hover={{ opacity: 1 }}
-          transition="opacity 0.15s"
         >
           <Icon as={TbPlus} boxSize={3} />
           <Text fontSize="2xs" fontWeight="700" textTransform="uppercase" letterSpacing="0.05em">
@@ -606,7 +588,6 @@ const MessagesTab = ({ clientId }) => {
     setMessages(data || []);
     setLoading(false);
 
-    // Mark team messages as read
     await supabase
       .from('client_messages')
       .update({ read_by_team: true })
@@ -760,6 +741,7 @@ const ClientDetail = () => {
         .from('invoices')
         .select('*, invoice_items(*)')
         .eq('client_id', clientId)
+        .is('cancelled_at', null) // Hide cancelled
         .order('created_at', { ascending: false }),
       supabase
         .from('activity_log')
@@ -780,7 +762,6 @@ const ClientDetail = () => {
     setInvoices(invs);
     setActivity(activityRes.data || []);
 
-    // Flatten all sprints from all invoices
     const allSprints = invs.flatMap((inv) =>
       (inv.invoice_items || []).map((item) => ({
         ...item,
@@ -819,7 +800,6 @@ const ClientDetail = () => {
 
   return (
     <Box position="relative" minH="100%">
-      {/* Ambient gradient */}
       <Box
         position="absolute"
         top={0}
@@ -831,7 +811,6 @@ const ClientDetail = () => {
       />
 
       <Container maxW="900px" px={{ base: 4, md: 6 }} py={{ base: 6, md: 10 }} position="relative">
-        {/* Back button */}
         <HStack
           spacing={2}
           cursor="pointer"
@@ -848,7 +827,6 @@ const ClientDetail = () => {
           </Text>
         </HStack>
 
-        {/* Client header */}
         <HStack spacing={5} align="start" mb={8}>
           <Box
             w="72px"
@@ -931,7 +909,6 @@ const ClientDetail = () => {
           </HStack>
         </HStack>
 
-        {/* Tab strip */}
         <HStack spacing={6} borderBottom="1px solid" borderColor="surface.900" mb={8}>
           {TAB_OPTIONS.map((tab) => {
             const active = activeTab === tab.value;
@@ -950,7 +927,6 @@ const ClientDetail = () => {
                   textTransform="uppercase"
                   letterSpacing="0.05em"
                   _hover={!active ? { color: 'surface.400' } : {}}
-                  transition="color 0.15s"
                 >
                   {tab.label}
                 </Text>
@@ -971,7 +947,6 @@ const ClientDetail = () => {
           })}
         </HStack>
 
-        {/* Tab content */}
         <Box>
           {activeTab === 'overview' && (
             <OverviewTab client={client} stats={stats} activity={activity} />
