@@ -1,9 +1,6 @@
 // src/pages/Dashboard/index.jsx
-// Clean dashboard matching the Clients/Invoicing DNA
-// - Title row with subtle action links top-right
-// - Inline mono pulse strip (replaces stat cards)
-// - Form Inbox + Activity Stream as naked sections
-// - SystemHeader: live time + online count + refresh
+// Clean dashboard with inline pulse strip + form inbox + smart activity stream
+// Fetches activity_log with client_id for the new smart stream
 
 import { useState, useEffect } from 'react';
 import {
@@ -37,7 +34,6 @@ const Dashboard = () => {
   });
   const [activities, setActivities] = useState([]);
   const [profileMap, setProfileMap] = useState({});
-  const [onlineCount, setOnlineCount] = useState(1);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -45,13 +41,15 @@ const Dashboard = () => {
 
   const fetchAll = async () => {
     try {
+      // Fetch the last 7 days of activity so the "Show last 7 days" toggle has data ready
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
       const [
         clientsRes,
         invoicesRes,
         formsRes,
         activitiesRes,
         profilesRes,
-        presenceRes,
       ] = await Promise.all([
         supabase
           .from('clients')
@@ -67,25 +65,21 @@ const Dashboard = () => {
         supabase
           .from('activity_log')
           .select('*')
+          .gte('created_at', sevenDaysAgo)
           .order('created_at', { ascending: false })
-          .limit(20),
+          .limit(200),
         supabase
           .from('profiles')
           .select('id, display_name, username, avatar_url'),
-        supabase
-          .from('presence')
-          .select('user_id')
-          .gte('last_seen', new Date(Date.now() - 60000).toISOString()),
       ]);
 
       const clients = clientsRes.data || [];
       const invoices = invoicesRes.data || [];
       const forms = formsRes.data || [];
 
-      // Compute everything
       const activeClients = clients.filter((c) => c.status === 'active').length;
 
-      // Active sprints = billable, unpaid, on sent invoices
+      // Active sprints: billable, unpaid, on sent invoices
       const activeSprints = invoices
         .filter((inv) => ['sent', 'viewed', 'partial', 'overdue'].includes(inv.status))
         .reduce((sum, inv) => {
@@ -124,9 +118,6 @@ const Dashboard = () => {
       const map = {};
       (profilesRes.data || []).forEach((p) => { map[p.id] = p; });
       setProfileMap(map);
-
-      const uniqueOnline = new Set((presenceRes.data || []).map((p) => p.user_id));
-      setOnlineCount(Math.max(1, uniqueOnline.size));
     } catch (err) {
       console.error('Dashboard fetch failed:', err);
     } finally {
@@ -142,7 +133,6 @@ const Dashboard = () => {
 
   return (
     <Box position="relative" minH="100%">
-      {/* Ambient gradient at top */}
       <Box
         position="absolute"
         top={0}
@@ -156,14 +146,11 @@ const Dashboard = () => {
       <Container maxW="1100px" px={{ base: 4, md: 6 }} py={{ base: 6, md: 10 }} position="relative">
         <VStack spacing={{ base: 6, md: 8 }} align="stretch">
 
-          {/* SystemHeader at very top - online count + time + refresh */}
           <SystemHeader
             onRefresh={handleRefresh}
             refreshing={refreshing}
-            onlineCount={onlineCount}
           />
 
-          {/* Title row with action links - matches Clients page */}
           <VStack align="stretch" spacing={4}>
             <HStack justify="space-between" align="flex-end" flexWrap="wrap" gap={3}>
               <Text
@@ -209,7 +196,6 @@ const Dashboard = () => {
               </HStack>
             </HStack>
 
-            {/* Inline pulse strip - the only "stats" on the dashboard */}
             <HStack spacing={0} color="surface.500" fontSize="xs" fontFamily="mono" flexWrap="wrap">
               <Text
                 color="white"
@@ -262,10 +248,8 @@ const Dashboard = () => {
             </HStack>
           </VStack>
 
-          {/* Form Inbox - naked section */}
           <FormInbox />
 
-          {/* Activity Stream - naked section */}
           <ActivityStream
             activities={activities}
             profileMap={profileMap}
