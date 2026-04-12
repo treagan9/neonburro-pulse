@@ -1,10 +1,10 @@
 // src/pages/Dashboard/components/ActivityStream.jsx
 // Smart activity stream:
-// - Last 24h by default, "show 7 days" toggle
+// - Last 24h by default, "last 7 days" toggle
 // - Hides category='system' noise (login, password changes)
 // - Groups consecutive same-client events into expandable rows
 // - Every entity name links to /clients/:id/
-// - Neon Burro logo for system actions, user avatars for team
+// - All timestamps render in MST via formatSmart from src/lib/time
 
 import { useState, useMemo } from 'react';
 import {
@@ -17,10 +17,10 @@ import {
 import {
   FaCcVisa, FaCcMastercard, FaCcAmex, FaCcDiscover, FaApplePay, FaGooglePay,
 } from 'react-icons/fa';
-import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import Avatar from '../../../components/common/Avatar';
 import { usePresence } from '../../../hooks/usePresence';
+import { formatSmart } from '../../../lib/time';
 
 const VERB_MAP = {
   client_created:   'added client',
@@ -40,6 +40,9 @@ const VERB_MAP = {
   message_sent:     'replied to',
   message_received: 'message from',
   note_added:       'added note to',
+  portal_activated: 'activated portal for',
+  deploy_succeeded: 'deployed',
+  deploy_failed:    'deploy failed for',
 };
 
 const ENTITY_COLORS = {
@@ -57,6 +60,9 @@ const ENTITY_COLORS = {
   message_sent:     '#06B6D4',
   message_received: '#06B6D4',
   note_added:       '#737373',
+  portal_activated: '#00E5E5',
+  deploy_succeeded: '#39FF14',
+  deploy_failed:    '#FF3366',
 };
 
 const PaymentMethodIcon = ({ type, brand, wallet }) => {
@@ -104,6 +110,7 @@ const ActivityItem = ({ activity, profileMap }) => {
     activity.metadata?.project_name ||
     activity.metadata?.invoice_number ||
     activity.metadata?.sender_name ||
+    activity.metadata?.site_name ||
     activity.metadata?.form_type ||
     '';
 
@@ -120,9 +127,6 @@ const ActivityItem = ({ activity, profileMap }) => {
   const showPaymentMethod =
     (activity.action === 'invoice_paid' || activity.action === 'payment_received') && pmType;
 
-  const timeAgo = formatDistanceToNow(new Date(activity.created_at), { addSuffix: true });
-
-  // Click entity name -> navigate to client detail
   const handleEntityClick = (e) => {
     e.stopPropagation();
     if (activity.client_id) {
@@ -232,28 +236,22 @@ const ActivityItem = ({ activity, profileMap }) => {
         </HStack>
 
         <Text color="surface.700" fontSize="2xs" fontFamily="mono" mt={0.5}>
-          {timeAgo}
+          {formatSmart(activity.created_at)}
         </Text>
       </Box>
     </HStack>
   );
 };
 
-// ============================================================
-// CLIENT GROUP - collapses consecutive same-client events
-// ============================================================
 const ClientGroup = ({ clientId, clientName, events, profileMap }) => {
   const [expanded, setExpanded] = useState(false);
   const navigate = useNavigate();
 
-  // If just one event, render normally
   if (events.length === 1) {
     return <ActivityItem activity={events[0]} profileMap={profileMap} />;
   }
 
-  // Multiple events - show a collapsed summary row
   const latestEvent = events[0];
-  const latestTime = formatDistanceToNow(new Date(latestEvent.created_at), { addSuffix: true });
 
   return (
     <Box borderBottom="1px solid" borderColor="surface.900">
@@ -293,7 +291,7 @@ const ClientGroup = ({ clientId, clientName, events, profileMap }) => {
             </Text>
           </HStack>
           <Text color="surface.700" fontSize="2xs" fontFamily="mono" mt={0.5}>
-            latest {latestTime}
+            latest {formatSmart(latestEvent.created_at)}
           </Text>
         </Box>
       </HStack>
@@ -309,14 +307,10 @@ const ClientGroup = ({ clientId, clientName, events, profileMap }) => {
   );
 };
 
-// ============================================================
-// MAIN
-// ============================================================
 const ActivityStream = ({ activities, profileMap = {}, loading }) => {
-  const [range, setRange] = useState('24h'); // '24h' | '7d'
+  const [range, setRange] = useState('24h');
   const [showSystem, setShowSystem] = useState(false);
 
-  // Filter activities by range and category
   const filtered = useMemo(() => {
     const now = Date.now();
     const cutoff = range === '24h' ? now - 24 * 60 * 60 * 1000 : now - 7 * 24 * 60 * 60 * 1000;
@@ -328,7 +322,6 @@ const ActivityStream = ({ activities, profileMap = {}, loading }) => {
     });
   }, [activities, range, showSystem]);
 
-  // Group consecutive same-client events
   const grouped = useMemo(() => {
     const result = [];
     let currentGroup = null;

@@ -1,15 +1,18 @@
 // src/pages/Dashboard/index.jsx
-// Clean dashboard with inline pulse strip + form inbox + smart activity stream
-// Fetches activity_log with client_id for the new smart stream
+// Clean dashboard:
+// - No clock (removed per Tyler - dashboard doesn't need it)
+// - Inline pulse strip (stats)
+// - FormInbox + ActivityStream as naked sections
+// - Team avatars stay at top-left via SystemHeader
 
 import { useState, useEffect } from 'react';
 import {
-  Box, VStack, HStack, Text, Container, Icon,
+  Box, VStack, HStack, Text, Container, Icon, IconButton, Tooltip,
 } from '@chakra-ui/react';
 import { useNavigate } from 'react-router-dom';
-import { TbPlus } from 'react-icons/tb';
+import { TbPlus, TbRefresh } from 'react-icons/tb';
 import { supabase } from '../../lib/supabase';
-import SystemHeader from './components/SystemHeader';
+import TeamOnlineStrip from './components/TeamOnlineStrip';
 import FormInbox from './components/FormInbox';
 import ActivityStream from './components/ActivityStream';
 
@@ -41,7 +44,6 @@ const Dashboard = () => {
 
   const fetchAll = async () => {
     try {
-      // Fetch the last 7 days of activity so the "Show last 7 days" toggle has data ready
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
       const [
@@ -79,7 +81,6 @@ const Dashboard = () => {
 
       const activeClients = clients.filter((c) => c.status === 'active').length;
 
-      // Active sprints: billable, unpaid, on sent invoices
       const activeSprints = invoices
         .filter((inv) => ['sent', 'viewed', 'partial', 'overdue'].includes(inv.status))
         .reduce((sum, inv) => {
@@ -146,11 +147,45 @@ const Dashboard = () => {
       <Container maxW="1100px" px={{ base: 4, md: 6 }} py={{ base: 6, md: 10 }} position="relative">
         <VStack spacing={{ base: 6, md: 8 }} align="stretch">
 
-          <SystemHeader
-            onRefresh={handleRefresh}
-            refreshing={refreshing}
-          />
+          {/* Top strip: team avatars left, refresh button right. No clock. */}
+          <HStack justify="space-between" align="center" flexWrap="wrap" spacing={4}>
+            <Box flex={1} minW={0}>
+              <TeamOnlineStrip />
+            </Box>
 
+            <Tooltip
+              label="Refresh"
+              placement="bottom"
+              hasArrow
+              bg="surface.800"
+              color="white"
+              fontSize="xs"
+            >
+              <IconButton
+                icon={<TbRefresh size={14} />}
+                onClick={handleRefresh}
+                isLoading={refreshing}
+                variant="ghost"
+                size="sm"
+                color="surface.500"
+                h="32px"
+                w="32px"
+                minW="32px"
+                borderRadius="md"
+                border="1px solid"
+                borderColor="surface.800"
+                _hover={{
+                  color: 'brand.500',
+                  borderColor: 'brand.500',
+                  bg: 'rgba(0,229,229,0.05)',
+                }}
+                transition="all 0.15s"
+                aria-label="Refresh dashboard"
+              />
+            </Tooltip>
+          </HStack>
+
+          {/* Title row with action links */}
           <VStack align="stretch" spacing={4}>
             <HStack justify="space-between" align="flex-end" flexWrap="wrap" gap={3}>
               <Text
@@ -196,6 +231,7 @@ const Dashboard = () => {
               </HStack>
             </HStack>
 
+            {/* Inline pulse strip */}
             <HStack spacing={0} color="surface.500" fontSize="xs" fontFamily="mono" flexWrap="wrap">
               <Text
                 color="white"
