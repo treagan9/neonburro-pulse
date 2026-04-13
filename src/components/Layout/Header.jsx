@@ -1,85 +1,78 @@
 // src/components/Layout/Header.jsx
-import { useState, useEffect } from 'react';
+// Top header bar - minimal on desktop, user menu only on mobile
+//
+// Desktop: empty (sidebar shows everything)
+// Mobile: avatar dropdown for Settings/Sign Out (hamburger handles nav)
+
 import {
-  Box, HStack, Text, IconButton, Menu, MenuButton, MenuList,
-  MenuItem, Avatar, MenuDivider,
+  Box, HStack, Text, Avatar as ChakraAvatar, Menu, MenuButton, MenuList,
+  MenuItem, MenuDivider, useBreakpointValue,
 } from '@chakra-ui/react';
-import { TbLogout, TbSettings, TbChevronDown } from 'react-icons/tb';
-import { useAuth } from '../../hooks/useAuth';
+import { TbSettings, TbLogout } from 'react-icons/tb';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
 
 const Header = () => {
-  const { user, signOut } = useAuth();
   const navigate = useNavigate();
-  const [profile, setProfile] = useState(null);
+  const { user, profile } = useAuth();
+  const isMobile = useBreakpointValue({ base: true, md: false });
 
-  useEffect(() => {
-    if (user) {
-      supabase
-        .from('profiles')
-        .select('display_name, username, avatar_url, role')
-        .eq('id', user.id)
-        .single()
-        .then(({ data }) => { if (data) setProfile(data); });
-    }
-  }, [user]);
+  const displayName = profile?.display_name || user?.email?.split('@')[0] || 'User';
 
   const handleSignOut = async () => {
-    await signOut();
+    await supabase.auth.signOut();
     navigate('/login/');
   };
 
-  const displayName = profile?.display_name || profile?.username || user?.email?.split('@')[0] || 'User';
+  // Desktop: no header content - sidebar is the source of truth
+  if (!isMobile) {
+    return null;
+  }
 
+  // Mobile: just the avatar dropdown for account actions
+  // (the hamburger menu in MobileNav handles navigation)
   return (
     <Box
-      h="56px"
-      borderBottom="1px solid"
-      borderColor="surface.800"
-      bg="surface.950"
-      px={{ base: 4, md: 6 }}
-      display="flex"
-      alignItems="center"
-      justifyContent="flex-end"
-      position="sticky"
-      top={0}
+      position="absolute"
+      top={4}
+      right={4}
       zIndex={10}
     >
-      <Menu>
+      <Menu placement="bottom-end">
         <MenuButton
           as={Box}
           cursor="pointer"
-          borderRadius="full"
-          transition="all 0.15s"
           _hover={{ opacity: 0.85 }}
+          transition="opacity 0.15s"
         >
-          <HStack spacing={2.5}>
-            <Text
-              color="surface.400"
-              fontSize="xs"
-              fontWeight="600"
-              display={{ base: 'none', md: 'block' }}
-            >
-              {displayName}
-            </Text>
-            <Avatar
-              size="sm"
-              name={displayName}
-              src={profile?.avatar_url || ''}
-              bg="surface.700"
-              color="brand.500"
-              border="2px solid"
-              borderColor="surface.700"
-            />
-          </HStack>
+          <ChakraAvatar
+            size="sm"
+            name={displayName}
+            src={profile?.avatar_url || ''}
+            bg="surface.700"
+            color="brand.500"
+            border="2px solid"
+            borderColor="surface.700"
+          />
         </MenuButton>
         <MenuList bg="surface.900" borderColor="surface.700" py={1} minW="200px">
           <Box px={3} py={2}>
-            <Text color="white" fontSize="sm" fontWeight="700">{displayName}</Text>
-            <Text color="surface.500" fontSize="xs">{user?.email}</Text>
+            <Text color="white" fontSize="sm" fontWeight="700">
+              {displayName}
+            </Text>
+            <Text color="surface.500" fontSize="xs">
+              {user?.email}
+            </Text>
             {profile?.role && (
-              <Text color="accent.purple" fontSize="2xs" fontWeight="700" textTransform="uppercase" letterSpacing="0.05em" mt={1}>
+              <Text
+                color="accent.purple"
+                fontSize="2xs"
+                fontWeight="700"
+                textTransform="uppercase"
+                letterSpacing="0.05em"
+                mt={1}
+              >
                 {profile.role}
               </Text>
             )}

@@ -1,5 +1,7 @@
 // src/components/Layout/AppShell.jsx
 // Main layout shell - sidebar + header + content + mobile nav
+// Content is left-tucked with max-w 1100px so it has anchor + breathing room
+
 import { Box, Flex } from '@chakra-ui/react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
@@ -19,7 +21,14 @@ const AppShell = () => {
         overflow="hidden"
       >
         <Header />
-        <Box as="main" w="100%" maxW="100%" pb={{ base: '80px', lg: 0 }}>
+        <Box
+          as="main"
+          w="100%"
+          maxW={{ base: '100%', lg: '1100px' }}
+          mx={{ base: 0, lg: 0 }}
+          px={{ base: 4, md: 8, lg: 10 }}
+          pb={{ base: '80px', lg: 0 }}
+        >
           <Outlet />
         </Box>
       </Box>
