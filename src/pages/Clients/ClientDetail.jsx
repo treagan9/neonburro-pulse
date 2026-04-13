@@ -1,12 +1,12 @@
 // src/pages/Clients/ClientDetail.jsx
 // path: /clients/:clientId/
 //
-// Tabs: Overview / Sprints / Invoices / Projects / Messages
+// Tabs: Overview / Sprints / Invoices / Projects / Sites / Messages
 // All invoice queries filter cancelled_at IS NULL
 
 import { useState, useEffect } from 'react';
 import {
-  Box, VStack, HStack, Text, Container, Icon, Spinner, Center,
+  Box, VStack, HStack, Text, Icon, Spinner, Center,
   Button, SimpleGrid, Input, useToast,
 } from '@chakra-ui/react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -17,12 +17,14 @@ import {
 } from 'react-icons/tb';
 import { supabase } from '../../lib/supabase';
 import { formatPhoneDisplay, getInitials, getAvatarColor, timeAgo } from '../../utils/phone';
+import SitesTab from './components/SitesTab';
 
 const TAB_OPTIONS = [
   { value: 'overview', label: 'Overview' },
   { value: 'sprints', label: 'Sprints' },
   { value: 'invoices', label: 'Invoices' },
   { value: 'projects', label: 'Projects' },
+  { value: 'sites', label: 'Sites' },
   { value: 'messages', label: 'Messages' },
 ];
 
@@ -746,7 +748,7 @@ const ClientDetail = () => {
       supabase
         .from('activity_log')
         .select('*')
-        .eq('entity_id', clientId)
+        .eq('client_id', clientId)
         .order('created_at', { ascending: false })
         .limit(20),
     ]);
@@ -799,7 +801,7 @@ const ClientDetail = () => {
   };
 
   return (
-    <Box position="relative" minH="100%">
+    <Box position="relative" minH="100%" py={{ base: 6, md: 10 }}>
       <Box
         position="absolute"
         top={0}
@@ -810,7 +812,7 @@ const ClientDetail = () => {
         pointerEvents="none"
       />
 
-      <Container maxW="900px" px={{ base: 4, md: 6 }} py={{ base: 6, md: 10 }} position="relative">
+      <Box position="relative">
         <HStack spacing={5} align="start" mb={8}>
           <Box
             w="72px"
@@ -893,7 +895,7 @@ const ClientDetail = () => {
           </HStack>
         </HStack>
 
-        <HStack spacing={6} borderBottom="1px solid" borderColor="surface.900" mb={8}>
+        <HStack spacing={6} borderBottom="1px solid" borderColor="surface.900" mb={8} overflowX="auto">
           {TAB_OPTIONS.map((tab) => {
             const active = activeTab === tab.value;
             return (
@@ -903,6 +905,7 @@ const ClientDetail = () => {
                 cursor="pointer"
                 position="relative"
                 onClick={() => setActiveTab(tab.value)}
+                flexShrink={0}
               >
                 <Text
                   fontSize="xs"
@@ -940,9 +943,10 @@ const ClientDetail = () => {
             <InvoicesTab invoices={invoices} loading={false} navigate={navigate} />
           )}
           {activeTab === 'projects' && <ProjectsTab clientId={clientId} toast={toast} />}
+          {activeTab === 'sites' && <SitesTab clientId={clientId} clientName={client.name} />}
           {activeTab === 'messages' && <MessagesTab clientId={clientId} />}
         </Box>
-      </Container>
+      </Box>
     </Box>
   );
 };
