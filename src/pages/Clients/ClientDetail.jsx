@@ -2,7 +2,7 @@
 // path: /clients/:clientId/
 //
 // Tabs: Overview / Sprints / Invoices / Projects / Sites / Messages
-// All invoice queries filter cancelled_at IS NULL
+// Admin can click the avatar to upload/replace/remove the client's photo
 
 import { useState, useEffect } from 'react';
 import {
@@ -16,8 +16,9 @@ import {
   TbMessageCircle, TbTrash, TbX, TbEdit,
 } from 'react-icons/tb';
 import { supabase } from '../../lib/supabase';
-import { formatPhoneDisplay, getInitials, getAvatarColor, timeAgo } from '../../utils/phone';
+import { formatPhoneDisplay, timeAgo } from '../../utils/phone';
 import SitesTab from './components/SitesTab';
+import ClientAvatarUpload from '../../components/common/ClientAvatarUpload';
 
 const TAB_OPTIONS = [
   { value: 'overview', label: 'Overview' },
@@ -203,7 +204,7 @@ const SprintsTab = ({ sprints, loading }) => {
 
   const filtered = sprints.filter((s) => {
     if (filter === 'billable') return s.is_billable !== false && s.payment_status !== 'paid';
-    if (filter === 'wip') return s.is_billable === false;
+    if (filter === 'draft') return s.is_billable === false;
     if (filter === 'paid') return s.payment_status === 'paid' || s.locked;
     return true;
   });
@@ -211,7 +212,7 @@ const SprintsTab = ({ sprints, loading }) => {
   const counts = {
     all: sprints.length,
     billable: sprints.filter((s) => s.is_billable !== false && s.payment_status !== 'paid').length,
-    wip: sprints.filter((s) => s.is_billable === false).length,
+    draft: sprints.filter((s) => s.is_billable === false).length,
     paid: sprints.filter((s) => s.payment_status === 'paid' || s.locked).length,
   };
 
@@ -221,7 +222,7 @@ const SprintsTab = ({ sprints, loading }) => {
         {[
           { value: 'all', label: 'All' },
           { value: 'billable', label: 'Billable' },
-          { value: 'wip', label: 'WIP' },
+          { value: 'draft', label: 'Draft' },
           { value: 'paid', label: 'Paid' },
         ].map((opt) => {
           const active = filter === opt.value;
@@ -279,8 +280,8 @@ const SprintsTab = ({ sprints, loading }) => {
         <VStack spacing={0} align="stretch">
           {filtered.map((s) => {
             const isPaid = s.payment_status === 'paid' || s.locked;
-            const isWip = s.is_billable === false;
-            const statusColor = isPaid ? '#39FF14' : isWip ? '#737373' : '#FFE500';
+            const isDraft = s.is_billable === false;
+            const statusColor = isPaid ? '#39FF14' : isDraft ? '#737373' : '#FFE500';
             return (
               <HStack
                 key={s.id}
@@ -304,9 +305,9 @@ const SprintsTab = ({ sprints, loading }) => {
                     <Text color="surface.600" fontSize="2xs" fontFamily="mono" fontWeight="700">
                       {s.sprint_number || '—'}
                     </Text>
-                    {isWip && (
+                    {isDraft && (
                       <Text fontSize="2xs" fontFamily="mono" color="surface.600" textTransform="uppercase">
-                        WIP
+                        Draft
                       </Text>
                     )}
                   </HStack>
@@ -776,6 +777,11 @@ const ClientDetail = () => {
     setLoading(false);
   };
 
+  const handleAvatarChange = (newUrl) => {
+    // Optimistically update local state - no full refetch needed
+    setClient((prev) => ({ ...prev, avatar_url: newUrl }));
+  };
+
   if (loading) {
     return (
       <Box minH="100vh">
@@ -787,9 +793,6 @@ const ClientDetail = () => {
   }
 
   if (!client) return null;
-
-  const initials = getInitials(client.name);
-  const avatarColor = getAvatarColor(client.name);
 
   const stats = {
     totalSprints: sprints.length,
@@ -814,21 +817,14 @@ const ClientDetail = () => {
 
       <Box position="relative">
         <HStack spacing={5} align="start" mb={8}>
-          <Box
-            w="72px"
-            h="72px"
-            borderRadius="full"
-            bg={avatarColor}
-            display="flex"
-            alignItems="center"
-            justifyContent="center"
-            flexShrink={0}
-            boxShadow={`0 0 40px ${avatarColor}25`}
-          >
-            <Text color="surface.950" fontSize="xl" fontWeight="800" letterSpacing="-0.02em">
-              {initials}
-            </Text>
-          </Box>
+          <ClientAvatarUpload
+            clientId={client.id}
+            clientName={client.name}
+            avatarUrl={client.avatar_url}
+            size={72}
+            onChange={handleAvatarChange}
+          />
+
           <Box flex={1} pt={1}>
             <HStack spacing={3} align="center" mb={1}>
               <Text
