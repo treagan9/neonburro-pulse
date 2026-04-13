@@ -11,7 +11,7 @@ import {
 } from '@chakra-ui/react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  TbArrowLeft, TbMail, TbPhone, TbWorld,
+  TbMail, TbPhone, TbWorld,
   TbBolt, TbCash, TbPlus, TbFolder,
   TbMessageCircle, TbTrash, TbX, TbEdit,
 } from 'react-icons/tb';
@@ -741,7 +741,7 @@ const ClientDetail = () => {
         .from('invoices')
         .select('*, invoice_items(*)')
         .eq('client_id', clientId)
-        .is('cancelled_at', null) // Hide cancelled
+        .is('cancelled_at', null)
         .order('created_at', { ascending: false }),
       supabase
         .from('activity_log')
@@ -811,22 +811,6 @@ const ClientDetail = () => {
       />
 
       <Container maxW="900px" px={{ base: 4, md: 6 }} py={{ base: 6, md: 10 }} position="relative">
-        <HStack
-          spacing={2}
-          cursor="pointer"
-          color="surface.500"
-          _hover={{ color: 'brand.500' }}
-          transition="color 0.15s"
-          mb={6}
-          onClick={() => navigate('/clients/')}
-          userSelect="none"
-        >
-          <Icon as={TbArrowLeft} boxSize={3.5} />
-          <Text fontSize="xs" fontWeight="700" letterSpacing="0.05em" textTransform="uppercase">
-            All Clients
-          </Text>
-        </HStack>
-
         <HStack spacing={5} align="start" mb={8}>
           <Box
             w="72px"
