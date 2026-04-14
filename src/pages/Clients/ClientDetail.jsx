@@ -3,11 +3,12 @@
 //
 // Tabs: Overview / Sprints / Invoices / Projects / Sites / Messages
 // Admin can click the avatar to upload/replace/remove the client's photo
+// Admin can view/regenerate PIN from Portal Access section on Overview
 
 import { useState, useEffect } from 'react';
 import {
   Box, VStack, HStack, Text, Icon, Spinner, Center,
-  Button, SimpleGrid, Input, useToast,
+  Button, SimpleGrid, Input, useToast, useDisclosure,
 } from '@chakra-ui/react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
@@ -18,7 +19,9 @@ import {
 import { supabase } from '../../lib/supabase';
 import { formatPhoneDisplay, timeAgo } from '../../utils/phone';
 import SitesTab from './components/SitesTab';
+import ClientModal from './components/ClientModal';
 import ClientAvatarUpload from '../../components/common/ClientAvatarUpload';
+import PortalAccessCard from '../../components/common/PortalAccessCard';
 
 const TAB_OPTIONS = [
   { value: 'overview', label: 'Overview' },
@@ -48,7 +51,7 @@ const currency = (val) => {
 // ============================================================
 // OVERVIEW TAB
 // ============================================================
-const OverviewTab = ({ client, stats, activity }) => (
+const OverviewTab = ({ client, stats, activity, onClientUpdate }) => (
   <VStack spacing={8} align="stretch">
     <SimpleGrid columns={{ base: 2, md: 4 }} spacing={6}>
       {[
@@ -144,6 +147,11 @@ const OverviewTab = ({ client, stats, activity }) => (
       </VStack>
     </Box>
 
+    {/* Portal Access - owner only (component self-gates) */}
+    <Box pt={4} borderTop="1px solid" borderColor="surface.900">
+      <PortalAccessCard client={client} onUpdate={onClientUpdate} />
+    </Box>
+
     {client.notes && (
       <Box pt={4} borderTop="1px solid" borderColor="surface.900">
         <Text
@@ -181,7 +189,8 @@ const OverviewTab = ({ client, stats, activity }) => (
             <HStack key={a.id} spacing={3} py={1}>
               <Box w="5px" h="5px" borderRadius="full" bg="surface.700" flexShrink={0} />
               <Text color="surface.400" fontSize="xs" flex={1}>
-                {a.action?.replace(/_/g, ' ')} — {a.metadata?.note || ''}
+                {a.action?.replace(/_/g, ' ')}
+                {a.metadata?.note && ` — ${a.metadata.note}`}
               </Text>
               <Text color="surface.700" fontSize="2xs" fontFamily="mono">
                 {timeAgo(a.created_at)}
@@ -726,6 +735,7 @@ const ClientDetail = () => {
   const { clientId } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
+  const { isOpen: isEditOpen, onOpen: onEditOpen, onClose: onEditClose } = useDisclosure();
 
   const [client, setClient] = useState(null);
   const [sprints, setSprints] = useState([]);
@@ -777,9 +787,22 @@ const ClientDetail = () => {
     setLoading(false);
   };
 
+  const refetchClient = async () => {
+    const { data } = await supabase
+      .from('clients')
+      .select('*')
+      .eq('id', clientId)
+      .maybeSingle();
+    if (data) setClient(data);
+  };
+
   const handleAvatarChange = (newUrl) => {
-    // Optimistically update local state - no full refetch needed
     setClient((prev) => ({ ...prev, avatar_url: newUrl }));
+  };
+
+  const handleEditSave = async () => {
+    // ClientModal calls onSave after a successful save - refetch to show updates
+    await refetchClient();
   };
 
   if (loading) {
@@ -872,7 +895,7 @@ const ClientDetail = () => {
               color="surface.400"
               borderRadius="lg"
               leftIcon={<TbEdit size={12} />}
-              onClick={() => navigate('/clients/')}
+              onClick={onEditOpen}
               _hover={{ borderColor: 'brand.500', color: 'brand.500' }}
             >
               Edit
@@ -932,7 +955,12 @@ const ClientDetail = () => {
 
         <Box>
           {activeTab === 'overview' && (
-            <OverviewTab client={client} stats={stats} activity={activity} />
+            <OverviewTab
+              client={client}
+              stats={stats}
+              activity={activity}
+              onClientUpdate={refetchClient}
+            />
           )}
           {activeTab === 'sprints' && <SprintsTab sprints={sprints} loading={false} />}
           {activeTab === 'invoices' && (
@@ -943,6 +971,14 @@ const ClientDetail = () => {
           {activeTab === 'messages' && <MessagesTab clientId={clientId} />}
         </Box>
       </Box>
+
+      {/* Edit modal */}
+      <ClientModal
+        isOpen={isEditOpen}
+        onClose={onEditClose}
+        client={client}
+        onSave={handleEditSave}
+      />
     </Box>
   );
 };
