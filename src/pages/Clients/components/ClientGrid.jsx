@@ -7,7 +7,12 @@ import {
 } from '@chakra-ui/react';
 import { useNavigate } from 'react-router-dom';
 import { TbUsers, TbBolt, TbFolder, TbEdit } from 'react-icons/tb';
-import { getInitials, getAvatarColor, timeAgo } from '../../../utils/phone';
+import { getAvatarColor, timeAgo } from '../../../utils/phone';
+import Avatar from '../../../components/common/Avatar';
+
+// ============================================================
+// HELPERS
+// ============================================================
 
 const STATUS_DOT = {
   active:   '#39FF14',
@@ -32,9 +37,12 @@ const currency = (val) => {
   return `$${num.toLocaleString()}`;
 };
 
+// ============================================================
+// ROW
+// ============================================================
+
 const ClientRow = ({ client, onEdit }) => {
   const navigate = useNavigate();
-  const initials = getInitials(client.name);
   const avatarColor = getAvatarColor(client.name);
   const statusColor = STATUS_DOT[client.status] || STATUS_DOT.active;
   const sprintCount = client.sprint_count || 0;
@@ -77,23 +85,13 @@ const ClientRow = ({ client, onEdit }) => {
           flexShrink={0}
         />
 
-        {/* Avatar */}
-        <Box
-          w="36px"
-          h="36px"
-          borderRadius="full"
-          bg={avatarColor}
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
-          flexShrink={0}
-          transition="all 0.15s"
-          _groupHover={{ boxShadow: `0 0 16px ${avatarColor}40` }}
-        >
-          <Text color="surface.950" fontSize="xs" fontWeight="800" letterSpacing="-0.02em">
-            {initials}
-          </Text>
-        </Box>
+        {/* Avatar - uses uploaded image or initials fallback */}
+        <Avatar
+          name={client.name}
+          url={client.avatar_url}
+          size="sm"
+          border={false}
+        />
 
         {/* Name + company + tags */}
         <VStack align="start" spacing={0} flex={1} minW={0}>
@@ -192,6 +190,10 @@ const ClientRow = ({ client, onEdit }) => {
     </Box>
   );
 };
+
+// ============================================================
+// GRID
+// ============================================================
 
 const ClientGrid = ({ clients, loading, onEdit, onAdd, isEmpty }) => {
   if (loading) {

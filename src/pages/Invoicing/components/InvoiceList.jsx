@@ -9,8 +9,13 @@ import {
 import {
   TbCash, TbBolt, TbTrash, TbAlertTriangle, TbEye,
 } from 'react-icons/tb';
-import { getInitials, getAvatarColor, timeAgo } from '../../../utils/phone';
+import { timeAgo } from '../../../utils/phone';
+import Avatar from '../../../components/common/Avatar';
 import InvoiceSnapshotModal from './InvoiceSnapshotModal';
+
+// ============================================================
+// HELPERS
+// ============================================================
 
 const STATUS_COLORS = {
   draft:   { color: '#737373', label: 'DRAFT' },
@@ -19,6 +24,7 @@ const STATUS_COLORS = {
   partial: { color: '#FFE500', label: 'PARTIAL' },
   overdue: { color: '#FF3366', label: 'OVERDUE' },
   paid:    { color: '#39FF14', label: 'PAID' },
+  cancelled: { color: '#525252', label: 'CANCELLED' },
 };
 
 const SENT_LIKE_STATUSES = ['sent', 'viewed', 'partial', 'overdue', 'paid'];
@@ -30,12 +36,14 @@ const currency = (val) => {
   return `$${num.toLocaleString()}`;
 };
 
+// ============================================================
+// ROW
+// ============================================================
+
 const InvoiceRow = ({ invoice, onSelect, onQuickDelete, onViewSnapshot }) => {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const client = invoice.clients;
   const status = STATUS_COLORS[invoice.status] || STATUS_COLORS.draft;
-  const avatarColor = getAvatarColor(client?.name || '');
-  const initials = getInitials(client?.name || '?');
   const sprintCount = invoice.invoice_items?.length || 0;
   const paidCount = (invoice.invoice_items || []).filter(
     (i) => i.payment_status === 'paid' || i.locked
@@ -88,20 +96,13 @@ const InvoiceRow = ({ invoice, onSelect, onQuickDelete, onViewSnapshot }) => {
           flexShrink={0}
         />
 
-        <Box
-          w="32px"
-          h="32px"
-          borderRadius="full"
-          bg={avatarColor}
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
-          flexShrink={0}
-        >
-          <Text color="surface.950" fontSize="2xs" fontWeight="800">
-            {initials}
-          </Text>
-        </Box>
+        {/* Avatar - uses uploaded image or initials fallback */}
+        <Avatar
+          name={client?.name || '?'}
+          url={client?.avatar_url}
+          size="sm"
+          border={false}
+        />
 
         <VStack align="start" spacing={0} flex={1} minW={0}>
           <HStack spacing={2}>
@@ -155,7 +156,6 @@ const InvoiceRow = ({ invoice, onSelect, onQuickDelete, onViewSnapshot }) => {
 
         {/* Action icons - eye + trash, hover-revealed */}
         <HStack spacing={0.5}>
-          {/* Eye icon - sent invoices only */}
           {wasSent ? (
             <Box
               as="button"
@@ -179,7 +179,6 @@ const InvoiceRow = ({ invoice, onSelect, onQuickDelete, onViewSnapshot }) => {
             <Box w="28px" />
           )}
 
-          {/* Trash icon - drafts only */}
           {isDraft ? (
             <Box
               as="button"
@@ -207,6 +206,10 @@ const InvoiceRow = ({ invoice, onSelect, onQuickDelete, onViewSnapshot }) => {
     </Box>
   );
 };
+
+// ============================================================
+// LIST
+// ============================================================
 
 const InvoiceList = ({ invoices, loading, onSelect, onNew, onQuickDelete }) => {
   const [snapshotInvoiceId, setSnapshotInvoiceId] = useState(null);
