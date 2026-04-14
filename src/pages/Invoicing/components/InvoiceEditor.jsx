@@ -1,28 +1,34 @@
 // src/pages/Invoicing/components/InvoiceEditor.jsx
-// Inline invoice editor with Compose/Preview tabs.
-// - Drafts: hard delete via two-click subtle link
-// - Sent/viewed/partial/overdue: soft cancel via modal with typed confirmation
-// - Paid: cannot delete (button hidden)
-// - Eye icon next to status badge: opens snapshot modal showing exact email sent
+// Invoice compose + preview surface.
+// Handles draft creation, editing, sending, cancelling, hard-deleting.
+// Invoice numbers: NB{YY}{MM}{NN} generated at load-time, monthly reset.
+// Sprint numbers: {invoice}-{NN} assigned at save-time per sprint.
 
 import { useState, useEffect } from 'react';
 import {
-  Box, VStack, HStack, Text, Container, Icon, Spinner, Center,
-  Button, Input, Textarea, Select, useToast, Divider, Tooltip,
-  Modal, ModalOverlay, ModalContent, ModalBody, ModalHeader, ModalFooter, ModalCloseButton,
+  Box, VStack, HStack, Text, Icon, Spinner, Center, Button,
+  Input, Textarea, Select, Container, Divider, Tooltip,
+  Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody,
+  ModalFooter, ModalCloseButton, useToast,
 } from '@chakra-ui/react';
 import {
-  TbArrowLeft, TbPlus, TbTrash, TbSend, TbEye, TbEdit,
-  TbCheck, TbBolt, TbAlertTriangle,
+  TbArrowLeft, TbPlus, TbTrash, TbEdit, TbEye, TbSend, TbBolt,
+  TbCheck, TbAlertTriangle,
 } from 'react-icons/tb';
 import { supabase } from '../../../lib/supabase';
+import {
+  fetchNextInvoiceNumber,
+  fetchNextSprintNumber,
+  withInvoiceNumberRetry,
+} from '../../../lib/numbering';
 import InvoicePreview from './InvoicePreview';
 import InvoiceSnapshotModal from './InvoiceSnapshotModal';
 
-const currency = (val) => {
-  const num = parseFloat(val || 0);
-  return `$${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-};
+// ============================================================
+// HELPERS
+// ============================================================
+
+const SENT_STATUSES = ['sent', 'viewed', 'partial', 'overdue'];
 
 const FUNDING_MODES = [
   { value: 'approve_only', label: 'Confirm Scope', color: '#737373' },
@@ -30,7 +36,25 @@ const FUNDING_MODES = [
   { value: 'pay_full', label: 'Fund in Full', color: '#39FF14' },
 ];
 
-const SENT_STATUSES = ['sent', 'viewed', 'partial', 'overdue'];
+const currency = (val) => {
+  const num = parseFloat(val || 0);
+  if (num === 0) return '$0';
+  return `$${num.toLocaleString('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  })}`;
+};
+
+const FIELD_LABEL = {
+  fontSize: '2xs',
+  fontWeight: '700',
+  color: 'surface.600',
+  textTransform: 'uppercase',
+  letterSpacing: '0.1em',
+  fontFamily: 'mono',
+  mb: 2,
+  display: 'block',
+};
 
 const nakedInput = {
   bg: 'transparent',
@@ -42,43 +66,46 @@ const nakedInput = {
   fontSize: 'sm',
   h: '40px',
   px: 0,
-  _hover: { borderColor: 'surface.700' },
   _focus: { borderColor: 'brand.500', boxShadow: 'none' },
   _placeholder: { color: 'surface.700' },
 };
 
-const FIELD_LABEL = {
-  fontSize: '2xs',
-  fontWeight: '700',
-  color: 'surface.600',
-  textTransform: 'uppercase',
-  letterSpacing: '0.08em',
-  fontFamily: 'mono',
-  mb: 1,
+// Validate sprints before sending. Returns { valid, reason } tuple.
+const validateSprintsForSend = (sprints) => {
+  const billable = sprints.filter((s) => s.is_billable !== false);
+  if (billable.length === 0) {
+    return { valid: false, reason: 'At least one billable sprint is required' };
+  }
+  const untitled = billable.find((s) => !s.title || !s.title.trim());
+  if (untitled) {
+    return { valid: false, reason: 'Every billable sprint needs a title' };
+  }
+  const zeroAmount = billable.find((s) => !parseFloat(s.amount) || parseFloat(s.amount) <= 0);
+  if (zeroAmount) {
+    return { valid: false, reason: 'Sprint amounts must be greater than zero' };
+  }
+  return { valid: true };
 };
 
 // ============================================================
-// SPRINT ROW (editable)
+// SPRINT EDIT ROW
 // ============================================================
 const SprintEditRow = ({ sprint, onUpdate, onDelete }) => {
-  const [expanded, setExpanded] = useState(!sprint.title);
+  const [expanded, setExpanded] = useState(false);
   const isLocked = sprint.locked || sprint.payment_status === 'paid';
   const isWip = sprint.is_billable === false;
 
   return (
     <Box
+      py={3}
       borderBottom="1px solid"
       borderColor="surface.900"
-      py={3}
-      opacity={isWip ? 0.5 : 1}
-      transition="opacity 0.15s"
+      role="group"
     >
-      <HStack spacing={3} align="start">
+      <HStack align="start" spacing={3}>
         <Box
-          as="button"
-          onClick={() => !isLocked && onUpdate({ ...sprint, is_billable: !isWip })}
-          w="18px"
-          h="18px"
+          w="16px"
+          h="16px"
           borderRadius="sm"
           border="1.5px solid"
           borderColor={isWip ? 'surface.700' : 'brand.500'}
@@ -86,6 +113,7 @@ const SprintEditRow = ({ sprint, onUpdate, onDelete }) => {
           display="flex"
           alignItems="center"
           justifyContent="center"
+          onClick={() => !isLocked && onUpdate({ ...sprint, is_billable: isWip })}
           mt={1}
           cursor={isLocked ? 'not-allowed' : 'pointer'}
           flexShrink={0}
@@ -233,7 +261,7 @@ const SprintEditRow = ({ sprint, onUpdate, onDelete }) => {
 };
 
 // ============================================================
-// CANCEL MODAL - heavyweight confirmation for sent invoices
+// CANCEL MODAL
 // ============================================================
 const CancelInvoiceModal = ({ isOpen, onClose, invoice, onConfirm, processing }) => {
   const [typedConfirm, setTypedConfirm] = useState('');
@@ -382,6 +410,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
   const [sprints, setSprints] = useState([]);
   const [notes, setNotes] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [previewNumber, setPreviewNumber] = useState(null);
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -407,6 +436,15 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
     if (isNew) {
       setInvoice({ status: 'draft' });
       setSprints([]);
+      // Preview the NEXT invoice number so the user sees "NB260401" immediately
+      // not "NB______". The actual number is assigned at save-time via
+      // withInvoiceNumberRetry so a race is still handled correctly.
+      try {
+        const nextNum = await fetchNextInvoiceNumber();
+        setPreviewNumber(nextNum);
+      } catch (err) {
+        console.warn('Could not preview invoice number:', err);
+      }
       setLoading(false);
       return;
     }
@@ -486,6 +524,20 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
       return;
     }
 
+    // Extra guardrail when sending: block if any sprint has empty title
+    if (sendAfterSave) {
+      const check = validateSprintsForSend(sprints);
+      if (!check.valid) {
+        toast({
+          title: 'Cannot send yet',
+          description: check.reason,
+          status: 'warning',
+          duration: 3500,
+        });
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       const total = sprints
@@ -493,29 +545,31 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
         .reduce((sum, s) => sum + parseFloat(s.amount || 0), 0);
 
       let savedInvoiceId = invoiceId;
+      let savedInvoiceNumber = invoice?.invoice_number;
 
       if (isNew) {
-        const { data: sprintNumData } = await supabase.rpc('next_sprint_number');
-        const newInvoiceNumber = sprintNumData || `NB${Date.now().toString().slice(-6)}`;
-
-        const { data, error } = await supabase
-          .from('invoices')
-          .insert({
-            client_id: clientId,
-            project_id: projectId || null,
-            status: 'draft',
-            invoice_number: newInvoiceNumber,
-            total,
-            total_paid: 0,
-            notes: notes || null,
-            due_date: dueDate || null,
-            created_at: new Date().toISOString(),
-          })
-          .select()
-          .single();
-
-        if (error) throw error;
-        savedInvoiceId = data.id;
+        // Wrap the insert with retry-on-unique-collision
+        const inserted = await withInvoiceNumberRetry(async (newNumber) => {
+          const { data, error } = await supabase
+            .from('invoices')
+            .insert({
+              client_id: clientId,
+              project_id: projectId || null,
+              status: 'draft',
+              invoice_number: newNumber,
+              total,
+              total_paid: 0,
+              notes: notes || null,
+              due_date: dueDate || null,
+              created_at: new Date().toISOString(),
+            })
+            .select()
+            .single();
+          if (error) throw error;
+          return data;
+        });
+        savedInvoiceId = inserted.id;
+        savedInvoiceNumber = inserted.invoice_number;
       } else {
         const { error } = await supabase
           .from('invoices')
@@ -531,6 +585,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
         if (error) throw error;
       }
 
+      // Save sprints (new ones get child sprint_number like NB260401-01)
       for (const sprint of sprints) {
         const sprintPayload = {
           title: sprint.title || 'Untitled Sprint',
@@ -543,8 +598,8 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
         };
 
         if (sprint._isNew) {
-          const { data: sprintNumData } = await supabase.rpc('next_sprint_number');
-          sprintPayload.sprint_number = sprintNumData;
+          const childNumber = await fetchNextSprintNumber(savedInvoiceId);
+          if (childNumber) sprintPayload.sprint_number = childNumber;
           sprintPayload.created_at = new Date().toISOString();
           await supabase.from('invoice_items').insert(sprintPayload);
         } else if (sprint._dirty) {
@@ -556,7 +611,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
       }
 
       toast({
-        title: isNew ? 'Invoice created' : 'Invoice saved',
+        title: isNew ? `Invoice ${savedInvoiceNumber} created` : 'Invoice saved',
         status: 'success',
         duration: 2000,
       });
@@ -703,6 +758,21 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
     .reduce((sum, s) => sum + parseFloat(s.amount || 0), 0);
   const billableCount = sprints.filter((s) => s.is_billable !== false).length;
 
+  // Number to show in the header. For new invoices use the previewed number,
+  // so the user sees NB260401 right away.
+  const displayNumber = isNew
+    ? (previewNumber || 'New Invoice')
+    : (invoice?.invoice_number || 'Invoice');
+
+  // Same number passed to the preview so the email preview also shows it
+  const previewInvoice = {
+    ...invoice,
+    invoice_number: isNew ? previewNumber : invoice?.invoice_number,
+    client_id: clientId,
+    notes,
+    due_date: dueDate,
+  };
+
   return (
     <Box position="relative" minH="100%">
       <Box
@@ -742,8 +812,9 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                   color="white"
                   letterSpacing="-0.02em"
                   lineHeight="1"
+                  fontFamily={isNew ? 'mono' : 'heading'}
                 >
-                  {isNew ? 'New Invoice' : invoice?.invoice_number || 'Invoice'}
+                  {displayNumber}
                 </Text>
                 {!isNew && invoice?.status && (
                   <HStack spacing={2}>
@@ -782,6 +853,11 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                       </Tooltip>
                     )}
                   </HStack>
+                )}
+                {isNew && previewNumber && (
+                  <Text fontSize="2xs" color="surface.600" fontFamily="mono" fontWeight="700" textTransform="uppercase" letterSpacing="0.08em">
+                    Draft preview
+                  </Text>
                 )}
               </HStack>
               <Text color="surface.500" fontSize="sm">
@@ -825,7 +901,6 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
           </HStack>
         </VStack>
 
-        {/* Tabs */}
         <HStack spacing={6} borderBottom="1px solid" borderColor="surface.900" mb={8}>
           {[
             { value: 'compose', label: 'Compose', icon: TbEdit },
@@ -1078,7 +1153,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
 
         {activeTab === 'preview' && (
           <InvoicePreview
-            invoice={{ ...invoice, client_id: clientId, notes, due_date: dueDate }}
+            invoice={previewInvoice}
             client={client}
             sprints={sprints.filter((s) => s.is_billable !== false)}
           />
