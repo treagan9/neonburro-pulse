@@ -3,8 +3,6 @@
 // - Sidebar: fixed left, 240px expanded / 64px collapsed, persisted via profile
 // - Content: max 1400px centered, responsive gutters, consistent rhythm
 // - Mobile: full-bleed with bottom tab bar (5 icons + More sheet)
-//
-// Container math: content width scales from 100% (mobile) → 95% (desktop) → max 1400px
 
 import { useState, useEffect } from 'react';
 import { Box, Flex } from '@chakra-ui/react';
@@ -15,12 +13,12 @@ import MobileNav from './MobileNav';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
 
-const AppShell = () => {
+const AppShell = ({ children }) => {
   const { user } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
-  const [loaded, setLoaded] = useState(false);
 
-  // Load collapsed preference from profiles on mount
+  // Load collapsed preference from profiles in background.
+  // Sidebar shows expanded by default — no blocking hide/show.
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
@@ -30,15 +28,13 @@ const AppShell = () => {
         .select('sidebar_collapsed')
         .eq('id', user.id)
         .maybeSingle();
-      if (!cancelled && data) {
-        setCollapsed(!!data.sidebar_collapsed);
+      if (!cancelled && data && data.sidebar_collapsed) {
+        setCollapsed(true);
       }
-      if (!cancelled) setLoaded(true);
     })();
     return () => { cancelled = true; };
   }, [user]);
 
-  // Toggle + persist — optimistic local update, background write
   const toggleCollapsed = async () => {
     const next = !collapsed;
     setCollapsed(next);
@@ -53,11 +49,7 @@ const AppShell = () => {
 
   return (
     <Flex minH="100vh" bg="surface.950">
-      <Sidebar
-        collapsed={collapsed}
-        onToggle={toggleCollapsed}
-        loaded={loaded}
-      />
+      <Sidebar collapsed={collapsed} onToggle={toggleCollapsed} />
 
       <Box
         flex={1}
@@ -79,7 +71,7 @@ const AppShell = () => {
           py={{ base: 5, md: 8, lg: 10 }}
           pb={{ base: '88px', lg: 10 }}
         >
-          <Outlet />
+          {children || <Outlet />}
         </Box>
       </Box>
 

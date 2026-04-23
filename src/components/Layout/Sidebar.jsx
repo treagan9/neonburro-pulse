@@ -2,7 +2,7 @@
 // Desktop sidebar with expand/collapse toggle.
 // - Expanded (240px): avatar + name + full nav labels + settings footer
 // - Collapsed (64px): avatar + icon-only nav + tooltips on hover
-// - Preference persists via profiles.sidebar_collapsed (passed from AppShell)
+// - Preference persists via profiles.sidebar_collapsed (managed by AppShell)
 
 import { useState, useEffect } from 'react';
 import {
@@ -28,7 +28,7 @@ const NAV_ITEMS = [
 
 const FOOTER_ITEM = { path: '/settings/', label: 'Settings', icon: TbSettings };
 
-const Sidebar = ({ collapsed = false, onToggle, loaded = true }) => {
+const Sidebar = ({ collapsed = false, onToggle }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -66,7 +66,6 @@ const Sidebar = ({ collapsed = false, onToggle, loaded = true }) => {
       display={{ base: 'none', lg: 'flex' }}
       flexDirection="column"
       transition="width 240ms cubic-bezier(0.4, 0, 0.2, 1)"
-      visibility={loaded ? 'visible' : 'hidden'}
       zIndex={10}
     >
       {/* Brand + user identity */}
@@ -154,7 +153,6 @@ const Sidebar = ({ collapsed = false, onToggle, loaded = true }) => {
           color="white"
           fontSize="xs"
           openDelay={300}
-          isDisabled={!collapsed && false}
         >
           <Box
             as="button"
@@ -180,7 +178,6 @@ const Sidebar = ({ collapsed = false, onToggle, loaded = true }) => {
         </Tooltip>
       </VStack>
 
-      {/* Footer version tag */}
       {!collapsed && (
         <Box px={5} py={2}>
           <Text color="surface.700" fontSize="2xs" fontFamily="mono">
@@ -192,15 +189,12 @@ const Sidebar = ({ collapsed = false, onToggle, loaded = true }) => {
   );
 };
 
-// ============================================================
-// NAV BUTTON (shared between primary nav + footer)
-// ============================================================
 const NavButton = ({ item, active, collapsed, onClick }) => {
   const button = (
     <Box
       as="button"
       onClick={onClick}
-      h={collapsed ? '40px' : '40px'}
+      h="40px"
       w="100%"
       px={collapsed ? 0 : 4}
       borderRadius="lg"
@@ -241,7 +235,6 @@ const NavButton = ({ item, active, collapsed, onClick }) => {
     </Box>
   );
 
-  // Wrap in tooltip only when collapsed
   if (collapsed) {
     return (
       <Tooltip
