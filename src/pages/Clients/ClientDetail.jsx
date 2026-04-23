@@ -4,6 +4,7 @@
 // Tabs: Overview / Sprints / Invoices / Projects / Sites / Messages
 // Admin can click the avatar to upload/replace/remove the client's photo
 // Admin can view/regenerate PIN from Portal Access section on Overview
+// Admin can "View as Client" to open the portal impersonation view
 
 import { useState, useEffect } from 'react';
 import {
@@ -22,6 +23,7 @@ import SitesTab from './components/SitesTab';
 import ClientModal from './components/ClientModal';
 import ClientAvatarUpload from '../../components/common/ClientAvatarUpload';
 import PortalAccessCard from '../../components/common/PortalAccessCard';
+import ImpersonateButton from '../../components/common/ImpersonateButton';
 
 const TAB_OPTIONS = [
   { value: 'overview', label: 'Overview' },
@@ -147,7 +149,6 @@ const OverviewTab = ({ client, stats, activity, onClientUpdate }) => (
       </VStack>
     </Box>
 
-    {/* Portal Access - owner only (component self-gates) */}
     <Box pt={4} borderTop="1px solid" borderColor="surface.900">
       <PortalAccessCard client={client} onUpdate={onClientUpdate} />
     </Box>
@@ -190,7 +191,7 @@ const OverviewTab = ({ client, stats, activity, onClientUpdate }) => (
               <Box w="5px" h="5px" borderRadius="full" bg="surface.700" flexShrink={0} />
               <Text color="surface.400" fontSize="xs" flex={1}>
                 {a.action?.replace(/_/g, ' ')}
-                {a.metadata?.note && ` — ${a.metadata.note}`}
+                {a.metadata?.note && ` \u2014 ${a.metadata.note}`}
               </Text>
               <Text color="surface.700" fontSize="2xs" fontFamily="mono">
                 {timeAgo(a.created_at)}
@@ -312,7 +313,7 @@ const SprintsTab = ({ sprints, loading }) => {
                 <Box flex={1} minW={0}>
                   <HStack spacing={2}>
                     <Text color="surface.600" fontSize="2xs" fontFamily="mono" fontWeight="700">
-                      {s.sprint_number || '—'}
+                      {s.sprint_number || '\u2014'}
                     </Text>
                     {isDraft && (
                       <Text fontSize="2xs" fontFamily="mono" color="surface.600" textTransform="uppercase">
@@ -404,7 +405,7 @@ const InvoicesTab = ({ invoices, loading, navigate }) => {
                 </Text>
               </HStack>
               <Text color="surface.600" fontSize="2xs" fontFamily="mono" mt={0.5}>
-                {inv.invoice_items?.length || 0} sprints · sent {inv.sent_at ? timeAgo(inv.sent_at) : '—'}
+                {inv.invoice_items?.length || 0} sprints \u00b7 sent {inv.sent_at ? timeAgo(inv.sent_at) : '\u2014'}
               </Text>
             </Box>
             <VStack align="end" spacing={0}>
@@ -675,7 +676,7 @@ const MessagesTab = ({ clientId }) => {
                     </Text>
                   </Box>
                   <Text color="surface.600" fontSize="2xs" fontFamily="mono">
-                    {m.sender_name} · {timeAgo(m.created_at)}
+                    {m.sender_name} \u00b7 {timeAgo(m.created_at)}
                   </Text>
                 </VStack>
               </HStack>
@@ -709,7 +710,7 @@ const MessagesTab = ({ clientId }) => {
         />
         <HStack justify="space-between" pt={2}>
           <Text color="surface.700" fontSize="2xs" fontFamily="mono">
-            ⌘ + Enter to send
+            {'\u2318'} + Enter to send
           </Text>
           <Button
             size="xs"
@@ -801,7 +802,6 @@ const ClientDetail = () => {
   };
 
   const handleEditSave = async () => {
-    // ClientModal calls onSave after a successful save - refetch to show updates
     await refetchClient();
   };
 
@@ -900,6 +900,7 @@ const ClientDetail = () => {
             >
               Edit
             </Button>
+            <ImpersonateButton client={client} />
             <Button
               size="xs"
               bg="brand.500"
@@ -972,7 +973,6 @@ const ClientDetail = () => {
         </Box>
       </Box>
 
-      {/* Edit modal */}
       <ClientModal
         isOpen={isEditOpen}
         onClose={onEditClose}
