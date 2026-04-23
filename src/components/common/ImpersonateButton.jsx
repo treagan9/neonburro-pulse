@@ -3,11 +3,7 @@
 // Opens an admin-minted impersonation session and launches it in a new tab
 // at neonburro.com/account/?impersonate=<token>.
 //
-// Security:
-// - Token is minted server-side with a 30-min expiry (clamped inside the RPC)
-// - Admin's Supabase JWT is sent for authorization; the RPC double-checks role
-// - Raw token is returned once, dropped into the redirect URL, never stored here
-// - Session shows up in the audit log automatically
+// Shows detailed error codes from the server to make debugging painless.
 
 import { useRef, useState } from 'react';
 import {
@@ -50,8 +46,23 @@ const ImpersonateButton = ({ client, size = 'xs' }) => {
       });
 
       const data = await res.json();
+
+      // Log everything to console so Tyler can see what the server returned
       if (!res.ok) {
-        throw new Error(data.error || 'Could not start session');
+        console.group('%c[ImpersonateButton] Request failed', 'color:#FF3366;font-weight:bold');
+        console.log('HTTP status:', res.status);
+        console.log('Error code:', data.code);
+        console.log('Error message:', data.error);
+        if (data.debug) console.log('Debug payload:', data.debug);
+        console.log('Full response:', data);
+        console.groupEnd();
+
+        // Build a useful description that includes the code
+        const description = data.code
+          ? `${data.error} [${data.code}]`
+          : data.error;
+
+        throw new Error(description || 'Could not start session');
       }
 
       const opened = window.open(data.redirect_url, '_blank', 'noopener,noreferrer');
@@ -78,7 +89,8 @@ const ImpersonateButton = ({ client, size = 'xs' }) => {
         title: 'Could not start session',
         description: err.message,
         status: 'error',
-        duration: 4000,
+        duration: 8000,
+        isClosable: true,
       });
     } finally {
       setIsLoading(false);
