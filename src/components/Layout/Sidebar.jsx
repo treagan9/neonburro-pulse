@@ -1,42 +1,53 @@
 // src/components/Layout/Sidebar.jsx
-// Icon-free nav, Projects removed - clients are the source of truth
+// Desktop sidebar with expand/collapse toggle.
+// - Expanded (240px): avatar + name + full nav labels + settings footer
+// - Collapsed (64px): avatar + icon-only nav + tooltips on hover
+// - Preference persists via profiles.sidebar_collapsed (passed from AppShell)
+
 import { useState, useEffect } from 'react';
 import {
-  Box, VStack, HStack, Text, Divider, Avatar,
+  Box, VStack, HStack, Text, Divider, Avatar, Icon, Tooltip,
 } from '@chakra-ui/react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import {
+  TbLayoutDashboard, TbUsers, TbFileInvoice, TbInbox,
+  TbCalendar, TbChartBar, TbSettings,
+  TbChevronLeft, TbChevronRight,
+} from 'react-icons/tb';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
 
 const NAV_ITEMS = [
-  { path: '/dashboard/', label: 'Dashboard' },
-  { path: '/clients/', label: 'Clients' },
-  { path: '/invoicing/', label: 'Invoicing' },
-  { path: '/forms/', label: 'Forms' },
-  { path: '/calendar/', label: 'Calendar' },
-  { path: '/analytics/', label: 'Analytics' },
-  { path: '/settings/', label: 'Settings' },
+  { path: '/dashboard/', label: 'Dashboard', icon: TbLayoutDashboard },
+  { path: '/clients/',   label: 'Clients',   icon: TbUsers },
+  { path: '/invoicing/', label: 'Invoicing', icon: TbFileInvoice },
+  { path: '/forms/',     label: 'Forms',     icon: TbInbox },
+  { path: '/calendar/',  label: 'Calendar',  icon: TbCalendar },
+  { path: '/analytics/', label: 'Analytics', icon: TbChartBar },
 ];
 
-const Sidebar = () => {
+const FOOTER_ITEM = { path: '/settings/', label: 'Settings', icon: TbSettings };
+
+const Sidebar = ({ collapsed = false, onToggle, loaded = true }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [profile, setProfile] = useState(null);
 
   useEffect(() => {
-    if (user) {
-      supabase
-        .from('profiles')
-        .select('display_name, username, avatar_url')
-        .eq('id', user.id)
-        .single()
-        .then(({ data }) => { if (data) setProfile(data); });
-    }
+    if (!user) return;
+    supabase
+      .from('profiles')
+      .select('display_name, username, avatar_url')
+      .eq('id', user.id)
+      .single()
+      .then(({ data }) => { if (data) setProfile(data); });
   }, [user]);
 
   const isActive = (path) => {
-    if (path === '/dashboard/') return location.pathname === '/' || location.pathname === '/dashboard/';
+    if (path === '/dashboard/') {
+      return location.pathname === '/' || location.pathname === '/dashboard/';
+    }
     return location.pathname.startsWith(path);
   };
 
@@ -44,18 +55,27 @@ const Sidebar = () => {
 
   return (
     <Box
-      w="240px"
+      w={collapsed ? '64px' : '240px'}
       h="100vh"
       bg="surface.950"
       borderRight="1px solid"
-      borderColor="surface.800"
+      borderColor="rgba(255,255,255,0.06)"
       position="fixed"
       left={0}
       top={0}
       display={{ base: 'none', lg: 'flex' }}
       flexDirection="column"
+      transition="width 240ms cubic-bezier(0.4, 0, 0.2, 1)"
+      visibility={loaded ? 'visible' : 'hidden'}
+      zIndex={10}
     >
-      <HStack px={5} py={4} spacing={3}>
+      {/* Brand + user identity */}
+      <HStack
+        px={collapsed ? 2 : 5}
+        py={5}
+        spacing={collapsed ? 0 : 3}
+        justify={collapsed ? 'center' : 'flex-start'}
+      >
         <Avatar
           size="sm"
           name={displayName}
@@ -64,63 +84,180 @@ const Sidebar = () => {
           color="surface.950"
           border="2px solid"
           borderColor="surface.800"
+          flexShrink={0}
         />
-        <Box flex={1} minW={0}>
-          <Text color="white" fontWeight="800" fontSize="md" lineHeight="1.2" noOfLines={1}>Pulse</Text>
-          <Text color="surface.500" fontSize="2xs" fontFamily="mono" noOfLines={1}>{displayName}</Text>
-        </Box>
-        <Box w="6px" h="6px" borderRadius="full" bg="accent.neon" boxShadow="0 0 6px rgba(57,255,20,0.5)" />
-      </HStack>
-
-      <Divider borderColor="surface.800" />
-
-      <VStack spacing={0.5} px={3} py={3} align="stretch" flex={1}>
-        {NAV_ITEMS.map((item) => {
-          const active = isActive(item.path);
-          return (
-            <Box
-              key={item.path}
-              px={4}
-              py={2.5}
-              borderRadius="lg"
-              cursor="pointer"
-              bg={active ? 'surface.850' : 'transparent'}
-              color={active ? 'white' : 'surface.500'}
-              _hover={{ bg: 'surface.850', color: 'white' }}
-              onClick={() => navigate(item.path)}
-              transition="all 0.15s"
-              position="relative"
-            >
-              {active && (
-                <Box
-                  position="absolute"
-                  left={0}
-                  top="50%"
-                  transform="translateY(-50%)"
-                  w="3px"
-                  h="18px"
-                  borderRadius="full"
-                  bg="brand.500"
-                  boxShadow="0 0 8px rgba(0,229,229,0.6)"
-                />
-              )}
-              <Text
-                fontSize="sm"
-                fontWeight={active ? '700' : '500'}
-                letterSpacing={active ? '-0.01em' : '0'}
-              >
-                {item.label}
+        {!collapsed && (
+          <>
+            <Box flex={1} minW={0}>
+              <Text color="white" fontWeight="800" fontSize="md" lineHeight="1.2" noOfLines={1}>
+                Pulse
+              </Text>
+              <Text color="surface.500" fontSize="2xs" fontFamily="mono" noOfLines={1}>
+                {displayName}
               </Text>
             </Box>
-          );
-        })}
+            <Box
+              w="6px"
+              h="6px"
+              borderRadius="full"
+              bg="accent.neon"
+              boxShadow="0 0 6px rgba(57,255,20,0.5)"
+              flexShrink={0}
+            />
+          </>
+        )}
+      </HStack>
+
+      <Divider borderColor="rgba(255,255,255,0.06)" />
+
+      {/* Primary nav */}
+      <VStack
+        spacing={0.5}
+        px={collapsed ? 2 : 3}
+        py={3}
+        align="stretch"
+        flex={1}
+      >
+        {NAV_ITEMS.map((item) => (
+          <NavButton
+            key={item.path}
+            item={item}
+            active={isActive(item.path)}
+            collapsed={collapsed}
+            onClick={() => navigate(item.path)}
+          />
+        ))}
       </VStack>
 
-      <Box px={5} py={3} borderTop="1px solid" borderColor="surface.800">
-        <Text color="surface.700" fontSize="2xs" fontFamily="mono">PULSE v1.0</Text>
-      </Box>
+      {/* Footer: settings + collapse toggle */}
+      <VStack
+        spacing={0.5}
+        px={collapsed ? 2 : 3}
+        pt={2}
+        pb={3}
+        align="stretch"
+        borderTop="1px solid"
+        borderColor="rgba(255,255,255,0.06)"
+      >
+        <NavButton
+          item={FOOTER_ITEM}
+          active={isActive(FOOTER_ITEM.path)}
+          collapsed={collapsed}
+          onClick={() => navigate(FOOTER_ITEM.path)}
+        />
+
+        <Tooltip
+          label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          placement="right"
+          hasArrow
+          bg="surface.800"
+          color="white"
+          fontSize="xs"
+          openDelay={300}
+          isDisabled={!collapsed && false}
+        >
+          <Box
+            as="button"
+            onClick={onToggle}
+            h="40px"
+            w="100%"
+            borderRadius="lg"
+            bg="transparent"
+            color="surface.500"
+            display="flex"
+            alignItems="center"
+            justifyContent={collapsed ? 'center' : 'flex-end'}
+            px={collapsed ? 0 : 3}
+            transition="all 160ms cubic-bezier(0.4, 0, 0.2, 1)"
+            _hover={{ bg: 'surface.900', color: 'white' }}
+            mt={1}
+          >
+            <Icon
+              as={collapsed ? TbChevronRight : TbChevronLeft}
+              boxSize={4}
+            />
+          </Box>
+        </Tooltip>
+      </VStack>
+
+      {/* Footer version tag */}
+      {!collapsed && (
+        <Box px={5} py={2}>
+          <Text color="surface.700" fontSize="2xs" fontFamily="mono">
+            PULSE ϟ v1.0
+          </Text>
+        </Box>
+      )}
     </Box>
   );
+};
+
+// ============================================================
+// NAV BUTTON (shared between primary nav + footer)
+// ============================================================
+const NavButton = ({ item, active, collapsed, onClick }) => {
+  const button = (
+    <Box
+      as="button"
+      onClick={onClick}
+      h={collapsed ? '40px' : '40px'}
+      w="100%"
+      px={collapsed ? 0 : 4}
+      borderRadius="lg"
+      bg={active ? 'surface.900' : 'transparent'}
+      color={active ? 'white' : 'surface.500'}
+      display="flex"
+      alignItems="center"
+      justifyContent={collapsed ? 'center' : 'flex-start'}
+      gap={collapsed ? 0 : 3}
+      cursor="pointer"
+      position="relative"
+      transition="all 160ms cubic-bezier(0.4, 0, 0.2, 1)"
+      _hover={{ bg: 'surface.900', color: 'white' }}
+    >
+      {active && (
+        <Box
+          position="absolute"
+          left={0}
+          top="50%"
+          transform="translateY(-50%)"
+          w="3px"
+          h="18px"
+          borderRadius="full"
+          bg="brand.500"
+          boxShadow="0 0 8px rgba(0,229,229,0.6)"
+        />
+      )}
+      <Icon as={item.icon} boxSize={collapsed ? 5 : 4} flexShrink={0} />
+      {!collapsed && (
+        <Text
+          fontSize="sm"
+          fontWeight={active ? '600' : '500'}
+          letterSpacing={active ? '-0.01em' : '0'}
+        >
+          {item.label}
+        </Text>
+      )}
+    </Box>
+  );
+
+  // Wrap in tooltip only when collapsed
+  if (collapsed) {
+    return (
+      <Tooltip
+        label={item.label}
+        placement="right"
+        hasArrow
+        bg="surface.800"
+        color="white"
+        fontSize="xs"
+        openDelay={300}
+      >
+        {button}
+      </Tooltip>
+    );
+  }
+  return button;
 };
 
 export default Sidebar;
