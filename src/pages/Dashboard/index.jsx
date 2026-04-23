@@ -1,13 +1,13 @@
 // src/pages/Dashboard/index.jsx
-// Clean dashboard:
-// - No clock (removed per Tyler - dashboard doesn't need it)
-// - Inline pulse strip (stats)
-// - FormInbox + ActivityStream as naked sections
-// - Team avatars stay at top-left via SystemHeader
+// Dashboard — editorial hero + existing rich sections
+// - Hero: Fraunces serif number + inline stats, no clock
+// - FormInbox + ActivityStream as naked sections (already rich, kept as-is)
+// - TeamOnlineStrip pinned top-left, refresh top-right
+// - No dashboard-specific Container; AppShell handles width + gutters
 
 import { useState, useEffect } from 'react';
 import {
-  Box, VStack, HStack, Text, Container, Icon, IconButton, Tooltip,
+  Box, VStack, HStack, Text, Icon, IconButton, Tooltip,
 } from '@chakra-ui/react';
 import { useNavigate } from 'react-router-dom';
 import { TbPlus, TbRefresh } from 'react-icons/tb';
@@ -53,9 +53,7 @@ const Dashboard = () => {
         activitiesRes,
         profilesRes,
       ] = await Promise.all([
-        supabase
-          .from('clients')
-          .select('id, status'),
+        supabase.from('clients').select('id, status'),
         supabase
           .from('invoices')
           .select('id, status, total, total_paid, paid_at, invoice_items(id, payment_status, locked, is_billable)')
@@ -132,8 +130,14 @@ const Dashboard = () => {
     await fetchAll();
   };
 
+  // Choose what to feature in the hero number
+  const heroValue = stats.outstanding > 0 ? stats.outstanding : stats.revenue;
+  const heroLabel = stats.outstanding > 0 ? 'outstanding' : 'collected';
+  const heroColor = stats.outstanding > 0 ? 'accent.banana' : 'accent.neon';
+
   return (
     <Box position="relative" minH="100%">
+      {/* Ambient top glow */}
       <Box
         position="absolute"
         top={0}
@@ -144,155 +148,207 @@ const Dashboard = () => {
         pointerEvents="none"
       />
 
-      <Container maxW="1100px" px={{ base: 4, md: 6 }} py={{ base: 6, md: 10 }} position="relative">
-        <VStack spacing={{ base: 6, md: 8 }} align="stretch">
+      <VStack spacing={{ base: 8, md: 12 }} align="stretch" position="relative">
 
-          {/* Top strip: team avatars left, refresh button right. No clock. */}
-          <HStack justify="space-between" align="center" flexWrap="wrap" spacing={4}>
-            <Box flex={1} minW={0}>
-              <TeamOnlineStrip />
-            </Box>
+        {/* Top strip: team avatars left, refresh top-right */}
+        <HStack justify="space-between" align="center" flexWrap="wrap" spacing={4}>
+          <Box flex={1} minW={0}>
+            <TeamOnlineStrip />
+          </Box>
 
-            <Tooltip
-              label="Refresh"
-              placement="bottom"
-              hasArrow
-              bg="surface.800"
-              color="white"
-              fontSize="xs"
-            >
-              <IconButton
-                icon={<TbRefresh size={14} />}
-                onClick={handleRefresh}
-                isLoading={refreshing}
-                variant="ghost"
-                size="sm"
-                color="surface.500"
-                h="32px"
-                w="32px"
-                minW="32px"
-                borderRadius="md"
-                border="1px solid"
-                borderColor="surface.800"
-                _hover={{
-                  color: 'brand.500',
-                  borderColor: 'brand.500',
-                  bg: 'rgba(0,229,229,0.05)',
-                }}
-                transition="all 0.15s"
-                aria-label="Refresh dashboard"
-              />
-            </Tooltip>
-          </HStack>
+          <Tooltip
+            label="Refresh"
+            placement="bottom"
+            hasArrow
+            bg="surface.800"
+            color="white"
+            fontSize="xs"
+          >
+            <IconButton
+              icon={<TbRefresh size={14} />}
+              onClick={handleRefresh}
+              isLoading={refreshing}
+              variant="ghost"
+              size="sm"
+              color="surface.500"
+              h="32px"
+              w="32px"
+              minW="32px"
+              borderRadius="md"
+              border="1px solid"
+              borderColor="surface.800"
+              _hover={{
+                color: 'brand.500',
+                borderColor: 'brand.500',
+                bg: 'rgba(0,229,229,0.05)',
+              }}
+              transition="all 0.15s"
+              aria-label="Refresh dashboard"
+            />
+          </Tooltip>
+        </HStack>
 
-          {/* Title row with action links */}
-          <VStack align="stretch" spacing={4}>
-            <HStack justify="space-between" align="flex-end" flexWrap="wrap" gap={3}>
+        {/* HERO BLOCK — editorial Fraunces number */}
+        <VStack align="stretch" spacing={6}>
+          <HStack justify="space-between" align="flex-end" flexWrap="wrap" gap={4}>
+            <VStack align="start" spacing={2} flex={1} minW={0}>
               <Text
-                fontSize={{ base: '2xl', md: '3xl' }}
-                fontWeight="800"
-                color="white"
-                letterSpacing="-0.02em"
-                lineHeight="1"
+                fontSize="2xs"
+                fontWeight="700"
+                color="brand.500"
+                textTransform="uppercase"
+                letterSpacing="0.15em"
+                fontFamily="mono"
               >
                 Dashboard
               </Text>
-              <HStack spacing={5}>
-                <HStack
-                  spacing={1.5}
-                  cursor="pointer"
-                  onClick={() => navigate('/clients/')}
-                  color="brand.500"
-                  opacity={0.7}
-                  transition="all 0.15s"
-                  _hover={{ opacity: 1, transform: 'translateY(-1px)' }}
-                  userSelect="none"
-                >
-                  <Icon as={TbPlus} boxSize={3.5} />
-                  <Text fontSize="xs" fontWeight="700" letterSpacing="0.05em" textTransform="uppercase">
-                    New Client
-                  </Text>
-                </HStack>
-                <HStack
-                  spacing={1.5}
-                  cursor="pointer"
-                  onClick={() => navigate('/invoicing/?invoice=new')}
-                  color="accent.banana"
-                  opacity={0.7}
-                  transition="all 0.15s"
-                  _hover={{ opacity: 1, transform: 'translateY(-1px)' }}
-                  userSelect="none"
-                >
-                  <Icon as={TbPlus} boxSize={3.5} />
-                  <Text fontSize="xs" fontWeight="700" letterSpacing="0.05em" textTransform="uppercase">
-                    New Invoice
-                  </Text>
-                </HStack>
-              </HStack>
-            </HStack>
 
-            {/* Inline pulse strip */}
-            <HStack spacing={0} color="surface.500" fontSize="xs" fontFamily="mono" flexWrap="wrap">
-              <Text
-                color="white"
-                fontWeight="700"
+              {/* Hero: Fraunces serif, massive, editorial */}
+              <HStack align="baseline" spacing={4} flexWrap="wrap">
+                <Text
+                  fontFamily="'Fraunces', Georgia, serif"
+                  fontSize={{ base: '5xl', md: '7xl', lg: '8xl' }}
+                  fontWeight="600"
+                  color={heroColor}
+                  letterSpacing="-0.03em"
+                  lineHeight="0.9"
+                  sx={{ fontVariationSettings: "'opsz' 144" }}
+                >
+                  {currency(heroValue)}
+                </Text>
+                <Text
+                  fontSize={{ base: 'sm', md: 'md' }}
+                  color="surface.400"
+                  fontFamily="mono"
+                  fontWeight="500"
+                  pb={{ base: 1, md: 2 }}
+                >
+                  {heroLabel}
+                </Text>
+              </HStack>
+            </VStack>
+
+            {/* Action buttons — right side on desktop, below on mobile */}
+            <HStack
+              spacing={3}
+              flexShrink={0}
+              alignSelf={{ base: 'flex-start', md: 'flex-end' }}
+            >
+              <HStack
+                as="button"
+                spacing={1.5}
                 cursor="pointer"
                 onClick={() => navigate('/clients/')}
-                _hover={{ color: 'brand.500' }}
-                transition="color 0.15s"
+                color="surface.300"
+                px={3}
+                py={2}
+                border="1px solid"
+                borderColor="surface.800"
+                borderRadius="lg"
+                transition="all 0.15s"
+                _hover={{
+                  color: 'brand.500',
+                  borderColor: 'brand.500',
+                  bg: 'rgba(0,229,229,0.04)',
+                }}
+                userSelect="none"
               >
-                {stats.activeClients}
-              </Text>
-              <Text color="surface.600" mx={1.5}>active clients</Text>
-              <Text color="surface.700" mx={1}>·</Text>
-              <Text
-                color="white"
-                fontWeight="700"
+                <Icon as={TbPlus} boxSize={3.5} />
+                <Text fontSize="xs" fontWeight="700" letterSpacing="0.05em" textTransform="uppercase" fontFamily="mono">
+                  Client
+                </Text>
+              </HStack>
+              <HStack
+                as="button"
+                spacing={1.5}
                 cursor="pointer"
-                onClick={() => navigate('/invoicing/')}
-                _hover={{ color: 'brand.500' }}
-                transition="color 0.15s"
+                onClick={() => navigate('/invoicing/?invoice=new')}
+                color="surface.300"
+                px={3}
+                py={2}
+                border="1px solid"
+                borderColor="surface.800"
+                borderRadius="lg"
+                transition="all 0.15s"
+                _hover={{
+                  color: 'accent.banana',
+                  borderColor: 'accent.banana',
+                  bg: 'rgba(255,229,0,0.04)',
+                }}
+                userSelect="none"
               >
-                {stats.activeSprints}
-              </Text>
-              <Text color="surface.600" mx={1.5}>active sprints</Text>
-              <Text color="surface.700" mx={1}>·</Text>
-              <Text color="accent.neon" fontWeight="700">{currency(stats.revenue)}</Text>
-              <Text color="surface.600" mx={1.5}>collected</Text>
-              {stats.outstanding > 0 && (
-                <>
-                  <Text color="surface.700" mx={1}>·</Text>
-                  <Text
-                    color="accent.banana"
-                    fontWeight="700"
-                    cursor="pointer"
-                    onClick={() => navigate('/invoicing/?status=sent')}
-                    _hover={{ opacity: 0.8 }}
-                  >
-                    {currency(stats.outstanding)}
-                  </Text>
-                  <Text color="surface.600" mx={1.5}>outstanding</Text>
-                </>
-              )}
-              {stats.unreadForms > 0 && (
-                <>
-                  <Text color="surface.700" mx={1}>·</Text>
-                  <Text color="brand.500" fontWeight="700">{stats.unreadForms}</Text>
-                  <Text color="surface.600" mx={1.5}>unread form{stats.unreadForms !== 1 ? 's' : ''}</Text>
-                </>
-              )}
+                <Icon as={TbPlus} boxSize={3.5} />
+                <Text fontSize="xs" fontWeight="700" letterSpacing="0.05em" textTransform="uppercase" fontFamily="mono">
+                  Invoice
+                </Text>
+              </HStack>
             </HStack>
-          </VStack>
+          </HStack>
 
-          <FormInbox />
+          {/* Secondary stat strip — smaller, monospace, informational */}
+          <HStack
+            spacing={0}
+            color="surface.500"
+            fontSize="xs"
+            fontFamily="mono"
+            flexWrap="wrap"
+            rowGap={1}
+          >
+            <Text
+              as="button"
+              color="white"
+              fontWeight="700"
+              onClick={() => navigate('/clients/')}
+              _hover={{ color: 'brand.500' }}
+              transition="color 0.15s"
+            >
+              {stats.activeClients}
+            </Text>
+            <Text color="surface.600" mx={1.5}>active clients</Text>
 
-          <ActivityStream
-            activities={activities}
-            profileMap={profileMap}
-            loading={loading}
-          />
+            <Text color="surface.700" mx={1}>·</Text>
+
+            <Text
+              as="button"
+              color="white"
+              fontWeight="700"
+              onClick={() => navigate('/invoicing/')}
+              _hover={{ color: 'brand.500' }}
+              transition="color 0.15s"
+            >
+              {stats.activeSprints}
+            </Text>
+            <Text color="surface.600" mx={1.5}>active sprints</Text>
+
+            {stats.revenue > 0 && stats.outstanding > 0 && (
+              <>
+                <Text color="surface.700" mx={1}>·</Text>
+                <Text color="accent.neon" fontWeight="700">{currency(stats.revenue)}</Text>
+                <Text color="surface.600" mx={1.5}>collected</Text>
+              </>
+            )}
+
+            {stats.unreadForms > 0 && (
+              <>
+                <Text color="surface.700" mx={1}>·</Text>
+                <Text color="brand.500" fontWeight="700">{stats.unreadForms}</Text>
+                <Text color="surface.600" mx={1.5}>
+                  unread form{stats.unreadForms !== 1 ? 's' : ''}
+                </Text>
+              </>
+            )}
+          </HStack>
         </VStack>
-      </Container>
+
+        {/* Existing rich sections — these are already good */}
+        <FormInbox />
+
+        <ActivityStream
+          activities={activities}
+          profileMap={profileMap}
+          loading={loading}
+        />
+      </VStack>
     </Box>
   );
 };

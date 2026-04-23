@@ -1,11 +1,14 @@
 // src/components/Layout/Header.jsx
-// Top header bar - minimal on desktop, user menu only on mobile
+// Top header bar — minimal on desktop, user menu on mobile + tablet
 //
-// Desktop: empty (sidebar shows everything)
-// Mobile: avatar dropdown for Settings/Sign Out (hamburger handles nav)
+// Desktop (lg+ = 1024px+): empty (sidebar shows everything)
+// Below lg: avatar dropdown for Settings/Sign Out
+//
+// Bug fix: previously used md (768px) as threshold which left 768-1023px
+// window with no avatar + no sidebar. Now matches sidebar breakpoint (lg).
 
 import {
-  Box, HStack, Text, Avatar as ChakraAvatar, Menu, MenuButton, MenuList,
+  Box, Text, Avatar as ChakraAvatar, Menu, MenuButton, MenuList,
   MenuItem, MenuDivider, useBreakpointValue,
 } from '@chakra-ui/react';
 import { TbSettings, TbLogout } from 'react-icons/tb';
@@ -16,22 +19,25 @@ import { supabase } from '../../lib/supabase';
 const Header = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
-  const isMobile = useBreakpointValue({ base: true, md: false });
+  const showAvatar = useBreakpointValue({ base: true, lg: false });
 
-  const displayName = profile?.display_name || user?.email?.split('@')[0] || 'User';
+  const displayName =
+    profile?.display_name ||
+    profile?.username ||
+    user?.email?.split('@')[0] ||
+    'User';
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     navigate('/login/');
   };
 
-  // Desktop: no header content - sidebar is the source of truth
-  if (!isMobile) {
+  // Desktop (lg+): sidebar handles everything, no header content
+  if (!showAvatar) {
     return null;
   }
 
-  // Mobile: just the avatar dropdown for account actions
-  // (the hamburger menu in MobileNav handles navigation)
+  // Mobile + tablet: avatar dropdown top-right
   return (
     <Box
       position="absolute"
@@ -56,12 +62,18 @@ const Header = () => {
             borderColor="surface.700"
           />
         </MenuButton>
-        <MenuList bg="surface.900" borderColor="surface.700" py={1} minW="200px">
-          <Box px={3} py={2}>
-            <Text color="white" fontSize="sm" fontWeight="700">
+        <MenuList
+          bg="surface.900"
+          borderColor="surface.700"
+          py={1}
+          minW="220px"
+          boxShadow="0 12px 40px rgba(0,0,0,0.6)"
+        >
+          <Box px={3} py={2.5}>
+            <Text color="white" fontSize="sm" fontWeight="700" noOfLines={1}>
               {displayName}
             </Text>
-            <Text color="surface.500" fontSize="xs">
+            <Text color="surface.500" fontSize="xs" noOfLines={1}>
               {user?.email}
             </Text>
             {profile?.role && (
@@ -71,6 +83,7 @@ const Header = () => {
                 fontWeight="700"
                 textTransform="uppercase"
                 letterSpacing="0.05em"
+                fontFamily="mono"
                 mt={1}
               >
                 {profile.role}
@@ -93,7 +106,7 @@ const Header = () => {
             _hover={{ bg: 'surface.800' }}
             icon={<TbLogout />}
             fontSize="sm"
-            color="surface.300"
+            color="accent.coral"
             onClick={handleSignOut}
           >
             Sign Out
