@@ -1,10 +1,11 @@
-// src/pages/Clients/ClientDetail.jsx
 // path: /clients/:clientId/
 //
 // Tabs: Overview / Sprints / Invoices / Projects / Sites / Messages
 // Admin can click the avatar to upload/replace/remove the client's photo
 // Admin can view/regenerate PIN from Portal Access section on Overview
 // Admin can "View as Client" to open the portal impersonation view
+// Admin can "Activate portal" to create auth user + send branded welcome email
+//   (only shown when portal_account_created_at is null)
 
 import { useState, useEffect } from 'react';
 import {
@@ -24,6 +25,7 @@ import ClientModal from './components/ClientModal';
 import ClientAvatarUpload from '../../components/common/ClientAvatarUpload';
 import PortalAccessCard from '../../components/common/PortalAccessCard';
 import ImpersonateButton from '../../components/common/ImpersonateButton';
+import ActivateClientButton from '../../components/common/ActivateClientButton';
 
 const TAB_OPTIONS = [
   { value: 'overview', label: 'Overview' },
@@ -826,6 +828,8 @@ const ClientDetail = () => {
     totalInvoices: invoices.length,
   };
 
+  const isActivated = !!client.portal_account_created_at;
+
   return (
     <Box position="relative" minH="100%" py={{ base: 6, md: 10 }}>
       <Box
@@ -900,6 +904,9 @@ const ClientDetail = () => {
             >
               Edit
             </Button>
+            {!isActivated && (
+              <ActivateClientButton client={client} onActivated={refetchClient} />
+            )}
             <ImpersonateButton client={client} />
             <Button
               size="xs"
