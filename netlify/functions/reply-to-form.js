@@ -1,14 +1,12 @@
 // netlify/functions/reply-to-form.js
-// Sends a branded reply email to the original form submitter.
-// - Uses Resend for delivery
-// - Uses service role to update form_submissions.responded_at
-// - Logs activity to activity_log as 'message_sent'
+// Sends a branded reply email + logs to form_replies table + updates submission counter.
+// Handles both first-time replies and follow-ups.
 
 const { Resend } = require('resend');
 const { createClient } = require('@supabase/supabase-js');
 
-const RESEND_API_KEY  = process.env.RESEND_API_KEY;
-const SUPABASE_URL    = process.env.SUPABASE_URL;
+const RESEND_API_KEY   = process.env.RESEND_API_KEY;
+const SUPABASE_URL     = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const FROM_EMAIL = 'NeonBurro <hello@neonburro.com>';
 
@@ -22,10 +20,11 @@ const escapeHtml = (s) => String(s || '')
   .replace(/"/g, '&quot;')
   .replace(/'/g, '&#039;');
 
-const buildReplyEmail = ({ recipientName, subject, body, adminName }) => {
+const buildReplyEmail = ({ recipientName, body, adminName, isFollowUp }) => {
   const safeName = escapeHtml(recipientName || 'there');
   const safeBody = escapeHtml(body).replace(/\n/g, '<br>');
   const safeAdmin = escapeHtml(adminName || 'The NeonBurro Team');
+  const kicker = isFollowUp ? 'Following up' : 'Reply from NeonBurro';
 
   return `
 <!DOCTYPE html>
@@ -39,7 +38,7 @@ const buildReplyEmail = ({ recipientName, subject, body, adminName }) => {
           <div style="margin-bottom:24px;">
             <img src="https://pulse.neonburro.com/neon-burro-email-logo.png" alt="NeonBurro" width="44" height="44" style="border-radius:50%;display:block;" />
           </div>
-          <div style="color:#00E5E5;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">Reply from NeonBurro</div>
+          <div style="color:#00E5E5;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">${kicker}</div>
           <div style="color:#ffffff;font-size:22px;font-weight:800;margin-bottom:24px;line-height:1.3;">Hi ${safeName},</div>
           <div style="color:#a0a0a0;font-size:15px;line-height:1.7;margin-bottom:28px;">${safeBody}</div>
           <div style="margin-top:32px;padding-top:20px;border-top:1px solid #1f1f1f;">
@@ -73,6 +72,7 @@ exports.handler = async (event) => {
       subject,
       body,
       userId,
+      isFollowUp,
     } = JSON.parse(event.body || '{}');
 
     if (!submissionId || !recipientEmail || !body) {
@@ -82,7 +82,7 @@ exports.handler = async (event) => {
       };
     }
 
-    // Look up admin display name (for email signature)
+    // Look up admin display name for email signature + reply row
     let adminName = 'The NeonBurro Team';
     if (userId) {
       const { data: profile } = await supabase
@@ -101,7 +101,7 @@ exports.handler = async (event) => {
       to: recipientEmail,
       reply_to: 'hello@neonburro.com',
       subject: subject || 'Re: Your message to NeonBurro',
-      html: buildReplyEmail({ recipientName, subject, body, adminName }),
+      html: buildReplyEmail({ recipientName, body, adminName, isFollowUp }),
     });
 
     if (emailResult.error) {
@@ -112,13 +112,40 @@ exports.handler = async (event) => {
       };
     }
 
-    // Mark submission as responded
+    const emailId = emailResult.data?.id || null;
+    const now = new Date().toISOString();
+
+    // Insert reply into form_replies table
+    const { error: replyErr } = await supabase.from('form_replies').insert({
+      submission_id: submissionId,
+      sender_id: userId || null,
+      sender_name: adminName,
+      recipient_email: recipientEmail,
+      recipient_name: recipientName || null,
+      subject: subject || null,
+      body,
+      email_message_id: emailId,
+    });
+    if (replyErr) console.error('form_replies insert failed:', replyErr);
+
+    // Fetch current counter to increment safely
+    const { data: existingSub } = await supabase
+      .from('form_submissions')
+      .select('reply_count, responded_at, responded_by')
+      .eq('id', submissionId)
+      .maybeSingle();
+
+    const nextCount = (existingSub?.reply_count || 0) + 1;
+
+    // Update submission — preserve first responded_at
     await supabase
       .from('form_submissions')
       .update({
-        responded_at: new Date().toISOString(),
-        responded_by: userId || null,
         status: 'responded',
+        responded_at: existingSub?.responded_at || now,
+        responded_by: existingSub?.responded_by || userId || null,
+        last_replied_at: now,
+        reply_count: nextCount,
       })
       .eq('id', submissionId);
 
@@ -132,12 +159,18 @@ exports.handler = async (event) => {
         recipient_email: recipientEmail,
         recipient_name: recipientName,
         subject,
+        reply_number: nextCount,
+        is_follow_up: !!isFollowUp,
       },
     });
 
     return {
       statusCode: 200,
-      body: JSON.stringify({ success: true, emailId: emailResult.data?.id }),
+      body: JSON.stringify({
+        success: true,
+        emailId,
+        replyNumber: nextCount,
+      }),
     };
   } catch (err) {
     console.error('reply-to-form error:', err);

@@ -1,6 +1,7 @@
 // src/pages/Dashboard/components/FormInbox.jsx
 // Condensed form inbox for the Dashboard — top 5 unread preview.
 // Full management lives on /forms/ page.
+// Reads from real schema (no "data" column).
 
 import { useState, useEffect } from 'react';
 import {
@@ -32,6 +33,20 @@ const FORM_TYPE_COLORS = {
 };
 
 const MAX_PREVIEW = 5;
+
+const getSenderName = (s) =>
+  s.name || s.metadata?.name || s.metadata?.full_name || s.metadata?.contact_name || 'Anonymous';
+
+const getSenderEmail = (s) =>
+  s.email || s.metadata?.email || s.metadata?.contact_email || null;
+
+const getPreviewMessage = (s) =>
+  s.message ||
+  s.metadata?.message ||
+  s.metadata?.description ||
+  s.metadata?.brief ||
+  s.metadata?.request ||
+  '';
 
 const FormInbox = () => {
   const navigate = useNavigate();
@@ -65,7 +80,6 @@ const FormInbox = () => {
     if (data) {
       const unread = data.filter((s) => s.status === 'unread');
       setTotalUnread(unread.length);
-      // Prefer unread first, fill with recent reads if fewer
       const preview = unread.length >= MAX_PREVIEW
         ? unread.slice(0, MAX_PREVIEW)
         : [...unread, ...data.filter((s) => s.status !== 'unread')].slice(0, MAX_PREVIEW);
@@ -76,7 +90,6 @@ const FormInbox = () => {
 
   return (
     <Box position="relative">
-      {/* Header */}
       <HStack
         spacing={2}
         mb={4}
@@ -164,10 +177,10 @@ const PreviewRow = ({ submission, onClick }) => {
   const typeLabel = FORM_TYPE_LABELS[formType] || formType.replace(/_/g, ' ');
   const typeColor = FORM_TYPE_COLORS[formType] || '#737373';
 
-  const data = submission.data || submission;
-  const senderName = submission.name || data.name || data.full_name || 'Anonymous';
-  const senderEmail = submission.email || data.email || null;
-  const previewMessage = submission.message || data.message || data.description || data.brief || '';
+  const senderName = getSenderName(submission);
+  const senderEmail = getSenderEmail(submission);
+  const previewMessage = getPreviewMessage(submission);
+  const replyCount = submission.reply_count || 0;
 
   const isUnread = submission.status === 'unread';
   const isResponded = submission.status === 'responded';
@@ -216,7 +229,14 @@ const PreviewRow = ({ submission, onClick }) => {
               </Text>
             )}
             {isResponded && (
-              <Icon as={TbCircleCheck} boxSize={3} color="accent.neon" />
+              <HStack spacing={0.5}>
+                <Icon as={TbCircleCheck} boxSize={3} color="accent.neon" />
+                {replyCount > 1 && (
+                  <Text color="accent.neon" fontSize="2xs" fontFamily="mono" fontWeight="800">
+                    ×{replyCount}
+                  </Text>
+                )}
+              </HStack>
             )}
           </HStack>
           {previewMessage && (

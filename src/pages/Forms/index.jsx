@@ -3,12 +3,9 @@
 // Desktop: split-pane (list left ~420px, detail right flex)
 // Mobile: list only, tap opens full-screen sheet for detail
 //
-// Features:
-// - Filter tabs: All / Unread / Responded / Archived + per-type filter
-// - Search by name/email/message
-// - Reply via modal (calls reply-to-form Netlify function)
-// - Mark read/unread, archive, unarchive
-// - Real-time updates via Supabase realtime
+// Schema match: form_submissions has top-level columns (name, email, phone, company,
+// message) + metadata JSONB. NO "data" column. reply_count + last_replied_at track
+// reply history; form_replies table stores each reply's full body.
 
 import { useState, useEffect, useMemo } from 'react';
 import {
@@ -17,10 +14,11 @@ import {
   Textarea, Button, useToast, Divider, IconButton, Tooltip,
 } from '@chakra-ui/react';
 import {
-  TbInbox, TbSearch, TbMail, TbArchive, TbArchiveOff, TbCheck,
+  TbInbox, TbSearch, TbArchive, TbArchiveOff,
   TbSend, TbArrowLeft, TbCircleCheck, TbCircleDashed,
+  TbHistory,
 } from 'react-icons/tb';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, format } from 'date-fns';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -44,7 +42,6 @@ const FORM_TYPE_COLORS = {
   wild_request:       '#FF6B35',
 };
 
-// Filter pills at top of list
 const STATUS_FILTERS = [
   { key: 'all',       label: 'All' },
   { key: 'unread',    label: 'Unread' },
@@ -52,11 +49,33 @@ const STATUS_FILTERS = [
   { key: 'archived',  label: 'Archived' },
 ];
 
+// ============================================================
+// Helpers — pull display values from submission + metadata
+// ============================================================
+const getSenderName = (s) =>
+  s.name || s.metadata?.name || s.metadata?.full_name || s.metadata?.contact_name || 'Anonymous';
+
+const getSenderEmail = (s) =>
+  s.email || s.metadata?.email || s.metadata?.contact_email || null;
+
+const getPreviewMessage = (s) =>
+  s.message ||
+  s.metadata?.message ||
+  s.metadata?.description ||
+  s.metadata?.brief ||
+  s.metadata?.request ||
+  s.metadata?.notes ||
+  '';
+
+// ============================================================
+// MAIN
+// ============================================================
 const Forms = () => {
   const { user } = useAuth();
   const toast = useToast();
 
   const [submissions, setSubmissions] = useState([]);
+  const [replies, setReplies] = useState({}); // { submission_id: [replies] }
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
@@ -66,30 +85,70 @@ const Forms = () => {
   const [replyOpen, setReplyOpen] = useState(false);
 
   useEffect(() => {
-    fetchSubmissions();
+    fetchAll();
 
-    // Real-time updates
-    const channel = supabase
+    const submissionsChannel = supabase
       .channel('form_submissions_changes')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'form_submissions' },
-        () => fetchSubmissions()
+        () => fetchAll()
       )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    const repliesChannel = supabase
+      .channel('form_replies_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'form_replies' },
+        () => fetchReplies()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(submissionsChannel);
+      supabase.removeChannel(repliesChannel);
+    };
   }, []);
 
-  const fetchSubmissions = async () => {
-    const { data, error } = await supabase
-      .from('form_submissions')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(200);
+  const fetchAll = async () => {
+    const [subsRes, repsRes] = await Promise.all([
+      supabase
+        .from('form_submissions')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(200),
+      supabase
+        .from('form_replies')
+        .select('*')
+        .order('created_at', { ascending: false }),
+    ]);
 
-    if (!error && data) setSubmissions(data);
+    if (subsRes.data) setSubmissions(subsRes.data);
+    if (repsRes.data) {
+      const grouped = {};
+      repsRes.data.forEach((r) => {
+        if (!grouped[r.submission_id]) grouped[r.submission_id] = [];
+        grouped[r.submission_id].push(r);
+      });
+      setReplies(grouped);
+    }
     setLoading(false);
+  };
+
+  const fetchReplies = async () => {
+    const { data } = await supabase
+      .from('form_replies')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (data) {
+      const grouped = {};
+      data.forEach((r) => {
+        if (!grouped[r.submission_id]) grouped[r.submission_id] = [];
+        grouped[r.submission_id].push(r);
+      });
+      setReplies(grouped);
+    }
   };
 
   // Filtered + searched list
@@ -104,10 +163,10 @@ const Forms = () => {
 
       if (search.trim()) {
         const q = search.toLowerCase();
-        const data = s.data || s;
         const haystack = [
-          s.name, s.email, s.message,
-          data.name, data.email, data.message, data.description, data.brief,
+          s.name, s.email, s.message, s.phone, s.company,
+          s.metadata?.name, s.metadata?.email, s.metadata?.message,
+          s.metadata?.description, s.metadata?.brief,
         ].filter(Boolean).join(' ').toLowerCase();
         if (!haystack.includes(q)) return false;
       }
@@ -121,7 +180,8 @@ const Forms = () => {
     [submissions, selectedId]
   );
 
-  // Counts for pills
+  const selectedReplies = selected ? (replies[selected.id] || []) : [];
+
   const counts = useMemo(() => ({
     all:       submissions.filter((s) => !s.archived_at).length,
     unread:    submissions.filter((s) => s.status === 'unread' && !s.archived_at).length,
@@ -129,7 +189,6 @@ const Forms = () => {
     archived:  submissions.filter((s) => !!s.archived_at).length,
   }), [submissions]);
 
-  // Types present in data
   const typesPresent = useMemo(() => {
     const set = new Set();
     submissions.forEach((s) => { if (s.form_type) set.add(s.form_type); });
@@ -298,6 +357,7 @@ const Forms = () => {
                 <ListRow
                   key={s.id}
                   submission={s}
+                  replyCount={s.reply_count || 0}
                   selected={s.id === selectedId}
                   onClick={() => handleSelect(s)}
                 />
@@ -306,14 +366,11 @@ const Forms = () => {
           </Box>
 
           {/* DETAIL (desktop) */}
-          <Box
-            display={{ base: 'none', lg: 'block' }}
-            flex={1}
-            minW={0}
-          >
+          <Box display={{ base: 'none', lg: 'block' }} flex={1} minW={0}>
             {selected ? (
               <DetailPane
                 submission={selected}
+                replies={selectedReplies}
                 onReply={() => setReplyOpen(true)}
                 onArchive={() => handleArchive(selected.id)}
                 onUnarchive={() => handleUnarchive(selected.id)}
@@ -354,6 +411,7 @@ const Forms = () => {
                 <Box p={5}>
                   <DetailPane
                     submission={selected}
+                    replies={selectedReplies}
                     onReply={() => setReplyOpen(true)}
                     onArchive={() => handleArchive(selected.id)}
                     onUnarchive={() => handleUnarchive(selected.id)}
@@ -372,12 +430,14 @@ const Forms = () => {
           isOpen={replyOpen}
           onClose={() => setReplyOpen(false)}
           submission={selected}
+          replyCount={selected.reply_count || 0}
           userId={user?.id}
           onSuccess={(updated) => {
             setSubmissions((prev) =>
               prev.map((s) => (s.id === updated.id ? { ...s, ...updated } : s))
             );
             setReplyOpen(false);
+            fetchReplies();
           }}
         />
       )}
@@ -412,11 +472,7 @@ const FilterPill = ({ active, onClick, children, count, color = 'brand.500' }) =
   >
     {children}
     {typeof count === 'number' && count > 0 && (
-      <Box
-        as="span"
-        color={active ? color : 'surface.500'}
-        fontWeight="800"
-      >
+      <Box as="span" color={active ? color : 'surface.500'} fontWeight="800">
         {count}
       </Box>
     )}
@@ -426,16 +482,14 @@ const FilterPill = ({ active, onClick, children, count, color = 'brand.500' }) =
 // ============================================================
 // LIST ROW
 // ============================================================
-const ListRow = ({ submission, selected, onClick }) => {
+const ListRow = ({ submission, replyCount, selected, onClick }) => {
   const formType = submission.form_type || 'contact';
   const typeLabel = FORM_TYPE_LABELS[formType] || formType.replace(/_/g, ' ');
   const typeColor = FORM_TYPE_COLORS[formType] || '#737373';
 
-  const data = submission.data || submission;
-  const senderName = submission.name || data.name || data.full_name || data.contact_name || 'Anonymous';
-  const senderEmail = submission.email || data.email || data.contact_email || null;
-  const previewMessage =
-    submission.message || data.message || data.description || data.brief || data.request || '';
+  const senderName = getSenderName(submission);
+  const senderEmail = getSenderEmail(submission);
+  const previewMessage = getPreviewMessage(submission);
 
   const isUnread = submission.status === 'unread';
   const isResponded = submission.status === 'responded';
@@ -470,7 +524,19 @@ const ListRow = ({ submission, selected, onClick }) => {
             {typeLabel}
           </Text>
           {isResponded && (
-            <Icon as={TbCircleCheck} boxSize={3} color="accent.neon" />
+            <HStack spacing={0.5}>
+              <Icon as={TbCircleCheck} boxSize={3} color="accent.neon" />
+              {replyCount > 1 && (
+                <Text
+                  color="accent.neon"
+                  fontSize="2xs"
+                  fontFamily="mono"
+                  fontWeight="800"
+                >
+                  ×{replyCount}
+                </Text>
+              )}
+            </HStack>
           )}
         </HStack>
         <HStack spacing={1.5}>
@@ -513,35 +579,39 @@ const ListRow = ({ submission, selected, onClick }) => {
 // ============================================================
 // DETAIL PANE
 // ============================================================
-const DetailPane = ({ submission, onReply, onArchive, onUnarchive, onMarkUnread }) => {
+const DetailPane = ({ submission, replies, onReply, onArchive, onUnarchive, onMarkUnread }) => {
   const formType = submission.form_type || 'contact';
   const typeLabel = FORM_TYPE_LABELS[formType] || formType.replace(/_/g, ' ');
   const typeColor = FORM_TYPE_COLORS[formType] || '#737373';
 
-  const data = submission.data || submission;
-  const senderName = submission.name || data.name || data.full_name || 'Anonymous';
-  const senderEmail = submission.email || data.email || null;
+  const senderName = getSenderName(submission);
+  const senderEmail = getSenderEmail(submission);
   const isResponded = submission.status === 'responded';
   const isArchived = !!submission.archived_at;
+  const replyCount = submission.reply_count || 0;
 
-  // Render all fields, skipping internal/duplicate ones
-  const skipKeys = new Set([
-    'form_type', 'submitted_at', 'ip', 'user_agent', '_internal',
-    'website', // honeypot
+  // Build field list
+  const skipMetadataKeys = new Set([
+    'form_type', 'submitted_at', 'ip', 'user_agent', '_internal', 'website',
+    'source', 'form', 'name', 'email', 'contact_name', 'contact_email',
+    'full_name', 'message', 'phone', 'company',
   ]);
+
   const fields = [];
   const addField = (label, value) => {
     if (value === null || value === undefined || value === '') return;
     fields.push({ label, value });
   };
-  if (senderName) addField('Name', senderName);
-  if (senderEmail) addField('Email', senderEmail);
-  if (submission.message || data.message) addField('Message', submission.message || data.message);
 
-  if (data && typeof data === 'object') {
-    Object.entries(data).forEach(([k, v]) => {
-      if (skipKeys.has(k)) return;
-      if (['name', 'email', 'message', 'full_name', 'contact_name', 'contact_email'].includes(k)) return;
+  if (senderName && senderName !== 'Anonymous') addField('Name', senderName);
+  if (senderEmail) addField('Email', senderEmail);
+  if (submission.phone) addField('Phone', submission.phone);
+  if (submission.company) addField('Company', submission.company);
+  if (submission.message) addField('Message', submission.message);
+
+  if (submission.metadata && typeof submission.metadata === 'object') {
+    Object.entries(submission.metadata).forEach(([k, v]) => {
+      if (skipMetadataKeys.has(k)) return;
       if (v === null || v === undefined || v === '') return;
       const label = k.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
       const display = typeof v === 'object' ? JSON.stringify(v, null, 2)
@@ -553,7 +623,6 @@ const DetailPane = ({ submission, onReply, onArchive, onUnarchive, onMarkUnread 
 
   return (
     <VStack align="stretch" spacing={5}>
-      {/* Header */}
       <VStack align="stretch" spacing={3}>
         <HStack justify="space-between" align="start">
           <VStack align="start" spacing={1}>
@@ -582,7 +651,7 @@ const DetailPane = ({ submission, onReply, onArchive, onUnarchive, onMarkUnread 
         </HStack>
 
         {/* Status chips */}
-        <HStack spacing={2}>
+        <HStack spacing={2} flexWrap="wrap">
           {isResponded && (
             <HStack
               spacing={1.5}
@@ -595,7 +664,7 @@ const DetailPane = ({ submission, onReply, onArchive, onUnarchive, onMarkUnread 
             >
               <Icon as={TbCircleCheck} boxSize={3} color="accent.neon" />
               <Text color="accent.neon" fontSize="2xs" fontWeight="700" fontFamily="mono" letterSpacing="0.05em" textTransform="uppercase">
-                Responded
+                {replyCount > 1 ? `Replied ${replyCount}×` : 'Responded'}
               </Text>
             </HStack>
           )}
@@ -622,7 +691,7 @@ const DetailPane = ({ submission, onReply, onArchive, onUnarchive, onMarkUnread 
       <HStack spacing={2} flexWrap="wrap">
         <ActionButton
           icon={TbSend}
-          label={isResponded ? 'Reply again' : 'Reply'}
+          label={replyCount === 0 ? 'Reply' : 'Send follow-up'}
           color="brand.500"
           onClick={onReply}
           disabled={!senderEmail}
@@ -634,23 +703,15 @@ const DetailPane = ({ submission, onReply, onArchive, onUnarchive, onMarkUnread 
           onClick={onMarkUnread}
         />
         {isArchived ? (
-          <ActionButton
-            icon={TbArchiveOff}
-            label="Unarchive"
-            onClick={onUnarchive}
-          />
+          <ActionButton icon={TbArchiveOff} label="Unarchive" onClick={onUnarchive} />
         ) : (
-          <ActionButton
-            icon={TbArchive}
-            label="Archive"
-            onClick={onArchive}
-          />
+          <ActionButton icon={TbArchive} label="Archive" onClick={onArchive} />
         )}
       </HStack>
 
       <Divider borderColor="surface.900" />
 
-      {/* Fields */}
+      {/* Form fields */}
       <VStack align="stretch" spacing={0} divider={<Box h="1px" bg="surface.900" />}>
         {fields.map(({ label, value }) => (
           <HStack key={label} align="start" spacing={6} py={3}>
@@ -681,14 +742,49 @@ const DetailPane = ({ submission, onReply, onArchive, onUnarchive, onMarkUnread 
         ))}
       </VStack>
 
+      {/* REPLY HISTORY */}
+      {replies.length > 0 && (
+        <>
+          <Divider borderColor="surface.900" />
+          <VStack align="stretch" spacing={3}>
+            <HStack spacing={2}>
+              <Icon as={TbHistory} boxSize={3.5} color="accent.neon" />
+              <Text
+                color="accent.neon"
+                fontSize="2xs"
+                fontWeight="700"
+                fontFamily="mono"
+                textTransform="uppercase"
+                letterSpacing="0.12em"
+              >
+                Reply History
+              </Text>
+              <Text color="surface.600" fontSize="2xs" fontFamily="mono">
+                {replies.length} {replies.length === 1 ? 'reply' : 'replies'}
+              </Text>
+            </HStack>
+
+            <VStack align="stretch" spacing={3}>
+              {replies.map((reply, idx) => (
+                <ReplyCard
+                  key={reply.id}
+                  reply={reply}
+                  index={replies.length - idx}
+                />
+              ))}
+            </VStack>
+          </VStack>
+        </>
+      )}
+
       {/* Footer metadata */}
       <HStack spacing={4} pt={2} opacity={0.6}>
         <Text color="surface.600" fontSize="2xs" fontFamily="mono">
           ID {String(submission.id).slice(0, 8)}
         </Text>
-        {submission.responded_at && (
+        {submission.last_replied_at && (
           <Text color="surface.600" fontSize="2xs" fontFamily="mono">
-            Responded {formatDistanceToNow(new Date(submission.responded_at), { addSuffix: true })}
+            Last reply {formatDistanceToNow(new Date(submission.last_replied_at), { addSuffix: true })}
           </Text>
         )}
       </HStack>
@@ -696,6 +792,65 @@ const DetailPane = ({ submission, onReply, onArchive, onUnarchive, onMarkUnread 
   );
 };
 
+// ============================================================
+// REPLY CARD — single reply in the history thread
+// ============================================================
+const ReplyCard = ({ reply, index }) => {
+  const sentAt = format(new Date(reply.created_at), "MMM d 'at' h:mma");
+  return (
+    <Box
+      border="1px solid"
+      borderColor="surface.900"
+      borderRadius="lg"
+      bg="surface.950"
+      p={4}
+    >
+      <HStack justify="space-between" mb={2}>
+        <HStack spacing={2}>
+          <Box
+            w="20px"
+            h="20px"
+            borderRadius="full"
+            bg="rgba(57,255,20,0.12)"
+            border="1px solid"
+            borderColor="rgba(57,255,20,0.3)"
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+          >
+            <Text color="accent.neon" fontSize="3xs" fontWeight="800" fontFamily="mono">
+              {index}
+            </Text>
+          </Box>
+          <Text color="white" fontSize="xs" fontWeight="700">
+            {reply.sender_name || 'Admin'}
+          </Text>
+        </HStack>
+        <Text color="surface.600" fontSize="2xs" fontFamily="mono">
+          {sentAt}
+        </Text>
+      </HStack>
+      {reply.subject && (
+        <Text color="surface.400" fontSize="xs" fontFamily="mono" mb={2}>
+          {reply.subject}
+        </Text>
+      )}
+      <Text
+        color="surface.300"
+        fontSize="xs"
+        whiteSpace="pre-wrap"
+        wordBreak="break-word"
+        lineHeight={1.6}
+      >
+        {reply.body}
+      </Text>
+    </Box>
+  );
+};
+
+// ============================================================
+// ACTION BUTTON
+// ============================================================
 const ActionButton = ({ icon, label, color, onClick, disabled, primary }) => (
   <Tooltip
     label={disabled ? 'No email address' : null}
@@ -725,7 +880,7 @@ const ActionButton = ({ icon, label, color, onClick, disabled, primary }) => (
       cursor={disabled ? 'not-allowed' : 'pointer'}
       transition="all 0.15s"
       _hover={disabled ? {} : {
-        color: primary ? 'white' : 'white',
+        color: 'white',
         bg: primary ? color || 'brand.500' : 'surface.900',
         borderColor: primary ? color || 'brand.500' : 'surface.700',
       }}
@@ -759,11 +914,11 @@ const EmptyDetail = () => (
 // ============================================================
 // REPLY MODAL
 // ============================================================
-const ReplyModal = ({ isOpen, onClose, submission, userId, onSuccess }) => {
+const ReplyModal = ({ isOpen, onClose, submission, replyCount, userId, onSuccess }) => {
   const toast = useToast();
-  const data = submission.data || submission;
-  const senderName = submission.name || data.name || 'there';
-  const senderEmail = submission.email || data.email || '';
+  const senderName = getSenderName(submission);
+  const senderEmail = getSenderEmail(submission);
+  const isFollowUp = replyCount > 0;
 
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
@@ -772,8 +927,13 @@ const ReplyModal = ({ isOpen, onClose, submission, userId, onSuccess }) => {
   useEffect(() => {
     if (isOpen) {
       const typeLabel = FORM_TYPE_LABELS[submission.form_type] || 'your message';
-      setSubject(`Re: ${typeLabel} — NeonBurro`);
-      setBody(`Hi ${senderName},\n\nThanks for reaching out. `);
+      if (isFollowUp) {
+        setSubject(`Following up — NeonBurro`);
+        setBody(`Hi ${senderName},\n\nWanted to follow up on our last message. `);
+      } else {
+        setSubject(`Re: ${typeLabel} — NeonBurro`);
+        setBody(`Hi ${senderName},\n\nThanks for reaching out. `);
+      }
     }
   }, [isOpen, submission.id]);
 
@@ -795,13 +955,14 @@ const ReplyModal = ({ isOpen, onClose, submission, userId, onSuccess }) => {
           subject,
           body,
           userId,
+          isFollowUp,
         }),
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || 'Send failed');
 
       toast({
-        title: 'Reply sent',
+        title: isFollowUp ? 'Follow-up sent' : 'Reply sent',
         description: `Email delivered to ${senderEmail}`,
         status: 'success',
         duration: 2500,
@@ -810,8 +971,10 @@ const ReplyModal = ({ isOpen, onClose, submission, userId, onSuccess }) => {
       onSuccess({
         id: submission.id,
         status: 'responded',
-        responded_at: new Date().toISOString(),
-        responded_by: userId,
+        responded_at: submission.responded_at || new Date().toISOString(),
+        responded_by: submission.responded_by || userId,
+        last_replied_at: new Date().toISOString(),
+        reply_count: (submission.reply_count || 0) + 1,
       });
     } catch (err) {
       toast({
@@ -839,13 +1002,32 @@ const ReplyModal = ({ isOpen, onClose, submission, userId, onSuccess }) => {
         <ModalBody p={6}>
           <VStack align="stretch" spacing={5}>
             <VStack align="start" spacing={1}>
-              <Text textStyle="kicker">Reply</Text>
+              <Text textStyle="kicker">
+                {isFollowUp ? `Follow-up #${replyCount + 1}` : 'Reply'}
+              </Text>
               <Text color="white" fontSize="xl" fontWeight="700" letterSpacing="-0.01em">
                 Sending to {senderName}
               </Text>
               <Text color="surface.500" fontSize="sm" fontFamily="mono">
                 {senderEmail}
               </Text>
+              {isFollowUp && (
+                <HStack
+                  spacing={1.5}
+                  mt={1}
+                  px={2}
+                  py={1}
+                  borderRadius="full"
+                  bg="rgba(255,229,0,0.08)"
+                  border="1px solid"
+                  borderColor="rgba(255,229,0,0.2)"
+                >
+                  <Icon as={TbHistory} boxSize={3} color="accent.banana" />
+                  <Text color="accent.banana" fontSize="2xs" fontWeight="700" fontFamily="mono" letterSpacing="0.05em" textTransform="uppercase">
+                    {replyCount} previous {replyCount === 1 ? 'reply' : 'replies'}
+                  </Text>
+                </HStack>
+              )}
             </VStack>
 
             <VStack align="stretch" spacing={3}>
@@ -883,7 +1065,7 @@ const ReplyModal = ({ isOpen, onClose, submission, userId, onSuccess }) => {
 
             <HStack justify="space-between" pt={2}>
               <Text color="surface.600" fontSize="2xs" fontFamily="mono">
-                Branded NeonBurro email template · reply_to: hello@neonburro.com
+                Branded NeonBurro email · reply_to: hello@neonburro.com
               </Text>
               <HStack spacing={2}>
                 <Button
@@ -906,7 +1088,7 @@ const ReplyModal = ({ isOpen, onClose, submission, userId, onSuccess }) => {
                   fontWeight="700"
                   _hover={{ bg: 'brand.400' }}
                 >
-                  Send reply
+                  {isFollowUp ? 'Send follow-up' : 'Send reply'}
                 </Button>
               </HStack>
             </HStack>
