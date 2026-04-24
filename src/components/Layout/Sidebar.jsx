@@ -2,11 +2,12 @@
 // Desktop sidebar with expand/collapse toggle.
 // - Expanded (240px): avatar + name + full nav labels + settings footer
 // - Collapsed (64px): avatar + icon-only nav + tooltips on hover
-// - Preference persists via profiles.sidebar_collapsed (managed by AppShell)
+// - Uses custom Avatar component (same as SettingsAvatar/ActivityStream)
+// - Preference persists via profiles.sidebar_collapsed (passed from AppShell)
 
 import { useState, useEffect } from 'react';
 import {
-  Box, VStack, HStack, Text, Divider, Avatar, Icon, Tooltip,
+  Box, VStack, HStack, Text, Divider, Icon, Tooltip,
 } from '@chakra-ui/react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -16,6 +17,7 @@ import {
 } from 'react-icons/tb';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
+import Avatar from '../common/Avatar';
 
 const NAV_ITEMS = [
   { path: '/dashboard/', label: 'Dashboard', icon: TbLayoutDashboard },
@@ -34,15 +36,23 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
   const { user } = useAuth();
   const [profile, setProfile] = useState(null);
 
+  // Refetch whenever user changes (not just on mount)
   useEffect(() => {
-    if (!user) return;
-    supabase
-      .from('profiles')
-      .select('display_name, username, avatar_url')
-      .eq('id', user.id)
-      .single()
-      .then(({ data }) => { if (data) setProfile(data); });
-  }, [user]);
+    if (!user?.id) return;
+    let cancelled = false;
+
+    const fetchProfile = async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('display_name, username, avatar_url')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (!cancelled && data) setProfile(data);
+    };
+
+    fetchProfile();
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
   const isActive = (path) => {
     if (path === '/dashboard/') {
@@ -70,40 +80,26 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
     >
       {/* Brand + user identity */}
       <HStack
-        px={collapsed ? 2 : 5}
+        px={collapsed ? 2 : 4}
         py={5}
         spacing={collapsed ? 0 : 3}
         justify={collapsed ? 'center' : 'flex-start'}
       >
         <Avatar
-          size="sm"
           name={displayName}
-          src={profile?.avatar_url || ''}
-          bg="brand.500"
-          color="surface.950"
-          border="2px solid"
-          borderColor="surface.800"
-          flexShrink={0}
+          url={profile?.avatar_url}
+          size="sm"
+          presence="online"
         />
         {!collapsed && (
-          <>
-            <Box flex={1} minW={0}>
-              <Text color="white" fontWeight="800" fontSize="md" lineHeight="1.2" noOfLines={1}>
-                Pulse
-              </Text>
-              <Text color="surface.500" fontSize="2xs" fontFamily="mono" noOfLines={1}>
-                {displayName}
-              </Text>
-            </Box>
-            <Box
-              w="6px"
-              h="6px"
-              borderRadius="full"
-              bg="accent.neon"
-              boxShadow="0 0 6px rgba(57,255,20,0.5)"
-              flexShrink={0}
-            />
-          </>
+          <Box flex={1} minW={0}>
+            <Text color="white" fontWeight="700" fontSize="sm" lineHeight="1.2" noOfLines={1}>
+              Pulse
+            </Text>
+            <Text color="surface.500" fontSize="2xs" fontFamily="mono" noOfLines={1}>
+              {displayName}
+            </Text>
+          </Box>
         )}
       </HStack>
 
@@ -179,7 +175,7 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
       </VStack>
 
       {!collapsed && (
-        <Box px={5} py={2}>
+        <Box px={4} py={2}>
           <Text color="surface.700" fontSize="2xs" fontFamily="mono">
             PULSE ϟ v1.0
           </Text>

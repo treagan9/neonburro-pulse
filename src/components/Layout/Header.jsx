@@ -3,23 +3,42 @@
 //
 // Desktop (lg+ = 1024px+): empty (sidebar shows everything)
 // Below lg: avatar dropdown for Settings/Sign Out
-//
-// Bug fix: previously used md (768px) as threshold which left 768-1023px
-// window with no avatar + no sidebar. Now matches sidebar breakpoint (lg).
+// Uses custom Avatar component (same as SettingsAvatar/ActivityStream)
 
+import { useState, useEffect } from 'react';
 import {
-  Box, Text, Avatar as ChakraAvatar, Menu, MenuButton, MenuList,
+  Box, Text, Menu, MenuButton, MenuList,
   MenuItem, MenuDivider, useBreakpointValue,
 } from '@chakra-ui/react';
 import { TbSettings, TbLogout } from 'react-icons/tb';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
+import Avatar from '../common/Avatar';
 
 const Header = () => {
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const showAvatar = useBreakpointValue({ base: true, lg: false });
+  const [profile, setProfile] = useState(null);
+
+  // Refetch profile whenever user changes
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+
+    const fetchProfile = async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('display_name, username, avatar_url, role')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (!cancelled && data) setProfile(data);
+    };
+
+    fetchProfile();
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
   const displayName =
     profile?.display_name ||
@@ -52,14 +71,10 @@ const Header = () => {
           _hover={{ opacity: 0.85 }}
           transition="opacity 0.15s"
         >
-          <ChakraAvatar
-            size="sm"
+          <Avatar
             name={displayName}
-            src={profile?.avatar_url || ''}
-            bg="surface.700"
-            color="brand.500"
-            border="2px solid"
-            borderColor="surface.700"
+            url={profile?.avatar_url}
+            size="sm"
           />
         </MenuButton>
         <MenuList
