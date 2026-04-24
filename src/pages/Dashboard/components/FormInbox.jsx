@@ -1,106 +1,184 @@
 // src/pages/Dashboard/components/FormInbox.jsx
-// Collapsable form submission inbox - naked section, no card frame
-// - Shows unread count when collapsed
-// - Click row to expand and see all fields
-// - Mark read / archive actions
-// - Generic JSONB renderer that handles any form_type
+// Condensed form inbox for the Dashboard — top 5 unread preview.
+// Full management lives on /forms/ page.
 
 import { useState, useEffect } from 'react';
 import {
-  Box, VStack, HStack, Text, Icon, Center, Spinner, Collapse,
-  useToast, Tooltip,
+  Box, VStack, HStack, Text, Icon, Center, Spinner,
 } from '@chakra-ui/react';
-import {
-  TbInbox, TbChevronDown, TbChevronRight, TbArchive, TbMail,
-} from 'react-icons/tb';
+import { TbInbox, TbArrowRight, TbCircleCheck } from 'react-icons/tb';
 import { formatDistanceToNow } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../../lib/supabase';
 
 const FORM_TYPE_LABELS = {
-  contact: 'Contact',
-  application: 'Application',
+  contact:            'Contact',
+  application:        'Application',
   collective_request: 'Collective',
-  hosting: 'Hosting',
-  nomination: 'Nomination',
-  project_brief: 'Project Brief',
-  wild_request: 'Wild Request',
+  hosting:            'Hosting',
+  nomination:         'Nomination',
+  project_brief:      'Project Brief',
+  wild_request:       'Wild Request',
 };
 
 const FORM_TYPE_COLORS = {
-  contact: '#00E5E5',
-  application: '#8B5CF6',
+  contact:            '#00E5E5',
+  application:        '#8B5CF6',
   collective_request: '#EC4899',
-  hosting: '#06B6D4',
-  nomination: '#FFE500',
-  project_brief: '#39FF14',
-  wild_request: '#FF6B35',
+  hosting:            '#06B6D4',
+  nomination:         '#FFE500',
+  project_brief:      '#39FF14',
+  wild_request:       '#FF6B35',
 };
 
-const renderFormFields = (data) => {
-  if (!data || typeof data !== 'object') return null;
-  const skipKeys = ['form_type', 'submitted_at', 'ip', 'user_agent', '_internal'];
-  const entries = Object.entries(data).filter(([k]) => !skipKeys.includes(k));
-  if (entries.length === 0) return null;
+const MAX_PREVIEW = 5;
 
-  return entries.map(([key, value]) => {
-    const label = key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
-    let display;
-    if (value === null || value === undefined || value === '') display = '—';
-    else if (typeof value === 'object') display = JSON.stringify(value, null, 2);
-    else if (typeof value === 'boolean') display = value ? 'Yes' : 'No';
-    else display = String(value);
+const FormInbox = () => {
+  const navigate = useNavigate();
+  const [submissions, setSubmissions] = useState([]);
+  const [totalUnread, setTotalUnread] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-    return (
-      <HStack key={key} align="start" spacing={4} py={1.5}>
-        <Text
-          color="surface.600"
-          fontSize="2xs"
-          fontWeight="700"
-          fontFamily="mono"
-          textTransform="uppercase"
-          letterSpacing="0.05em"
-          minW="100px"
-          flexShrink={0}
+  useEffect(() => {
+    fetchPreview();
+
+    const channel = supabase
+      .channel('dashboard_form_inbox')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'form_submissions' },
+        () => fetchPreview()
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
+  const fetchPreview = async () => {
+    const { data } = await supabase
+      .from('form_submissions')
+      .select('*')
+      .is('archived_at', null)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (data) {
+      const unread = data.filter((s) => s.status === 'unread');
+      setTotalUnread(unread.length);
+      // Prefer unread first, fill with recent reads if fewer
+      const preview = unread.length >= MAX_PREVIEW
+        ? unread.slice(0, MAX_PREVIEW)
+        : [...unread, ...data.filter((s) => s.status !== 'unread')].slice(0, MAX_PREVIEW);
+      setSubmissions(preview);
+    }
+    setLoading(false);
+  };
+
+  return (
+    <Box position="relative">
+      {/* Header */}
+      <HStack
+        spacing={2}
+        mb={4}
+        justify="space-between"
+        cursor="pointer"
+        onClick={() => navigate('/forms/')}
+        role="group"
+      >
+        <HStack spacing={2}>
+          <Box
+            w="6px"
+            h="6px"
+            borderRadius="full"
+            bg={totalUnread > 0 ? 'brand.500' : 'surface.700'}
+            boxShadow={totalUnread > 0 ? '0 0 8px rgba(0,229,229,0.6)' : 'none'}
+          />
+          <Text
+            color="brand.500"
+            fontSize="xs"
+            fontWeight="700"
+            textTransform="uppercase"
+            letterSpacing="0.12em"
+            fontFamily="mono"
+            _groupHover={{ color: 'brand.400' }}
+            transition="color 0.15s"
+          >
+            Form Inbox
+          </Text>
+          {totalUnread > 0 && (
+            <HStack spacing={1}>
+              <Text color="brand.500" fontSize="xs" fontFamily="mono" fontWeight="800">
+                {totalUnread}
+              </Text>
+              <Text color="surface.500" fontSize="2xs" fontFamily="mono">
+                unread
+              </Text>
+            </HStack>
+          )}
+        </HStack>
+
+        <HStack
+          spacing={1}
+          color="surface.500"
+          _groupHover={{ color: 'brand.500' }}
+          transition="color 0.15s"
         >
-          {label}
-        </Text>
-        <Text
-          color="surface.300"
-          fontSize="xs"
-          flex={1}
-          whiteSpace="pre-wrap"
-          wordBreak="break-word"
-        >
-          {display}
-        </Text>
+          <Text fontSize="2xs" fontFamily="mono" fontWeight="700" textTransform="uppercase" letterSpacing="0.05em">
+            View all
+          </Text>
+          <Icon as={TbArrowRight} boxSize={3} />
+        </HStack>
       </HStack>
-    );
-  });
+
+      {loading ? (
+        <Center py={6}>
+          <Spinner size="sm" color="brand.500" thickness="2px" />
+        </Center>
+      ) : submissions.length === 0 ? (
+        <VStack py={6} spacing={1.5}>
+          <Icon as={TbInbox} boxSize={6} color="surface.700" />
+          <Text color="surface.500" fontSize="xs" fontWeight="600">
+            Inbox Zero
+          </Text>
+          <Text color="surface.700" fontSize="2xs">
+            Form submissions will appear here
+          </Text>
+        </VStack>
+      ) : (
+        <Box borderTop="1px solid" borderColor="surface.900">
+          {submissions.map((s) => (
+            <PreviewRow
+              key={s.id}
+              submission={s}
+              onClick={() => navigate('/forms/')}
+            />
+          ))}
+        </Box>
+      )}
+    </Box>
+  );
 };
 
-const FormRow = ({ submission, onMarkRead, onArchive }) => {
-  const [expanded, setExpanded] = useState(false);
-
-  const formType = submission.form_type || submission.data?.form_type || 'contact';
+const PreviewRow = ({ submission, onClick }) => {
+  const formType = submission.form_type || 'contact';
   const typeLabel = FORM_TYPE_LABELS[formType] || formType.replace(/_/g, ' ');
   const typeColor = FORM_TYPE_COLORS[formType] || '#737373';
 
   const data = submission.data || submission;
-  const senderName = data.name || data.full_name || data.contact_name || 'Anonymous';
-  const senderEmail = data.email || data.contact_email || null;
-  const previewMessage =
-    data.message || data.description || data.brief || data.request || data.notes || data.details || '';
+  const senderName = submission.name || data.name || data.full_name || 'Anonymous';
+  const senderEmail = submission.email || data.email || null;
+  const previewMessage = submission.message || data.message || data.description || data.brief || '';
 
   const isUnread = submission.status === 'unread';
+  const isResponded = submission.status === 'responded';
   const timeAgo = formatDistanceToNow(new Date(submission.created_at), { addSuffix: true });
-
-  const handleToggle = async () => {
-    if (!expanded && isUnread) await onMarkRead(submission.id);
-    setExpanded(!expanded);
-  };
 
   return (
     <Box
+      as="button"
+      w="100%"
+      textAlign="left"
+      onClick={onClick}
       borderBottom="1px solid"
       borderColor="surface.900"
       borderLeft="2px solid"
@@ -108,22 +186,7 @@ const FormRow = ({ submission, onMarkRead, onArchive }) => {
       transition="all 0.15s"
       _hover={{ bg: 'rgba(255,255,255,0.012)' }}
     >
-      <HStack
-        spacing={3}
-        py={3}
-        pl={4}
-        pr={3}
-        cursor="pointer"
-        onClick={handleToggle}
-        align="center"
-      >
-        <Icon
-          as={expanded ? TbChevronDown : TbChevronRight}
-          boxSize={3}
-          color="surface.600"
-          flexShrink={0}
-        />
-
+      <HStack spacing={3} py={3} pl={4} pr={3} align="center">
         <Box minW="90px" flexShrink={0}>
           <Text
             fontSize="2xs"
@@ -148,9 +211,12 @@ const FormRow = ({ submission, onMarkRead, onArchive }) => {
               {senderName}
             </Text>
             {senderEmail && (
-              <Text color="surface.600" fontSize="xs" noOfLines={1}>
+              <Text color="surface.600" fontSize="xs" noOfLines={1} display={{ base: 'none', md: 'block' }}>
                 {senderEmail}
               </Text>
+            )}
+            {isResponded && (
+              <Icon as={TbCircleCheck} boxSize={3} color="accent.neon" />
             )}
           </HStack>
           {previewMessage && (
@@ -181,222 +247,6 @@ const FormRow = ({ submission, onMarkRead, onArchive }) => {
           />
         )}
       </HStack>
-
-      <Collapse in={expanded} animateOpacity>
-        <Box pl={12} pr={4} pb={4} pt={1}>
-          <Box
-            bg="surface.950"
-            border="1px solid"
-            borderColor="surface.800"
-            borderRadius="lg"
-            p={4}
-          >
-            <VStack align="stretch" spacing={0} divider={<Box h="1px" bg="surface.900" />}>
-              {renderFormFields(data)}
-            </VStack>
-
-            <HStack
-              justify="space-between"
-              pt={3}
-              mt={3}
-              borderTop="1px solid"
-              borderColor="surface.900"
-              flexWrap="wrap"
-              spacing={2}
-            >
-              <HStack spacing={3}>
-                {senderEmail && (
-                  <Tooltip label="Reply via email" placement="top" hasArrow bg="surface.800" fontSize="xs">
-                    <Box
-                      as="a"
-                      href={`mailto:${senderEmail}`}
-                      color="brand.500"
-                      _hover={{ color: 'brand.400' }}
-                    >
-                      <Icon as={TbMail} boxSize={3.5} />
-                    </Box>
-                  </Tooltip>
-                )}
-                <Text color="surface.700" fontSize="2xs" fontFamily="mono">
-                  ID {String(submission.id).slice(0, 8)}
-                </Text>
-                {data.ip && (
-                  <Text color="surface.700" fontSize="2xs" fontFamily="mono">
-                    {data.ip}
-                  </Text>
-                )}
-              </HStack>
-
-              <Box
-                as="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onArchive(submission.id);
-                }}
-                color="surface.600"
-                _hover={{ color: 'red.400' }}
-                fontSize="2xs"
-                fontWeight="700"
-                textTransform="uppercase"
-                letterSpacing="0.05em"
-              >
-                <HStack spacing={1}>
-                  <Icon as={TbArchive} boxSize={3} />
-                  <Text>Archive</Text>
-                </HStack>
-              </Box>
-            </HStack>
-          </Box>
-        </Box>
-      </Collapse>
-    </Box>
-  );
-};
-
-const FormInbox = () => {
-  const [submissions, setSubmissions] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [expanded, setExpanded] = useState(true);
-  const toast = useToast();
-
-  useEffect(() => { fetchSubmissions(); }, []);
-
-  const fetchSubmissions = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('form_submissions')
-      .select('*')
-      .is('archived_at', null)
-      .order('created_at', { ascending: false })
-      .limit(50);
-
-    if (error) {
-      console.error('Failed to load form submissions:', error);
-      setLoading(false);
-      return;
-    }
-    setSubmissions(data || []);
-    setLoading(false);
-  };
-
-  const handleMarkRead = async (id) => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      await supabase
-        .from('form_submissions')
-        .update({
-          status: 'read',
-          viewed_at: new Date().toISOString(),
-          viewed_by: user?.id,
-        })
-        .eq('id', id);
-      setSubmissions((prev) =>
-        prev.map((s) => (s.id === id ? { ...s, status: 'read' } : s))
-      );
-    } catch (err) {
-      console.error('Mark read failed:', err);
-    }
-  };
-
-  const handleArchive = async (id) => {
-    try {
-      await supabase
-        .from('form_submissions')
-        .update({ archived_at: new Date().toISOString(), status: 'archived' })
-        .eq('id', id);
-      setSubmissions((prev) => prev.filter((s) => s.id !== id));
-      toast({ title: 'Archived', status: 'success', duration: 1500 });
-    } catch (err) {
-      toast({ title: 'Archive failed', description: err.message, status: 'error' });
-    }
-  };
-
-  const unreadCount = submissions.filter((s) => s.status === 'unread').length;
-  const totalCount = submissions.length;
-
-  return (
-    <Box position="relative">
-      {/* Header - clickable to collapse, matches Activity Stream label style */}
-      <HStack
-        spacing={2}
-        mb={4}
-        cursor="pointer"
-        onClick={() => setExpanded(!expanded)}
-        userSelect="none"
-        _hover={{ '& .label': { color: 'brand.400' } }}
-      >
-        <Icon
-          as={expanded ? TbChevronDown : TbChevronRight}
-          boxSize={3}
-          color="brand.500"
-        />
-        <Text
-          className="label"
-          color="brand.500"
-          fontSize="xs"
-          fontWeight="700"
-          textTransform="uppercase"
-          letterSpacing="0.12em"
-          fontFamily="mono"
-          transition="color 0.15s"
-        >
-          Form Inbox
-        </Text>
-        <Box flex={1} />
-        {!loading && (
-          <HStack spacing={2}>
-            {unreadCount > 0 && (
-              <HStack spacing={1}>
-                <Box
-                  w="6px"
-                  h="6px"
-                  borderRadius="full"
-                  bg="brand.500"
-                  boxShadow="0 0 6px rgba(0,229,229,0.6)"
-                />
-                <Text color="brand.500" fontSize="xs" fontFamily="mono" fontWeight="800">
-                  {unreadCount}
-                </Text>
-                <Text color="surface.500" fontSize="2xs" fontFamily="mono">
-                  unread
-                </Text>
-              </HStack>
-            )}
-            <Text color="surface.700" fontSize="2xs" fontFamily="mono">
-              {totalCount} total
-            </Text>
-          </HStack>
-        )}
-      </HStack>
-
-      <Collapse in={expanded} animateOpacity>
-        {loading ? (
-          <Center py={10}>
-            <Spinner size="sm" color="brand.500" thickness="2px" />
-          </Center>
-        ) : submissions.length === 0 ? (
-          <VStack py={10} spacing={2}>
-            <Icon as={TbInbox} boxSize={8} color="surface.700" />
-            <Text color="surface.500" fontSize="sm" fontWeight="700">
-              Inbox Zero
-            </Text>
-            <Text color="surface.700" fontSize="2xs">
-              Form submissions will appear here when received
-            </Text>
-          </VStack>
-        ) : (
-          <Box borderTop="1px solid" borderColor="surface.900">
-            {submissions.map((sub) => (
-              <FormRow
-                key={sub.id}
-                submission={sub}
-                onMarkRead={handleMarkRead}
-                onArchive={handleArchive}
-              />
-            ))}
-          </Box>
-        )}
-      </Collapse>
     </Box>
   );
 };
