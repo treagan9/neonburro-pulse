@@ -18,7 +18,7 @@ import {
 } from '@chakra-ui/react';
 import {
   TbInbox, TbSearch, TbMail, TbArchive, TbArchiveOff, TbCheck,
-  TbSend, TbArrowLeft, TbCircleCheck, TbDot,
+  TbSend, TbArrowLeft, TbCircleCheck, TbCircleDashed,
 } from 'react-icons/tb';
 import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '../../lib/supabase';
@@ -629,7 +629,7 @@ const DetailPane = ({ submission, onReply, onArchive, onUnarchive, onMarkUnread 
           primary
         />
         <ActionButton
-          icon={TbDot}
+          icon={TbCircleDashed}
           label="Mark unread"
           onClick={onMarkUnread}
         />
