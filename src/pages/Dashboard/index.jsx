@@ -1,7 +1,6 @@
 // src/pages/Dashboard/index.jsx
-// New design language: kicker label, hero number stays JetBrains Mono,
-// teal-filled + Client and + Invoice buttons (replacing the outlined version).
-// FormInbox + ActivityStream as naked sections.
+// Design language v2: kicker label, mono hero number, teal-filled + Invoice
+// secondary outlined + Client. Explicit child color props on buttons.
 
 import { useState, useEffect } from 'react';
 import {
@@ -12,6 +11,10 @@ import { TbPlus, TbRefresh } from 'react-icons/tb';
 import { supabase } from '../../lib/supabase';
 import {
   PRIMARY_BUTTON_PROPS,
+  PRIMARY_BUTTON_ICON_PROPS,
+  PRIMARY_BUTTON_TEXT_PROPS,
+  SECONDARY_BUTTON_PROPS,
+  SECONDARY_BUTTON_ICON_PROPS,
   PAGE_AMBIENT_GLOW_PROPS,
   formatCurrency,
 } from '../../lib/uiConstants';
@@ -129,8 +132,7 @@ const Dashboard = () => {
       <Box {...PAGE_AMBIENT_GLOW_PROPS} />
 
       <VStack spacing={{ base: 8, md: 12 }} align="stretch" position="relative">
-
-        {/* Top strip - team avatars left, refresh top-right */}
+        {/* Top strip */}
         <HStack justify="space-between" align="center" flexWrap="wrap" spacing={4}>
           <Box flex={1} minW={0}>
             <TeamOnlineStrip />
@@ -168,7 +170,7 @@ const Dashboard = () => {
           </Tooltip>
         </HStack>
 
-        {/* HERO BLOCK - kicker + mono number + teal action buttons */}
+        {/* HERO BLOCK */}
         <VStack align="stretch" spacing={5}>
           <HStack justify="space-between" align="flex-end" flexWrap="wrap" gap={4}>
             <VStack align="start" spacing={2} flex={1} minW={0}>
@@ -198,7 +200,7 @@ const Dashboard = () => {
               </HStack>
             </VStack>
 
-            {/* Teal-filled action buttons */}
+            {/* Action buttons - secondary "+ Client", primary "+ Invoice" */}
             <HStack
               spacing={2}
               flexShrink={0}
@@ -206,36 +208,19 @@ const Dashboard = () => {
               flexWrap="wrap"
               rowGap={2}
             >
-              <Box
-                as="button"
-                onClick={() => navigate('/clients/')}
-                {...PRIMARY_BUTTON_PROPS}
-                bg="surface.900"
-                color="white"
-                border="1px solid"
-                borderColor="surface.800"
-                _hover={{
-                  bg: 'surface.850',
-                  borderColor: 'brand.500',
-                  transform: 'translateY(-1px)',
-                }}
-              >
-                <Icon as={TbPlus} boxSize={3.5} />
-                <Text>Client</Text>
+              <Box as="button" onClick={() => navigate('/clients/')} {...SECONDARY_BUTTON_PROPS}>
+                <Icon as={TbPlus} {...SECONDARY_BUTTON_ICON_PROPS} />
+                <Text color="white" fontWeight="700">Client</Text>
               </Box>
 
-              <Box
-                as="button"
-                onClick={() => navigate('/invoicing/?invoice=new')}
-                {...PRIMARY_BUTTON_PROPS}
-              >
-                <Icon as={TbPlus} boxSize={3.5} />
-                <Text>Invoice</Text>
+              <Box as="button" onClick={() => navigate('/invoicing/?invoice=new')} {...PRIMARY_BUTTON_PROPS}>
+                <Icon as={TbPlus} {...PRIMARY_BUTTON_ICON_PROPS} />
+                <Text {...PRIMARY_BUTTON_TEXT_PROPS}>Invoice</Text>
               </Box>
             </HStack>
           </HStack>
 
-          {/* Secondary stat strip - quiet, mono */}
+          {/* Secondary stat strip */}
           <HStack
             spacing={0}
             color="surface.500"

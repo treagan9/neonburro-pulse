@@ -1,7 +1,7 @@
 // src/pages/Invoicing/index.jsx
-// New design language: no big title, kicker only, teal-filled + Invoice button,
-// sticky rounded search bar, tab system from uiConstants.
-// AppShell handles width/gutters.
+// Design language v2: no big title, kicker only, teal-filled + Invoice button
+// with explicit child color props (Chakra cascade workaround).
+// Sticky rounded search, tab system from uiConstants.
 
 import { useState, useEffect } from 'react';
 import {
@@ -13,6 +13,8 @@ import { supabase } from '../../lib/supabase';
 import { SENT_STATUSES, formatCurrencyCompact } from '../../lib/invoiceConstants';
 import {
   PRIMARY_BUTTON_PROPS,
+  PRIMARY_BUTTON_ICON_PROPS,
+  PRIMARY_BUTTON_TEXT_PROPS,
   SEARCH_INPUT_WRAP_PROPS,
   SEARCH_INPUT_PROPS,
   buildFilterTabProps,
@@ -159,14 +161,14 @@ const Invoicing = () => {
       <Box {...PAGE_AMBIENT_GLOW_PROPS} />
 
       <VStack spacing={{ base: 8, md: 12 }} align="stretch" position="relative">
-        {/* Header - kicker + teal button + stats */}
+        {/* Header */}
         <VStack align="stretch" spacing={3}>
           <HStack justify="space-between" align="center" flexWrap="wrap" gap={3}>
             <Text textStyle="kicker">Invoicing</Text>
 
             <Box as="button" onClick={handleNewInvoice} {...PRIMARY_BUTTON_PROPS}>
-              <Icon as={TbPlus} boxSize={3.5} />
-              <Text>Invoice</Text>
+              <Icon as={TbPlus} {...PRIMARY_BUTTON_ICON_PROPS} />
+              <Text {...PRIMARY_BUTTON_TEXT_PROPS}>Invoice</Text>
             </Box>
           </HStack>
 

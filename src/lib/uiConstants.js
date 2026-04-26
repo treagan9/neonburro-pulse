@@ -1,10 +1,14 @@
 // src/lib/uiConstants.js
 // Shared UI constants for Pulse - the design language.
-// Imported by Dashboard, Clients, Invoicing, Forms, and any page that needs
-// the primary button, search bar, or filter/sort tab system.
+// Imported by Dashboard, Clients, Invoicing, Forms.
 
 // PRIMARY ACTION BUTTON - teal fill, dark text
-// Used for "+ Client", "+ Invoice", "Send", any single primary action on a page
+// Used as <Box as="button" {...PRIMARY_BUTTON_PROPS}>
+//   <Icon as={TbPlus} {...PRIMARY_BUTTON_ICON_PROPS} />
+//   <Text {...PRIMARY_BUTTON_TEXT_PROPS}>Client</Text>
+// </Box>
+// We split into three because <Box as="button"> doesn't reliably cascade
+// `color` down to <Icon> + <Text> children in all Chakra versions.
 export const PRIMARY_BUTTON_PROPS = {
   bg: 'brand.500',
   color: 'surface.950',
@@ -22,6 +26,7 @@ export const PRIMARY_BUTTON_PROPS = {
   alignItems: 'center',
   gap: 1.5,
   transition: 'all 0.15s',
+  border: 'none',
   _hover: {
     bg: 'brand.400',
     transform: 'translateY(-1px)',
@@ -30,8 +35,53 @@ export const PRIMARY_BUTTON_PROPS = {
   _active: { transform: 'translateY(0)' },
 };
 
+// Icon inside the primary button - explicit dark color
+export const PRIMARY_BUTTON_ICON_PROPS = {
+  boxSize: 3.5,
+  color: 'surface.950',
+};
+
+// Text inside the primary button - explicit dark color
+export const PRIMARY_BUTTON_TEXT_PROPS = {
+  color: 'surface.950',
+  fontWeight: '700',
+};
+
+// SECONDARY OUTLINED BUTTON - dark bg, white text, cyan border on hover
+// Used for "+ Client" on Dashboard (the secondary action next to + Invoice)
+export const SECONDARY_BUTTON_PROPS = {
+  bg: 'surface.900',
+  color: 'white',
+  fontWeight: '700',
+  fontSize: 'xs',
+  letterSpacing: '0.05em',
+  textTransform: 'uppercase',
+  px: 4,
+  py: 2,
+  h: '36px',
+  borderRadius: 'lg',
+  cursor: 'pointer',
+  userSelect: 'none',
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 1.5,
+  transition: 'all 0.15s',
+  border: '1px solid',
+  borderColor: 'surface.800',
+  _hover: {
+    bg: 'surface.850',
+    borderColor: 'brand.500',
+    transform: 'translateY(-1px)',
+  },
+  _active: { transform: 'translateY(0)' },
+};
+
+export const SECONDARY_BUTTON_ICON_PROPS = {
+  boxSize: 3.5,
+  color: 'white',
+};
+
 // SEARCH BAR WRAPPER - rounded card with focus glow
-// The HStack/Box that contains the search icon + input
 export const SEARCH_INPUT_WRAP_PROPS = {
   bg: 'surface.900',
   border: '1px solid',
@@ -60,7 +110,6 @@ export const SEARCH_INPUT_PROPS = {
 };
 
 // FILTER TAB - primary filter row (Active / Leads / Inactive)
-// Bigger, more prominent than sort tabs
 export const buildFilterTabProps = (active) => ({
   cursor: 'pointer',
   position: 'relative',
@@ -84,7 +133,6 @@ export const FILTER_TAB_COUNT_PROPS = (active) => ({
   color: active ? 'brand.500' : 'surface.700',
 });
 
-// FILTER TAB UNDERLINE - cyan glow under the active tab
 export const FILTER_TAB_UNDERLINE_PROPS = {
   position: 'absolute',
   bottom: 0,
@@ -110,7 +158,6 @@ export const SORT_TAB_LABEL_PROPS = (active) => ({
 });
 
 // PAGE WRAPPER - ambient glow + outer Box for any top-level page
-// Use as the outermost <Box>; AppShell handles width/gutters.
 export const PAGE_AMBIENT_GLOW_PROPS = {
   position: 'absolute',
   top: 0,
