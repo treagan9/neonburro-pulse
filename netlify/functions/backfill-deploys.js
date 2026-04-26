@@ -1,19 +1,18 @@
 // netlify/functions/backfill-deploys.js
-// One-shot historical sync of Netlify deploys into the netlify_deploys table.
+// Historical sync of Netlify deploys into the netlify_deploys table.
+// Now with pagination - fetches ALL deploys via per_page + pagination loop.
 //
 // Usage:
-//   GET https://pulse.neonburro.com/.netlify/functions/backfill-deploys
-//   GET https://pulse.neonburro.com/.netlify/functions/backfill-deploys?days=30
-//   GET https://pulse.neonburro.com/.netlify/functions/backfill-deploys?site=cimarronengineering
+//   GET /.netlify/functions/backfill-deploys
+//   GET /.netlify/functions/backfill-deploys?days=90
+//   GET /.netlify/functions/backfill-deploys?site=cimarronengineering
+//   GET /.netlify/functions/backfill-deploys?days=365&site=cimarronengineering
 //
-// Iterates every connected client_site, fetches its deploy history from
-// Netlify API, upserts into netlify_deploys (idempotent via onConflict: 'id').
+// Defaults: 90 days, all connected sites, paginates until cutoff or 1000 deploys.
 //
-// Does NOT log to activity_log - we don't want hundreds of fake "deploy
-// succeeded" notifications appearing in the team activity stream for old
-// deploys. Webhook handles activity_log for live deploys going forward.
-//
-// Defaults: 30 days, all connected sites.
+// Idempotent: re-running upserts existing rows by id, no duplicates.
+// Does NOT log to activity_log - we don't want hundreds of fake notifications
+// for old deploys. Webhook handles activity_log for live deploys going forward.
 
 const { createClient } = require('@supabase/supabase-js');
 
@@ -26,6 +25,8 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 });
 
 const NETLIFY_API = 'https://api.netlify.com/api/v1';
+const PER_PAGE = 100;
+const MAX_PAGES_PER_SITE = 10;  // hard cap: 1000 deploys per site per run
 
 const netlifyFetch = async (path) => {
   const res = await fetch(`${NETLIFY_API}${path}`, {
@@ -64,10 +65,44 @@ const mapDeployToRow = (d, clientSite) => ({
   published_at: d.published_at,
 });
 
+// Fetch all deploys for a site, paginating until we hit the cutoff date
+// or reach the safety cap of 1000 deploys.
+const fetchAllDeploysForSite = async (siteId, cutoffMs) => {
+  const all = [];
+  let page = 1;
+
+  while (page <= MAX_PAGES_PER_SITE) {
+    const batch = await netlifyFetch(
+      `/sites/${siteId}/deploys?per_page=${PER_PAGE}&page=${page}`
+    );
+
+    if (!batch || batch.length === 0) {
+      break;
+    }
+
+    all.push(...batch);
+
+    // Stop early if last deploy in batch is older than cutoff
+    const lastDeploy = batch[batch.length - 1];
+    if (lastDeploy.created_at && new Date(lastDeploy.created_at).getTime() < cutoffMs) {
+      break;
+    }
+
+    // Stop if we got fewer than per_page (last page)
+    if (batch.length < PER_PAGE) {
+      break;
+    }
+
+    page += 1;
+  }
+
+  return all;
+};
+
 exports.handler = async (event) => {
   const startedAt = Date.now();
   const params = event.queryStringParameters || {};
-  const daysBack = parseInt(params.days || '30', 10);
+  const daysBack = parseInt(params.days || '90', 10);
   const siteFilter = params.site || null;
 
   if (!NETLIFY_PAT) {
@@ -78,7 +113,6 @@ exports.handler = async (event) => {
   }
 
   try {
-    // 1. Load every connected client_site
     let sitesQuery = supabase
       .from('client_sites')
       .select('id, client_id, netlify_site_id, netlify_site_name, display_name');
@@ -112,28 +146,29 @@ exports.handler = async (event) => {
     let totalSkipped = 0;
     const errors = [];
 
-    // 2. For each site, fetch + upsert deploys
     for (const site of sites) {
       try {
-        const deploys = await netlifyFetch(
-          `/sites/${site.netlify_site_id}/deploys?per_page=100`
-        );
+        // Paginate to fetch ALL recent deploys
+        const allDeploys = await fetchAllDeploysForSite(site.netlify_site_id, cutoffMs);
 
         // Filter to deploys within the cutoff window
-        const recentDeploys = (deploys || []).filter((d) => {
+        const recentDeploys = (allDeploys || []).filter((d) => {
           if (!d.created_at) return false;
           return new Date(d.created_at).getTime() >= cutoffMs;
         });
+
+        const skipped = (allDeploys?.length || 0) - recentDeploys.length;
 
         if (recentDeploys.length === 0) {
           bySite.push({
             site: site.netlify_site_name,
             display_name: site.display_name,
             synced: 0,
-            skipped: deploys?.length || 0,
+            skipped,
+            fetched: allDeploys?.length || 0,
             note: `No deploys in last ${daysBack} days`,
           });
-          totalSkipped += deploys?.length || 0;
+          totalSkipped += skipped;
           continue;
         }
 
@@ -144,10 +179,7 @@ exports.handler = async (event) => {
           .upsert(rows, { onConflict: 'id' });
 
         if (upsertError) {
-          errors.push({
-            site: site.netlify_site_name,
-            error: upsertError.message,
-          });
+          errors.push({ site: site.netlify_site_name, error: upsertError.message });
           bySite.push({
             site: site.netlify_site_name,
             display_name: site.display_name,
@@ -161,23 +193,20 @@ exports.handler = async (event) => {
           site: site.netlify_site_name,
           display_name: site.display_name,
           synced: recentDeploys.length,
-          skipped: (deploys?.length || 0) - recentDeploys.length,
+          skipped,
+          fetched: allDeploys?.length || 0,
         });
 
         totalSynced += recentDeploys.length;
-        totalSkipped += (deploys?.length || 0) - recentDeploys.length;
+        totalSkipped += skipped;
 
-        // Update last_synced_at on the client_site
         await supabase
           .from('client_sites')
           .update({ last_synced_at: new Date().toISOString() })
           .eq('id', site.id);
       } catch (siteErr) {
         console.error(`Backfill failed for ${site.netlify_site_name}:`, siteErr);
-        errors.push({
-          site: site.netlify_site_name,
-          error: siteErr.message,
-        });
+        errors.push({ site: site.netlify_site_name, error: siteErr.message });
         bySite.push({
           site: site.netlify_site_name,
           display_name: site.display_name,
