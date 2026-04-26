@@ -1,65 +1,43 @@
 // src/pages/Clients/components/ClientsHeader.jsx
-// Minimal header - typography-led, no stat cards, inline counts
+// New design language - no big "Clients" title.
+// Teal-filled "+ Client" button. Inline mono stat strip below.
 
-import { HStack, Box, Text, VStack, Icon } from '@chakra-ui/react';
+import { HStack, VStack, Text, Icon, Box } from '@chakra-ui/react';
 import { TbPlus } from 'react-icons/tb';
+import { PRIMARY_BUTTON_PROPS, formatCurrency } from '../../../lib/uiConstants';
 
 const ClientsHeader = ({ counts, stats, onAdd }) => {
-  const currency = (val) => {
-    const num = parseFloat(val || 0);
-    if (num === 0) return '$0';
-    if (num >= 1000) return `$${(num / 1000).toFixed(1)}k`;
-    return `$${num.toLocaleString()}`;
-  };
-
   return (
-    <VStack align="stretch" spacing={4}>
-      {/* Title row */}
-      <HStack justify="space-between" align="flex-end" flexWrap="wrap" gap={3}>
-        <Box>
-          <Text
-            fontSize={{ base: '2xl', md: '3xl' }}
-            fontWeight="800"
-            color="white"
-            letterSpacing="-0.02em"
-            lineHeight="1"
-          >
-            Clients
-          </Text>
-        </Box>
+    <VStack align="stretch" spacing={3}>
+      {/* Top row: kicker + primary button */}
+      <HStack justify="space-between" align="center" flexWrap="wrap" gap={3}>
+        <Text textStyle="kicker">Clients</Text>
 
-        {/* Add client - subtle text button, not bold */}
-        <HStack
-          spacing={1.5}
-          cursor="pointer"
-          onClick={onAdd}
-          color="brand.500"
-          opacity={0.8}
-          transition="all 0.15s"
-          _hover={{ opacity: 1, transform: 'translateY(-1px)' }}
-          userSelect="none"
-        >
+        <Box as="button" onClick={onAdd} {...PRIMARY_BUTTON_PROPS}>
           <Icon as={TbPlus} boxSize={3.5} />
-          <Text fontSize="xs" fontWeight="700" letterSpacing="0.05em" textTransform="uppercase">
-            Add Client
-          </Text>
-        </HStack>
+          <Text>Client</Text>
+        </Box>
       </HStack>
 
-      {/* Inline stat strip - mono, muted, just text */}
-      <HStack spacing={0} color="surface.500" fontSize="xs" fontFamily="mono" flexWrap="wrap">
+      {/* Inline stat strip - same vibe everywhere */}
+      <HStack spacing={0} color="surface.500" fontSize="xs" fontFamily="mono" flexWrap="wrap" rowGap={1}>
         <Text color="white" fontWeight="700">{counts.all || 0}</Text>
         <Text color="surface.600" mx={1.5}>clients</Text>
+
         <Text color="surface.700" mx={1}>·</Text>
+
         <Text color="white" fontWeight="700">{stats?.activeSprints || 0}</Text>
         <Text color="surface.600" mx={1.5}>active sprints</Text>
+
         <Text color="surface.700" mx={1}>·</Text>
-        <Text color="white" fontWeight="700">{currency(stats?.mtdRevenue)}</Text>
+
+        <Text color="white" fontWeight="700">{formatCurrency(stats?.mtdRevenue)}</Text>
         <Text color="surface.600" mx={1.5}>MTD</Text>
+
         {parseFloat(stats?.outstanding || 0) > 0 && (
           <>
             <Text color="surface.700" mx={1}>·</Text>
-            <Text color="accent.banana" fontWeight="700">{currency(stats?.outstanding)}</Text>
+            <Text color="accent.banana" fontWeight="700">{formatCurrency(stats?.outstanding)}</Text>
             <Text color="surface.600" mx={1.5}>outstanding</Text>
           </>
         )}

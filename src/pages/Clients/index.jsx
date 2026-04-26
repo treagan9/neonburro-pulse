@@ -1,11 +1,11 @@
 // src/pages/Clients/index.jsx
-// Clients page - aligned with Dashboard/Forms layout rhythm.
-// No inner Container; AppShell handles width and gutters.
-// Section spacing matches Dashboard: { base: 8, md: 12 }.
+// New design language: no inner Container, no big title, kicker-only header.
+// AppShell handles width/gutters. Section spacing matches Dashboard.
 
 import { useState, useEffect } from 'react';
 import { Box, VStack, useDisclosure } from '@chakra-ui/react';
 import { supabase } from '../../lib/supabase';
+import { PAGE_AMBIENT_GLOW_PROPS } from '../../lib/uiConstants';
 import ClientsHeader from './components/ClientsHeader';
 import ClientFilters from './components/ClientFilters';
 import ClientGrid from './components/ClientGrid';
@@ -26,7 +26,6 @@ const Clients = () => {
   const fetchData = async () => {
     setLoading(true);
 
-    // Parallel fetch: clients, all invoices with items, all projects
     const [clientsRes, invoicesRes, projectsRes] = await Promise.all([
       supabase
         .from('clients')
@@ -43,14 +42,12 @@ const Clients = () => {
     const allInvoices = invoicesRes.data || [];
     const allProjects = projectsRes.data || [];
 
-    // Count projects per client
     const projectCountMap = {};
     allProjects.forEach((p) => {
       if (!p.client_id) return;
       projectCountMap[p.client_id] = (projectCountMap[p.client_id] || 0) + 1;
     });
 
-    // Build per-client stats
     const clientStatsMap = {};
     allInvoices.forEach((inv) => {
       if (!inv.client_id) return;
@@ -66,7 +63,6 @@ const Clients = () => {
       }
     });
 
-    // Enrich clients with their stats
     const enriched = (clientsRes.data || []).map((c) => ({
       ...c,
       sprint_count: clientStatsMap[c.id]?.sprint_count || 0,
@@ -77,7 +73,6 @@ const Clients = () => {
 
     setClients(enriched);
 
-    // Compute global stats
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
@@ -100,7 +95,6 @@ const Clients = () => {
   const handleAdd = () => { setEditingClient(null); onOpen(); };
   const handleEdit = (client) => { setEditingClient(client); onOpen(); };
 
-  // Filter
   const filtered = clients.filter((c) => {
     const searchLower = search.toLowerCase();
     const matchSearch = search
@@ -114,7 +108,6 @@ const Clients = () => {
     return matchSearch && matchStatus;
   });
 
-  // Sort
   const sorted = [...filtered].sort((a, b) => {
     switch (sortBy) {
       case 'alphabetical':
@@ -140,16 +133,7 @@ const Clients = () => {
 
   return (
     <Box position="relative" minH="100%">
-      {/* Ambient background - matches Dashboard */}
-      <Box
-        position="absolute"
-        top={0}
-        left={0}
-        right={0}
-        h="500px"
-        bg="radial-gradient(ellipse at top center, rgba(0,229,229,0.04), transparent 70%)"
-        pointerEvents="none"
-      />
+      <Box {...PAGE_AMBIENT_GLOW_PROPS} />
 
       <VStack spacing={{ base: 8, md: 12 }} align="stretch" position="relative">
         <ClientsHeader counts={counts} stats={stats} onAdd={handleAdd} />

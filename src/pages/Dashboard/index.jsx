@@ -1,8 +1,7 @@
 // src/pages/Dashboard/index.jsx
-// Dashboard - hero number JetBrains Mono, dialed down a notch in size
-// to feel more like a status indicator than a billboard.
+// New design language: kicker label, hero number stays JetBrains Mono,
+// teal-filled + Client and + Invoice buttons (replacing the outlined version).
 // FormInbox + ActivityStream as naked sections.
-// TeamOnlineStrip pinned top-left, refresh top-right.
 
 import { useState, useEffect } from 'react';
 import {
@@ -11,16 +10,14 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { TbPlus, TbRefresh } from 'react-icons/tb';
 import { supabase } from '../../lib/supabase';
+import {
+  PRIMARY_BUTTON_PROPS,
+  PAGE_AMBIENT_GLOW_PROPS,
+  formatCurrency,
+} from '../../lib/uiConstants';
 import TeamOnlineStrip from './components/TeamOnlineStrip';
 import FormInbox from './components/FormInbox';
 import ActivityStream from './components/ActivityStream';
-
-const currency = (val) => {
-  const num = parseFloat(val || 0);
-  if (num === 0) return '$0';
-  if (num >= 1000) return `$${(num / 1000).toFixed(1)}k`;
-  return `$${num.toLocaleString()}`;
-};
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -45,13 +42,7 @@ const Dashboard = () => {
     try {
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-      const [
-        clientsRes,
-        invoicesRes,
-        formsRes,
-        activitiesRes,
-        profilesRes,
-      ] = await Promise.all([
+      const [clientsRes, invoicesRes, formsRes, activitiesRes, profilesRes] = await Promise.all([
         supabase.from('clients').select('id, status'),
         supabase
           .from('invoices')
@@ -129,27 +120,17 @@ const Dashboard = () => {
     await fetchAll();
   };
 
-  // Choose what to feature in the hero number
   const heroValue = stats.outstanding > 0 ? stats.outstanding : stats.revenue;
   const heroLabel = stats.outstanding > 0 ? 'outstanding' : 'collected';
   const heroColor = stats.outstanding > 0 ? 'accent.banana' : 'accent.neon';
 
   return (
     <Box position="relative" minH="100%">
-      {/* Ambient top glow */}
-      <Box
-        position="absolute"
-        top={0}
-        left={0}
-        right={0}
-        h="500px"
-        bg="radial-gradient(ellipse at top center, rgba(0,229,229,0.04), transparent 70%)"
-        pointerEvents="none"
-      />
+      <Box {...PAGE_AMBIENT_GLOW_PROPS} />
 
       <VStack spacing={{ base: 8, md: 12 }} align="stretch" position="relative">
 
-        {/* Top strip: team avatars left, refresh top-right */}
+        {/* Top strip - team avatars left, refresh top-right */}
         <HStack justify="space-between" align="center" flexWrap="wrap" spacing={4}>
           <Box flex={1} minW={0}>
             <TeamOnlineStrip />
@@ -187,22 +168,12 @@ const Dashboard = () => {
           </Tooltip>
         </HStack>
 
-        {/* HERO BLOCK - smaller, more refined */}
-        <VStack align="stretch" spacing={6}>
+        {/* HERO BLOCK - kicker + mono number + teal action buttons */}
+        <VStack align="stretch" spacing={5}>
           <HStack justify="space-between" align="flex-end" flexWrap="wrap" gap={4}>
             <VStack align="start" spacing={2} flex={1} minW={0}>
-              <Text
-                fontSize="2xs"
-                fontWeight="700"
-                color="brand.500"
-                textTransform="uppercase"
-                letterSpacing="0.15em"
-                fontFamily="mono"
-              >
-                Dashboard
-              </Text>
+              <Text textStyle="kicker">Dashboard</Text>
 
-              {/* Hero number - JetBrains Mono, sized down to feel like an indicator */}
               <HStack align="baseline" spacing={3} flexWrap="wrap">
                 <Text
                   fontFamily="mono"
@@ -213,7 +184,7 @@ const Dashboard = () => {
                   lineHeight="1"
                   sx={{ fontVariantNumeric: 'tabular-nums' }}
                 >
-                  {currency(heroValue)}
+                  {formatCurrency(heroValue)}
                 </Text>
                 <Text
                   fontSize={{ base: 'xs', md: 'sm' }}
@@ -227,64 +198,44 @@ const Dashboard = () => {
               </HStack>
             </VStack>
 
-            {/* Action buttons - right side on desktop, below on mobile */}
+            {/* Teal-filled action buttons */}
             <HStack
-              spacing={3}
+              spacing={2}
               flexShrink={0}
               alignSelf={{ base: 'flex-start', md: 'flex-end' }}
+              flexWrap="wrap"
+              rowGap={2}
             >
-              <HStack
+              <Box
                 as="button"
-                spacing={1.5}
-                cursor="pointer"
                 onClick={() => navigate('/clients/')}
-                color="surface.300"
-                px={3}
-                py={2}
+                {...PRIMARY_BUTTON_PROPS}
+                bg="surface.900"
+                color="white"
                 border="1px solid"
                 borderColor="surface.800"
-                borderRadius="lg"
-                transition="all 0.15s"
                 _hover={{
-                  color: 'brand.500',
+                  bg: 'surface.850',
                   borderColor: 'brand.500',
-                  bg: 'rgba(0,229,229,0.04)',
+                  transform: 'translateY(-1px)',
                 }}
-                userSelect="none"
               >
                 <Icon as={TbPlus} boxSize={3.5} />
-                <Text fontSize="xs" fontWeight="700" letterSpacing="0.05em" textTransform="uppercase" fontFamily="mono">
-                  Client
-                </Text>
-              </HStack>
-              <HStack
+                <Text>Client</Text>
+              </Box>
+
+              <Box
                 as="button"
-                spacing={1.5}
-                cursor="pointer"
                 onClick={() => navigate('/invoicing/?invoice=new')}
-                color="surface.300"
-                px={3}
-                py={2}
-                border="1px solid"
-                borderColor="surface.800"
-                borderRadius="lg"
-                transition="all 0.15s"
-                _hover={{
-                  color: 'accent.banana',
-                  borderColor: 'accent.banana',
-                  bg: 'rgba(255,229,0,0.04)',
-                }}
-                userSelect="none"
+                {...PRIMARY_BUTTON_PROPS}
               >
                 <Icon as={TbPlus} boxSize={3.5} />
-                <Text fontSize="xs" fontWeight="700" letterSpacing="0.05em" textTransform="uppercase" fontFamily="mono">
-                  Invoice
-                </Text>
-              </HStack>
+                <Text>Invoice</Text>
+              </Box>
             </HStack>
           </HStack>
 
-          {/* Secondary stat strip - smaller, monospace, informational */}
+          {/* Secondary stat strip - quiet, mono */}
           <HStack
             spacing={0}
             color="surface.500"
@@ -322,7 +273,7 @@ const Dashboard = () => {
             {stats.revenue > 0 && stats.outstanding > 0 && (
               <>
                 <Text color="surface.700" mx={1}>·</Text>
-                <Text color="accent.neon" fontWeight="700">{currency(stats.revenue)}</Text>
+                <Text color="accent.neon" fontWeight="700">{formatCurrency(stats.revenue)}</Text>
                 <Text color="surface.600" mx={1.5}>collected</Text>
               </>
             )}
@@ -339,7 +290,6 @@ const Dashboard = () => {
           </HStack>
         </VStack>
 
-        {/* Existing rich sections */}
         <FormInbox />
 
         <ActivityStream
