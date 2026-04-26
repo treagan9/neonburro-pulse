@@ -1,6 +1,10 @@
 // src/pages/Clients/index.jsx
+// Clients page - aligned with Dashboard/Forms layout rhythm.
+// No inner Container; AppShell handles width and gutters.
+// Section spacing matches Dashboard: { base: 8, md: 12 }.
+
 import { useState, useEffect } from 'react';
-import { Box, VStack, Container, useDisclosure } from '@chakra-ui/react';
+import { Box, VStack, useDisclosure } from '@chakra-ui/react';
 import { supabase } from '../../lib/supabase';
 import ClientsHeader from './components/ClientsHeader';
 import ClientFilters from './components/ClientFilters';
@@ -136,38 +140,38 @@ const Clients = () => {
 
   return (
     <Box position="relative" minH="100%">
-      {/* Ambient background - same vibe as Dashboard */}
+      {/* Ambient background - matches Dashboard */}
       <Box
         position="absolute"
         top={0}
         left={0}
         right={0}
-        h="400px"
-        bg="radial-gradient(ellipse at top center, rgba(0,229,229,0.025), transparent 70%)"
+        h="500px"
+        bg="radial-gradient(ellipse at top center, rgba(0,229,229,0.04), transparent 70%)"
         pointerEvents="none"
       />
 
-      <Container maxW="1200px" px={{ base: 4, md: 6 }} py={{ base: 6, md: 10 }} position="relative">
-        <VStack spacing={{ base: 6, md: 8 }} align="stretch">
-          <ClientsHeader counts={counts} stats={stats} onAdd={handleAdd} />
-          <ClientFilters
-            search={search}
-            onSearch={setSearch}
-            filterStatus={filterStatus}
-            onFilterStatus={setFilterStatus}
-            sortBy={sortBy}
-            onSortBy={setSortBy}
-            counts={counts}
-          />
-          <ClientGrid
-            clients={sorted}
-            loading={loading}
-            onEdit={handleEdit}
-            onAdd={handleAdd}
-            isEmpty={clients.length === 0}
-          />
-        </VStack>
-      </Container>
+      <VStack spacing={{ base: 8, md: 12 }} align="stretch" position="relative">
+        <ClientsHeader counts={counts} stats={stats} onAdd={handleAdd} />
+
+        <ClientFilters
+          search={search}
+          onSearch={setSearch}
+          filterStatus={filterStatus}
+          onFilterStatus={setFilterStatus}
+          sortBy={sortBy}
+          onSortBy={setSortBy}
+          counts={counts}
+        />
+
+        <ClientGrid
+          clients={sorted}
+          loading={loading}
+          onEdit={handleEdit}
+          onAdd={handleAdd}
+          isEmpty={clients.length === 0}
+        />
+      </VStack>
 
       <ClientModal
         isOpen={isOpen}
