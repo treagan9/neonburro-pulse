@@ -1,7 +1,7 @@
 // src/pages/Dashboard/index.jsx
-// Dashboard - hero number now uses JetBrains Mono to match every other
-// monetary value in Pulse. Fraunces removed; numbers stay tabulated.
-// FormInbox + ActivityStream as naked sections (already rich, kept as-is).
+// Dashboard - hero number JetBrains Mono, dialed down a notch in size
+// to feel more like a status indicator than a billboard.
+// FormInbox + ActivityStream as naked sections.
 // TeamOnlineStrip pinned top-left, refresh top-right.
 
 import { useState, useEffect } from 'react';
@@ -187,7 +187,7 @@ const Dashboard = () => {
           </Tooltip>
         </HStack>
 
-        {/* HERO BLOCK - JetBrains Mono number, matches the rest of Pulse */}
+        {/* HERO BLOCK - smaller, more refined */}
         <VStack align="stretch" spacing={6}>
           <HStack justify="space-between" align="flex-end" flexWrap="wrap" gap={4}>
             <VStack align="start" spacing={2} flex={1} minW={0}>
@@ -202,11 +202,11 @@ const Dashboard = () => {
                 Dashboard
               </Text>
 
-              {/* Hero number - JetBrains Mono, heavy weight, tabulated */}
-              <HStack align="baseline" spacing={4} flexWrap="wrap">
+              {/* Hero number - JetBrains Mono, sized down to feel like an indicator */}
+              <HStack align="baseline" spacing={3} flexWrap="wrap">
                 <Text
                   fontFamily="mono"
-                  fontSize={{ base: '5xl', md: '6xl', lg: '7xl' }}
+                  fontSize={{ base: '3xl', md: '4xl', lg: '5xl' }}
                   fontWeight="800"
                   color={heroColor}
                   letterSpacing="-0.02em"
@@ -216,11 +216,11 @@ const Dashboard = () => {
                   {currency(heroValue)}
                 </Text>
                 <Text
-                  fontSize={{ base: 'sm', md: 'md' }}
+                  fontSize={{ base: 'xs', md: 'sm' }}
                   color="surface.400"
                   fontFamily="mono"
                   fontWeight="500"
-                  pb={{ base: 1, md: 2 }}
+                  pb={1}
                 >
                   {heroLabel}
                 </Text>
@@ -339,7 +339,7 @@ const Dashboard = () => {
           </HStack>
         </VStack>
 
-        {/* Existing rich sections - these are already good */}
+        {/* Existing rich sections */}
         <FormInbox />
 
         <ActivityStream
