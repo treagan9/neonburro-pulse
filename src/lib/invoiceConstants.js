@@ -1,21 +1,16 @@
 // src/lib/invoiceConstants.js
 // Shared constants for the invoicing surface.
-// Imported by Invoicing/index.jsx, InvoiceEditor.jsx, InvoiceList.jsx, SprintEditRow.jsx.
 
-// Statuses that mean "the client has it but hasn't paid yet"
 export const SENT_STATUSES = ['sent', 'viewed', 'partial', 'overdue'];
 
-// Statuses that include paid (used by InvoiceList for the eye-icon visibility check)
 export const SENT_LIKE_STATUSES = ['sent', 'viewed', 'partial', 'overdue', 'paid'];
 
-// Funding modes a sprint can be assigned. Drives the pill UI on each sprint.
 export const FUNDING_MODES = [
   { value: 'approve_only', label: 'Confirm Scope', color: '#737373' },
   { value: 'deposit_50',   label: '50% to Start',  color: '#FFE500' },
   { value: 'pay_full',     label: 'Fund in Full',  color: '#39FF14' },
 ];
 
-// Status pill colors used in InvoiceList rows
 export const STATUS_COLORS = {
   draft:     { color: '#737373', label: 'DRAFT' },
   sent:      { color: '#00E5E5', label: 'SENT' },
@@ -26,8 +21,15 @@ export const STATUS_COLORS = {
   cancelled: { color: '#525252', label: 'CANCELLED' },
 };
 
-// Shared tooltip props - dark surface, white text, soft border, generous padding.
-// Use anywhere on the invoicing surface to keep tooltips readable.
+// Phase 6.4b - off-platform payment methods for "Mark Paid" modal
+export const PAYMENT_METHODS = [
+  { value: 'check', label: 'Check', referenceLabel: 'Check number' },
+  { value: 'wire',  label: 'Wire transfer', referenceLabel: 'Wire confirmation #' },
+  { value: 'ach',   label: 'ACH', referenceLabel: 'ACH reference' },
+  { value: 'cash',  label: 'Cash', referenceLabel: 'Receipt #' },
+  { value: 'other', label: 'Other', referenceLabel: 'Reference' },
+];
+
 export const TOOLTIP_PROPS = {
   placement: 'top',
   hasArrow: true,
@@ -42,7 +44,6 @@ export const TOOLTIP_PROPS = {
   borderColor: 'surface.700',
 };
 
-// Label style used for field captions inside the editor (CLIENT, PROJECT, SPRINTS, etc.)
 export const FIELD_LABEL = {
   fontSize: '2xs',
   fontWeight: '700',
@@ -54,8 +55,6 @@ export const FIELD_LABEL = {
   display: 'block',
 };
 
-// "Naked" input style used for fields inside the editor and modals.
-// Single-line input with bottom border only.
 export const NAKED_INPUT = {
   bg: 'transparent',
   border: 'none',
@@ -70,7 +69,6 @@ export const NAKED_INPUT = {
   _placeholder: { color: 'surface.700' },
 };
 
-// Currency formatter used everywhere on the invoicing surface
 export const formatCurrency = (val) => {
   const num = parseFloat(val || 0);
   if (num === 0) return '$0';
@@ -80,7 +78,6 @@ export const formatCurrency = (val) => {
   })}`;
 };
 
-// Compact currency for list rows (1.5k, 2.3k, etc.)
 export const formatCurrencyCompact = (val) => {
   const num = parseFloat(val || 0);
   if (num === 0) return '$0';

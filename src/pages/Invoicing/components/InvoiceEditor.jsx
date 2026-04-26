@@ -1,16 +1,18 @@
 // src/pages/Invoicing/components/InvoiceEditor.jsx
 // Invoice compose + preview surface.
-// Phase 6.4a refactor: SprintEditRow, CancelInvoiceModal, constants, validation
-// extracted into their own files. This file is now the orchestrator only.
+// Phase 6.4b additions: Mark Paid (off-platform), Duplicate invoice.
+// Bonus fix: due_date now stripped to YYYY-MM-DD before setting state
+// so <input type="date"> doesn't emit the format warning.
 
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box, VStack, HStack, Text, Icon, Spinner, Center, Button,
   Input, Textarea, Select, Container, Divider, Tooltip, useToast,
 } from '@chakra-ui/react';
 import {
   TbArrowLeft, TbPlus, TbTrash, TbEdit, TbEye, TbSend, TbBolt,
-  TbAlertTriangle, TbRotateClockwise, TbBellRinging,
+  TbAlertTriangle, TbRotateClockwise, TbBellRinging, TbCash, TbCopy,
 } from 'react-icons/tb';
 import { supabase } from '../../../lib/supabase';
 import {
@@ -29,13 +31,26 @@ import { validateSprintsForSend } from '../../../lib/invoiceValidation';
 
 import SprintEditRow from './SprintEditRow';
 import CancelInvoiceModal from './CancelInvoiceModal';
+import MarkPaidModal from './MarkPaidModal';
 import InvoicePreview from './InvoicePreview';
 import InvoiceSnapshotModal from './InvoiceSnapshotModal';
 import SendHistoryStrip from './SendHistoryStrip';
 import ReminderModal from './ReminderModal';
 
+// Strip timestamp to YYYY-MM-DD for <input type="date"> compatibility
+const dateInputValue = (val) => {
+  if (!val) return '';
+  if (val.length === 10 && val.match(/^\d{4}-\d{2}-\d{2}$/)) return val;
+  try {
+    return new Date(val).toISOString().split('T')[0];
+  } catch {
+    return '';
+  }
+};
+
 const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose, onSaved }) => {
   const toast = useToast();
+  const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState('compose');
   const [loading, setLoading] = useState(true);
@@ -55,11 +70,15 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
   const [cancelling, setCancelling] = useState(false);
   const [showSnapshot, setShowSnapshot] = useState(false);
 
-  // Phase 6.4a state
   const [resending, setResending] = useState(false);
   const [showReminderModal, setShowReminderModal] = useState(false);
   const [sendingReminder, setSendingReminder] = useState(false);
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
+
+  // Phase 6.4b state
+  const [showMarkPaidModal, setShowMarkPaidModal] = useState(false);
+  const [markingPaid, setMarkingPaid] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
 
   const isNew = !invoiceId;
   const client = clients.find((c) => c.id === clientId);
@@ -68,6 +87,8 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
   const isDraft = invoice?.status === 'draft' || isNew;
   const wasSent = !isNew && invoice?.status && invoice.status !== 'draft';
   const canResendOrRemind = isSentish && !invoice?.cancelled_at;
+  const canMarkPaid = isSentish && !invoice?.cancelled_at;
+  const canDuplicate = !isNew && !invoice?.cancelled_at;
 
   useEffect(() => { loadData(); }, [invoiceId]);
   useEffect(() => {
@@ -100,7 +121,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
       setClientId(data.client_id || '');
       setProjectId(data.project_id || '');
       setNotes(data.notes || '');
-      setDueDate(data.due_date || '');
+      setDueDate(dateInputValue(data.due_date));
       setSprints(
         (data.invoice_items || [])
           .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
@@ -305,11 +326,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
       const res = await fetch('/.netlify/functions/resend-invoice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          invoiceId,
-          action: 'resend',
-          userId: user?.id,
-        }),
+        body: JSON.stringify({ invoiceId, action: 'resend', userId: user?.id }),
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || 'Resend failed');
@@ -338,11 +355,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          invoiceId,
-          action: 'reminder',
-          subject,
-          body,
-          userId: user?.id,
+          invoiceId, action: 'reminder', subject, body, userId: user?.id,
         }),
       });
       const result = await res.json();
@@ -361,6 +374,174 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
       toast({ title: 'Reminder failed', description: err.message, status: 'error', duration: 4000 });
     } finally {
       setSendingReminder(false);
+    }
+  };
+
+  // ============================================================
+  // PHASE 6.4b - MARK PAID OFF-PLATFORM
+  // ============================================================
+  const handleMarkPaid = async ({ method, reference, amount, notes: payNotes, paid_date }) => {
+    if (!invoiceId) return;
+    setMarkingPaid(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const now = new Date().toISOString();
+
+      const newTotalPaid = parseFloat(invoice.total_paid || 0) + amount;
+      const fullyPaid = newTotalPaid >= parseFloat(invoice.total || 0);
+
+      const { error } = await supabase
+        .from('invoices')
+        .update({
+          status: fullyPaid ? 'paid' : 'partial',
+          total_paid: newTotalPaid,
+          paid_at: fullyPaid ? `${paid_date}T12:00:00Z` : null,
+          payment_method: method,
+          payment_reference: reference,
+          pay_token: fullyPaid ? null : invoice.pay_token, // kill pay link if fully paid
+          updated_at: now,
+        })
+        .eq('id', invoiceId);
+
+      if (error) throw error;
+
+      await supabase.from('activity_log').insert({
+        user_id: user?.id,
+        action: fullyPaid ? 'invoice_paid' : 'invoice_partial_payment',
+        entity_type: 'invoice',
+        entity_id: invoiceId,
+        metadata: {
+          invoice_number: invoice?.invoice_number,
+          client_name: client?.name,
+          method,
+          reference,
+          amount,
+          notes: payNotes,
+          paid_date,
+          off_platform: true,
+        },
+        created_at: now,
+      });
+
+      // Snapshot to invoice_history for the timeline
+      await supabase.from('invoice_history').insert({
+        invoice_id: invoiceId,
+        sent_at: now,
+        sent_by: user?.id,
+        send_type: 'initial', // payment events use 'initial' bucket since no email sent
+        amount,
+        method,
+        notes: `Off-platform payment: ${method}${reference ? ` (${reference})` : ''}${payNotes ? ` — ${payNotes}` : ''}`,
+      });
+
+      toast({
+        title: fullyPaid ? 'Invoice marked paid' : 'Partial payment recorded',
+        description: fullyPaid
+          ? `${formatCurrency(amount)} via ${method} — fully paid`
+          : `${formatCurrency(amount)} via ${method} — ${formatCurrency(parseFloat(invoice.total) - newTotalPaid)} still due`,
+        status: 'success',
+        duration: 4000,
+      });
+
+      setShowMarkPaidModal(false);
+      onSaved();
+      loadData();
+    } catch (err) {
+      toast({
+        title: 'Mark paid failed',
+        description: err.message,
+        status: 'error',
+        duration: 4000,
+      });
+    } finally {
+      setMarkingPaid(false);
+    }
+  };
+
+  // ============================================================
+  // PHASE 6.4b - DUPLICATE INVOICE
+  // ============================================================
+  const handleDuplicate = async () => {
+    if (!invoiceId || duplicating) return;
+    setDuplicating(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // Create the new draft with a fresh invoice number
+      const newInvoice = await withInvoiceNumberRetry(async (newNumber) => {
+        const { data, error } = await supabase
+          .from('invoices')
+          .insert({
+            client_id: invoice.client_id,
+            project_id: invoice.project_id || null,
+            status: 'draft',
+            invoice_number: newNumber,
+            total: invoice.total,
+            total_paid: 0,
+            notes: invoice.notes || null,
+            due_date: null, // user picks fresh due date
+            created_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+        if (error) throw error;
+        return data;
+      });
+
+      // Copy sprints with fresh sprint_numbers
+      const sprintsToClone = (invoice.invoice_items || sprints).filter((s) => !String(s.id).startsWith('new-'));
+
+      for (let i = 0; i < sprintsToClone.length; i++) {
+        const original = sprintsToClone[i];
+        const childNumber = await fetchNextSprintNumber(newInvoice.id);
+
+        await supabase.from('invoice_items').insert({
+          invoice_id: newInvoice.id,
+          sprint_number: childNumber,
+          title: original.title || 'Untitled Sprint',
+          description: original.description || null,
+          amount: parseFloat(original.amount || 0),
+          payment_mode: original.payment_mode || 'approve_only',
+          is_billable: original.is_billable !== false,
+          sort_order: original.sort_order || i,
+          created_at: new Date().toISOString(),
+        });
+      }
+
+      await supabase.from('activity_log').insert({
+        user_id: user?.id,
+        action: 'invoice_duplicated',
+        entity_type: 'invoice',
+        entity_id: newInvoice.id,
+        metadata: {
+          source_invoice_id: invoiceId,
+          source_invoice_number: invoice.invoice_number,
+          new_invoice_number: newInvoice.invoice_number,
+          sprint_count: sprintsToClone.length,
+          client_name: client?.name,
+        },
+        created_at: new Date().toISOString(),
+      });
+
+      toast({
+        title: 'Invoice duplicated',
+        description: `${newInvoice.invoice_number} created as draft from ${invoice.invoice_number}`,
+        status: 'success',
+        duration: 3000,
+      });
+
+      onSaved();
+      // Navigate to the new draft
+      navigate(`/invoicing/?invoice=${newInvoice.id}`);
+    } catch (err) {
+      toast({
+        title: 'Duplicate failed',
+        description: err.message,
+        status: 'error',
+        duration: 4000,
+      });
+    } finally {
+      setDuplicating(false);
     }
   };
 
@@ -521,6 +702,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                       fontWeight="700"
                       color={
                         invoice.status === 'paid' ? 'accent.neon' :
+                        invoice.status === 'overdue' ? 'red.400' :
                         invoice.status === 'draft' ? 'surface.500' :
                         'brand.500'
                       }
@@ -557,7 +739,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
               </Text>
             </VStack>
 
-            <HStack spacing={2}>
+            <HStack spacing={2} flexWrap="wrap" rowGap={2}>
               {!isPaid && (
                 <Button
                   size="sm"
@@ -625,6 +807,43 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                     </Button>
                   </Tooltip>
                 </>
+              )}
+
+              {canMarkPaid && (
+                <Tooltip label="Record an off-platform payment" {...TOOLTIP_PROPS}>
+                  <Button
+                    size="sm"
+                    bg="accent.neon"
+                    color="surface.950"
+                    fontWeight="700"
+                    borderRadius="lg"
+                    leftIcon={<TbCash size={14} />}
+                    onClick={() => setShowMarkPaidModal(true)}
+                    _hover={{ bg: '#2DD30F', transform: 'translateY(-1px)' }}
+                  >
+                    Mark Paid
+                  </Button>
+                </Tooltip>
+              )}
+
+              {canDuplicate && (
+                <Tooltip label="Create a fresh draft with the same sprints" {...TOOLTIP_PROPS}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    borderColor="surface.800"
+                    color="surface.400"
+                    fontWeight="700"
+                    borderRadius="lg"
+                    leftIcon={<TbCopy size={14} />}
+                    onClick={handleDuplicate}
+                    isLoading={duplicating}
+                    loadingText="Duplicating"
+                    _hover={{ borderColor: 'surface.700', color: 'white' }}
+                  >
+                    Duplicate
+                  </Button>
+                </Tooltip>
               )}
             </HStack>
           </HStack>
@@ -902,6 +1121,14 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
         client={client}
         onSend={handleSendReminder}
         sending={sendingReminder}
+      />
+
+      <MarkPaidModal
+        isOpen={showMarkPaidModal}
+        onClose={() => setShowMarkPaidModal(false)}
+        invoice={invoice}
+        onConfirm={handleMarkPaid}
+        processing={markingPaid}
       />
 
       <InvoiceSnapshotModal

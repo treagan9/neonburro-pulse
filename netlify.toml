@@ -1,11 +1,25 @@
+# netlify.toml
+# Build config + scheduled functions for Pulse
+
 [build]
   command = "yarn build"
   publish = "dist"
-  functions = "netlify/functions"
 
 [build.environment]
   NODE_VERSION = "20"
 
+# Scheduled functions
+# keep-alive runs every 5 minutes to prevent Supabase cold starts on free tier
+# flip-overdue-invoices runs daily at 6am UTC (midnight Mountain Time)
+[[scheduled_functions]]
+  function = "keep-alive"
+  cron = "*/5 * * * *"
+
+[[scheduled_functions]]
+  function = "flip-overdue-invoices"
+  cron = "0 6 * * *"
+
+# SPA rewrite - all routes serve index.html
 [[redirects]]
   from = "/*"
   to = "/index.html"
