@@ -1,18 +1,16 @@
 // src/pages/Invoicing/components/InvoiceEditor.jsx
 // Invoice compose + preview surface.
-// Phase 6.4a additions: SendHistoryStrip, Resend button, Reminder modal.
-// Polish: readable tooltips with stronger contrast and clearer copy.
+// Phase 6.4a refactor: SprintEditRow, CancelInvoiceModal, constants, validation
+// extracted into their own files. This file is now the orchestrator only.
 
 import { useState, useEffect } from 'react';
 import {
   Box, VStack, HStack, Text, Icon, Spinner, Center, Button,
-  Input, Textarea, Select, Container, Divider, Tooltip,
-  Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody,
-  ModalFooter, ModalCloseButton, useToast,
+  Input, Textarea, Select, Container, Divider, Tooltip, useToast,
 } from '@chakra-ui/react';
 import {
   TbArrowLeft, TbPlus, TbTrash, TbEdit, TbEye, TbSend, TbBolt,
-  TbCheck, TbAlertTriangle, TbRotateClockwise, TbBellRinging,
+  TbAlertTriangle, TbRotateClockwise, TbBellRinging,
 } from 'react-icons/tb';
 import { supabase } from '../../../lib/supabase';
 import {
@@ -20,377 +18,22 @@ import {
   fetchNextSprintNumber,
   withInvoiceNumberRetry,
 } from '../../../lib/numbering';
+import {
+  SENT_STATUSES,
+  TOOLTIP_PROPS,
+  FIELD_LABEL,
+  NAKED_INPUT,
+  formatCurrency,
+} from '../../../lib/invoiceConstants';
+import { validateSprintsForSend } from '../../../lib/invoiceValidation';
+
+import SprintEditRow from './SprintEditRow';
+import CancelInvoiceModal from './CancelInvoiceModal';
 import InvoicePreview from './InvoicePreview';
 import InvoiceSnapshotModal from './InvoiceSnapshotModal';
 import SendHistoryStrip from './SendHistoryStrip';
 import ReminderModal from './ReminderModal';
 
-// ============================================================
-// HELPERS
-// ============================================================
-
-const SENT_STATUSES = ['sent', 'viewed', 'partial', 'overdue'];
-
-const FUNDING_MODES = [
-  { value: 'approve_only', label: 'Confirm Scope', color: '#737373' },
-  { value: 'deposit_50',   label: '50% to Start',  color: '#FFE500' },
-  { value: 'pay_full',     label: 'Fund in Full',  color: '#39FF14' },
-];
-
-// Shared tooltip props: dark surface, white text, soft border, generous padding.
-// Used for the Resend / Remind / Snapshot tooltips so they read clearly.
-const TOOLTIP_PROPS = {
-  placement: 'top',
-  hasArrow: true,
-  bg: 'surface.900',
-  color: 'white',
-  fontSize: 'xs',
-  fontWeight: '600',
-  px: 3,
-  py: 2,
-  borderRadius: 'md',
-  border: '1px solid',
-  borderColor: 'surface.700',
-};
-
-const currency = (val) => {
-  const num = parseFloat(val || 0);
-  if (num === 0) return '$0';
-  return `$${num.toLocaleString('en-US', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  })}`;
-};
-
-const FIELD_LABEL = {
-  fontSize: '2xs',
-  fontWeight: '700',
-  color: 'surface.600',
-  textTransform: 'uppercase',
-  letterSpacing: '0.1em',
-  fontFamily: 'mono',
-  mb: 2,
-  display: 'block',
-};
-
-const nakedInput = {
-  bg: 'transparent',
-  border: 'none',
-  borderBottom: '1px solid',
-  borderColor: 'surface.800',
-  borderRadius: 0,
-  color: 'white',
-  fontSize: 'sm',
-  h: '40px',
-  px: 0,
-  _focus: { borderColor: 'brand.500', boxShadow: 'none' },
-  _placeholder: { color: 'surface.700' },
-};
-
-const validateSprintsForSend = (sprints) => {
-  const billable = sprints.filter((s) => s.is_billable !== false);
-  if (billable.length === 0) {
-    return { valid: false, reason: 'At least one billable sprint is required' };
-  }
-  const untitled = billable.find((s) => !s.title || !s.title.trim());
-  if (untitled) {
-    return { valid: false, reason: 'Every billable sprint needs a title' };
-  }
-  const zeroAmount = billable.find((s) => !parseFloat(s.amount) || parseFloat(s.amount) <= 0);
-  if (zeroAmount) {
-    return { valid: false, reason: 'Sprint amounts must be greater than zero' };
-  }
-  return { valid: true };
-};
-
-// ============================================================
-// SPRINT EDIT ROW
-// ============================================================
-const SprintEditRow = ({ sprint, onUpdate, onDelete }) => {
-  const [expanded, setExpanded] = useState(false);
-  const isLocked = sprint.locked || sprint.payment_status === 'paid';
-  const isWip = sprint.is_billable === false;
-
-  return (
-    <Box py={3} borderBottom="1px solid" borderColor="surface.900" role="group">
-      <HStack align="start" spacing={3}>
-        <Box
-          w="16px"
-          h="16px"
-          borderRadius="sm"
-          border="1.5px solid"
-          borderColor={isWip ? 'surface.700' : 'brand.500'}
-          bg={isWip ? 'transparent' : 'brand.500'}
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
-          onClick={() => !isLocked && onUpdate({ ...sprint, is_billable: isWip })}
-          mt={1}
-          cursor={isLocked ? 'not-allowed' : 'pointer'}
-          flexShrink={0}
-          transition="all 0.15s"
-        >
-          {!isWip && <Icon as={TbCheck} boxSize={2.5} color="surface.950" strokeWidth={3} />}
-        </Box>
-
-        <Box flex={1}>
-          <HStack spacing={3} align="center" mb={1}>
-            <Input
-              value={sprint.title || ''}
-              onChange={(e) => onUpdate({ ...sprint, title: e.target.value })}
-              placeholder="Sprint title..."
-              bg="transparent"
-              border="none"
-              color="white"
-              fontSize="sm"
-              fontWeight="700"
-              h="28px"
-              px={0}
-              flex={1}
-              isReadOnly={isLocked}
-              _focus={{ boxShadow: 'none' }}
-              _placeholder={{ color: 'surface.600', fontWeight: '500' }}
-            />
-            <Input
-              value={sprint.amount || ''}
-              onChange={(e) => onUpdate({ ...sprint, amount: e.target.value })}
-              placeholder="0"
-              type="number"
-              step="0.01"
-              bg="transparent"
-              border="none"
-              color="white"
-              fontSize="sm"
-              fontFamily="mono"
-              fontWeight="700"
-              h="28px"
-              px={0}
-              textAlign="right"
-              w="80px"
-              isReadOnly={isLocked}
-              _focus={{ boxShadow: 'none' }}
-              _placeholder={{ color: 'surface.600' }}
-            />
-            <Text color="surface.600" fontSize="xs" fontFamily="mono">USD</Text>
-          </HStack>
-
-          <HStack spacing={3} mt={1}>
-            <Text color="surface.600" fontSize="2xs" fontFamily="mono" fontWeight="700">
-              {sprint.sprint_number || '— not assigned yet —'}
-            </Text>
-
-            <HStack spacing={1.5}>
-              {FUNDING_MODES.map((mode) => {
-                const active = (sprint.payment_mode || 'approve_only') === mode.value;
-                return (
-                  <Box
-                    key={mode.value}
-                    as="button"
-                    onClick={() => !isLocked && onUpdate({ ...sprint, payment_mode: mode.value })}
-                    px={2}
-                    py={0.5}
-                    borderRadius="full"
-                    border="1px solid"
-                    borderColor={active ? mode.color : 'surface.800'}
-                    bg={active ? `${mode.color}12` : 'transparent'}
-                    transition="all 0.15s"
-                    cursor={isLocked ? 'not-allowed' : 'pointer'}
-                  >
-                    <Text
-                      fontSize="2xs"
-                      fontWeight="700"
-                      color={active ? mode.color : 'surface.600'}
-                      textTransform="uppercase"
-                    >
-                      {mode.label}
-                    </Text>
-                  </Box>
-                );
-              })}
-            </HStack>
-
-            {isLocked && (
-              <Text color="accent.neon" fontSize="2xs" fontFamily="mono" fontWeight="700">
-                🔒 PAID
-              </Text>
-            )}
-            {isWip && (
-              <Text color="surface.600" fontSize="2xs" fontFamily="mono" fontWeight="700">
-                WIP
-              </Text>
-            )}
-
-            <Box flex={1} />
-
-            <Box
-              as="button"
-              onClick={() => setExpanded(!expanded)}
-              color="surface.600"
-              _hover={{ color: 'surface.400' }}
-              fontSize="2xs"
-              fontFamily="mono"
-              fontWeight="700"
-              textTransform="uppercase"
-            >
-              {expanded ? 'Less' : 'Details'}
-            </Box>
-
-            {!isLocked && (
-              <Box as="button" onClick={onDelete} color="surface.700" _hover={{ color: 'red.400' }}>
-                <Icon as={TbTrash} boxSize={3.5} />
-              </Box>
-            )}
-          </HStack>
-
-          {expanded && (
-            <Textarea
-              value={sprint.description || ''}
-              onChange={(e) => onUpdate({ ...sprint, description: e.target.value })}
-              placeholder="What's happening in this sprint..."
-              mt={3}
-              bg="transparent"
-              border="1px solid"
-              borderColor="surface.800"
-              borderRadius="lg"
-              color="surface.300"
-              fontSize="xs"
-              rows={2}
-              isReadOnly={isLocked}
-              _focus={{ borderColor: 'brand.500', boxShadow: 'none' }}
-              _placeholder={{ color: 'surface.700' }}
-            />
-          )}
-        </Box>
-      </HStack>
-    </Box>
-  );
-};
-
-// ============================================================
-// CANCEL MODAL
-// ============================================================
-const CancelInvoiceModal = ({ isOpen, onClose, invoice, onConfirm, processing }) => {
-  const [typedConfirm, setTypedConfirm] = useState('');
-  const [reason, setReason] = useState('');
-
-  useEffect(() => {
-    if (!isOpen) {
-      setTypedConfirm('');
-      setReason('');
-    }
-  }, [isOpen]);
-
-  const canConfirm = typedConfirm === 'CANCEL';
-
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} isCentered size="md">
-      <ModalOverlay bg="blackAlpha.900" backdropFilter="blur(8px)" />
-      <ModalContent bg="surface.950" border="1px solid" borderColor="red.900" borderRadius="2xl" mx={4}>
-        <ModalHeader pb={2} pt={6} px={6}>
-          <HStack spacing={3}>
-            <Box
-              w="40px"
-              h="40px"
-              borderRadius="full"
-              bg="rgba(255,51,102,0.1)"
-              border="1px solid rgba(255,51,102,0.3)"
-              display="flex"
-              alignItems="center"
-              justifyContent="center"
-            >
-              <Icon as={TbAlertTriangle} boxSize={4} color="red.400" />
-            </Box>
-            <VStack align="start" spacing={0}>
-              <Text color="white" fontSize="md" fontWeight="800">Cancel Invoice</Text>
-              <Text color="surface.500" fontSize="2xs" fontFamily="mono">
-                {invoice?.invoice_number}
-              </Text>
-            </VStack>
-          </HStack>
-        </ModalHeader>
-        <ModalCloseButton color="surface.500" top={5} right={5} />
-
-        <ModalBody px={6} py={5}>
-          <VStack spacing={5} align="stretch">
-            <Text color="surface.300" fontSize="sm" lineHeight="1.6">
-              This will mark the invoice as cancelled and invalidate the payment link in the client's email. The sprint history and snapshot will be preserved.
-            </Text>
-
-            <Box bg="rgba(255,229,0,0.04)" border="1px solid rgba(255,229,0,0.15)" borderRadius="lg" p={3}>
-              <Text color="accent.banana" fontSize="2xs" fontWeight="700" textTransform="uppercase" letterSpacing="0.08em" mb={1}>
-                What happens
-              </Text>
-              <VStack align="start" spacing={1} fontSize="xs" color="surface.400">
-                <Text>· Invoice hidden from all lists</Text>
-                <Text>· Magic pay link in email is killed</Text>
-                <Text>· Snapshot preserved for records</Text>
-                <Text>· Activity log entry created</Text>
-              </VStack>
-            </Box>
-
-            <Box>
-              <Text {...FIELD_LABEL}>Reason (optional)</Text>
-              <Input
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="Why are you cancelling?"
-                {...nakedInput}
-              />
-            </Box>
-
-            <Box>
-              <Text {...FIELD_LABEL}>Type CANCEL to confirm</Text>
-              <Input
-                value={typedConfirm}
-                onChange={(e) => setTypedConfirm(e.target.value.toUpperCase())}
-                placeholder="CANCEL"
-                {...nakedInput}
-                fontFamily="mono"
-                letterSpacing="0.1em"
-              />
-            </Box>
-          </VStack>
-        </ModalBody>
-
-        <ModalFooter borderTop="1px solid" borderColor="surface.900" pt={4} pb={6} px={6}>
-          <HStack spacing={2} w="100%">
-            <Button
-              flex={1}
-              size="md"
-              variant="outline"
-              borderColor="surface.800"
-              color="surface.400"
-              borderRadius="lg"
-              onClick={onClose}
-              _hover={{ borderColor: 'surface.700', color: 'white' }}
-            >
-              Keep Invoice
-            </Button>
-            <Button
-              flex={1}
-              size="md"
-              bg={canConfirm ? 'red.500' : 'surface.850'}
-              color={canConfirm ? 'white' : 'surface.700'}
-              fontWeight="700"
-              borderRadius="lg"
-              onClick={() => onConfirm(reason)}
-              isDisabled={!canConfirm}
-              isLoading={processing}
-              loadingText="Cancelling"
-              _hover={canConfirm ? { bg: 'red.600' } : {}}
-            >
-              Cancel Invoice
-            </Button>
-          </HStack>
-        </ModalFooter>
-      </ModalContent>
-    </Modal>
-  );
-};
-
-// ============================================================
-// MAIN COMPONENT
-// ============================================================
 const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose, onSaved }) => {
   const toast = useToast();
 
@@ -654,9 +297,6 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
     }
   };
 
-  // ============================================================
-  // RESEND - same email, fresh delivery
-  // ============================================================
   const handleResend = async () => {
     if (!invoiceId) return;
     setResending(true);
@@ -689,9 +329,6 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
     }
   };
 
-  // ============================================================
-  // REMINDER - editorial nudge with custom subject + body
-  // ============================================================
   const handleSendReminder = async ({ subject, body }) => {
     if (!invoiceId) return;
     setSendingReminder(true);
@@ -916,7 +553,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                 )}
               </HStack>
               <Text color="surface.500" fontSize="sm">
-                {billableCount} sprint{billableCount !== 1 ? 's' : ''} · {currency(billableTotal)}
+                {billableCount} sprint{billableCount !== 1 ? 's' : ''} · {formatCurrency(billableTotal)}
               </Text>
             </VStack>
 
@@ -953,7 +590,6 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                 </Button>
               )}
 
-              {/* Resend + Reminder - only after invoice has been sent */}
               {canResendOrRemind && (
                 <>
                   <Tooltip label="Send the same email again" {...TOOLTIP_PROPS}>
@@ -993,7 +629,6 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
             </HStack>
           </HStack>
 
-          {/* SEND HISTORY STRIP */}
           {!isNew && (
             <SendHistoryStrip
               invoiceId={invoiceId}
@@ -1055,7 +690,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                   value={clientId}
                   onChange={(e) => setClientId(e.target.value)}
                   placeholder="Select client..."
-                  {...nakedInput}
+                  {...NAKED_INPUT}
                   fontFamily="body"
                   cursor="pointer"
                   isDisabled={isPaid}
@@ -1075,7 +710,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                     value={projectId}
                     onChange={(e) => setProjectId(e.target.value)}
                     placeholder="No project"
-                    {...nakedInput}
+                    {...NAKED_INPUT}
                     fontFamily="body"
                     cursor="pointer"
                     isDisabled={isPaid}
@@ -1146,7 +781,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                       Billable Total
                     </Text>
                     <Text fontSize="2xl" color="white" fontFamily="mono" fontWeight="800">
-                      {currency(billableTotal)}
+                      {formatCurrency(billableTotal)}
                     </Text>
                   </VStack>
                 </HStack>
@@ -1181,7 +816,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
                   isDisabled={isPaid}
-                  {...nakedInput}
+                  {...NAKED_INPUT}
                 />
               </Box>
             </HStack>
