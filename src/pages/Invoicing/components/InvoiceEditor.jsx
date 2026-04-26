@@ -1,7 +1,7 @@
 // src/pages/Invoicing/components/InvoiceEditor.jsx
 // Invoice compose + preview surface.
 // Phase 6.4a additions: SendHistoryStrip, Resend button, Reminder modal.
-// Handles draft creation, editing, sending, resending, reminders, cancelling, hard-deleting.
+// Polish: readable tooltips with stronger contrast and clearer copy.
 
 import { useState, useEffect } from 'react';
 import {
@@ -36,6 +36,22 @@ const FUNDING_MODES = [
   { value: 'deposit_50',   label: '50% to Start',  color: '#FFE500' },
   { value: 'pay_full',     label: 'Fund in Full',  color: '#39FF14' },
 ];
+
+// Shared tooltip props: dark surface, white text, soft border, generous padding.
+// Used for the Resend / Remind / Snapshot tooltips so they read clearly.
+const TOOLTIP_PROPS = {
+  placement: 'top',
+  hasArrow: true,
+  bg: 'surface.900',
+  color: 'white',
+  fontSize: 'xs',
+  fontWeight: '600',
+  px: 3,
+  py: 2,
+  borderRadius: 'md',
+  border: '1px solid',
+  borderColor: 'surface.700',
+};
 
 const currency = (val) => {
   const num = parseFloat(val || 0);
@@ -396,7 +412,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
   const [cancelling, setCancelling] = useState(false);
   const [showSnapshot, setShowSnapshot] = useState(false);
 
-  // Phase 6.4a additions
+  // Phase 6.4a state
   const [resending, setResending] = useState(false);
   const [showReminderModal, setShowReminderModal] = useState(false);
   const [sendingReminder, setSendingReminder] = useState(false);
@@ -639,7 +655,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
   };
 
   // ============================================================
-  // RESEND — same email, fresh delivery
+  // RESEND - same email, fresh delivery
   // ============================================================
   const handleResend = async () => {
     if (!invoiceId) return;
@@ -674,7 +690,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
   };
 
   // ============================================================
-  // REMINDER — editorial nudge with custom subject + body
+  // REMINDER - editorial nudge with custom subject + body
   // ============================================================
   const handleSendReminder = async ({ subject, body }) => {
     if (!invoiceId) return;
@@ -697,7 +713,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
 
       toast({
         title: 'Reminder sent',
-        description: `Editorial nudge delivered to ${result.recipient}`,
+        description: `Friendly nudge delivered to ${result.recipient}`,
         status: 'success',
         duration: 3000,
       });
@@ -878,7 +894,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                       {invoice.status}
                     </Text>
                     {wasSent && (
-                      <Tooltip label="View sent email" placement="top" hasArrow bg="surface.800" fontSize="xs">
+                      <Tooltip label="View the email we sent" {...TOOLTIP_PROPS}>
                         <Box
                           as="button"
                           onClick={() => setShowSnapshot(true)}
@@ -937,16 +953,10 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                 </Button>
               )}
 
-              {/* Resend + Reminder — only after invoice has been sent */}
+              {/* Resend + Reminder - only after invoice has been sent */}
               {canResendOrRemind && (
                 <>
-                  <Tooltip
-                    label="Re-deliver the same email (lost / spam)"
-                    placement="top"
-                    hasArrow
-                    bg="surface.800"
-                    fontSize="xs"
-                  >
+                  <Tooltip label="Send the same email again" {...TOOLTIP_PROPS}>
                     <Button
                       size="sm"
                       variant="outline"
@@ -963,13 +973,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                       Resend
                     </Button>
                   </Tooltip>
-                  <Tooltip
-                    label="Send an editorial reminder"
-                    placement="top"
-                    hasArrow
-                    bg="surface.800"
-                    fontSize="xs"
-                  >
+                  <Tooltip label="Send a friendly nudge" {...TOOLTIP_PROPS}>
                     <Button
                       size="sm"
                       variant="outline"
@@ -989,7 +993,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
             </HStack>
           </HStack>
 
-          {/* SEND HISTORY STRIP — visible whenever there's send history */}
+          {/* SEND HISTORY STRIP */}
           {!isNew && (
             <SendHistoryStrip
               invoiceId={invoiceId}
