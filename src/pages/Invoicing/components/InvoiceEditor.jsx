@@ -1,8 +1,7 @@
 // src/pages/Invoicing/components/InvoiceEditor.jsx
 // Invoice compose + preview surface.
-// Handles draft creation, editing, sending, cancelling, hard-deleting.
-// Invoice numbers: NB{YY}{MM}{NN} generated at load-time, monthly reset.
-// Sprint numbers: {invoice}-{NN} assigned at save-time per sprint.
+// Phase 6.4a additions: SendHistoryStrip, Resend button, Reminder modal.
+// Handles draft creation, editing, sending, resending, reminders, cancelling, hard-deleting.
 
 import { useState, useEffect } from 'react';
 import {
@@ -13,7 +12,7 @@ import {
 } from '@chakra-ui/react';
 import {
   TbArrowLeft, TbPlus, TbTrash, TbEdit, TbEye, TbSend, TbBolt,
-  TbCheck, TbAlertTriangle,
+  TbCheck, TbAlertTriangle, TbRotateClockwise, TbBellRinging,
 } from 'react-icons/tb';
 import { supabase } from '../../../lib/supabase';
 import {
@@ -23,6 +22,8 @@ import {
 } from '../../../lib/numbering';
 import InvoicePreview from './InvoicePreview';
 import InvoiceSnapshotModal from './InvoiceSnapshotModal';
+import SendHistoryStrip from './SendHistoryStrip';
+import ReminderModal from './ReminderModal';
 
 // ============================================================
 // HELPERS
@@ -32,8 +33,8 @@ const SENT_STATUSES = ['sent', 'viewed', 'partial', 'overdue'];
 
 const FUNDING_MODES = [
   { value: 'approve_only', label: 'Confirm Scope', color: '#737373' },
-  { value: 'deposit_50', label: '50% to Start', color: '#FFE500' },
-  { value: 'pay_full', label: 'Fund in Full', color: '#39FF14' },
+  { value: 'deposit_50',   label: '50% to Start',  color: '#FFE500' },
+  { value: 'pay_full',     label: 'Fund in Full',  color: '#39FF14' },
 ];
 
 const currency = (val) => {
@@ -70,7 +71,6 @@ const nakedInput = {
   _placeholder: { color: 'surface.700' },
 };
 
-// Validate sprints before sending. Returns { valid, reason } tuple.
 const validateSprintsForSend = (sprints) => {
   const billable = sprints.filter((s) => s.is_billable !== false);
   if (billable.length === 0) {
@@ -96,12 +96,7 @@ const SprintEditRow = ({ sprint, onUpdate, onDelete }) => {
   const isWip = sprint.is_billable === false;
 
   return (
-    <Box
-      py={3}
-      borderBottom="1px solid"
-      borderColor="surface.900"
-      role="group"
-    >
+    <Box py={3} borderBottom="1px solid" borderColor="surface.900" role="group">
       <HStack align="start" spacing={3}>
         <Box
           w="16px"
@@ -225,12 +220,7 @@ const SprintEditRow = ({ sprint, onUpdate, onDelete }) => {
             </Box>
 
             {!isLocked && (
-              <Box
-                as="button"
-                onClick={onDelete}
-                color="surface.700"
-                _hover={{ color: 'red.400' }}
-              >
+              <Box as="button" onClick={onDelete} color="surface.700" _hover={{ color: 'red.400' }}>
                 <Icon as={TbTrash} boxSize={3.5} />
               </Box>
             )}
@@ -279,13 +269,7 @@ const CancelInvoiceModal = ({ isOpen, onClose, invoice, onConfirm, processing })
   return (
     <Modal isOpen={isOpen} onClose={onClose} isCentered size="md">
       <ModalOverlay bg="blackAlpha.900" backdropFilter="blur(8px)" />
-      <ModalContent
-        bg="surface.950"
-        border="1px solid"
-        borderColor="red.900"
-        borderRadius="2xl"
-        mx={4}
-      >
+      <ModalContent bg="surface.950" border="1px solid" borderColor="red.900" borderRadius="2xl" mx={4}>
         <ModalHeader pb={2} pt={6} px={6}>
           <HStack spacing={3}>
             <Box
@@ -301,9 +285,7 @@ const CancelInvoiceModal = ({ isOpen, onClose, invoice, onConfirm, processing })
               <Icon as={TbAlertTriangle} boxSize={4} color="red.400" />
             </Box>
             <VStack align="start" spacing={0}>
-              <Text color="white" fontSize="md" fontWeight="800">
-                Cancel Invoice
-              </Text>
+              <Text color="white" fontSize="md" fontWeight="800">Cancel Invoice</Text>
               <Text color="surface.500" fontSize="2xs" fontFamily="mono">
                 {invoice?.invoice_number}
               </Text>
@@ -318,12 +300,7 @@ const CancelInvoiceModal = ({ isOpen, onClose, invoice, onConfirm, processing })
               This will mark the invoice as cancelled and invalidate the payment link in the client's email. The sprint history and snapshot will be preserved.
             </Text>
 
-            <Box
-              bg="rgba(255,229,0,0.04)"
-              border="1px solid rgba(255,229,0,0.15)"
-              borderRadius="lg"
-              p={3}
-            >
+            <Box bg="rgba(255,229,0,0.04)" border="1px solid rgba(255,229,0,0.15)" borderRadius="lg" p={3}>
               <Text color="accent.banana" fontSize="2xs" fontWeight="700" textTransform="uppercase" letterSpacing="0.08em" mb={1}>
                 What happens
               </Text>
@@ -419,12 +396,19 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
   const [cancelling, setCancelling] = useState(false);
   const [showSnapshot, setShowSnapshot] = useState(false);
 
+  // Phase 6.4a additions
+  const [resending, setResending] = useState(false);
+  const [showReminderModal, setShowReminderModal] = useState(false);
+  const [sendingReminder, setSendingReminder] = useState(false);
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
+
   const isNew = !invoiceId;
   const client = clients.find((c) => c.id === clientId);
   const isPaid = invoice?.status === 'paid';
   const isSentish = SENT_STATUSES.includes(invoice?.status);
   const isDraft = invoice?.status === 'draft' || isNew;
   const wasSent = !isNew && invoice?.status && invoice.status !== 'draft';
+  const canResendOrRemind = isSentish && !invoice?.cancelled_at;
 
   useEffect(() => { loadData(); }, [invoiceId]);
   useEffect(() => {
@@ -436,9 +420,6 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
     if (isNew) {
       setInvoice({ status: 'draft' });
       setSprints([]);
-      // Preview the NEXT invoice number so the user sees "NB260401" immediately
-      // not "NB______". The actual number is assigned at save-time via
-      // withInvoiceNumberRetry so a race is still handled correctly.
       try {
         const nextNum = await fetchNextInvoiceNumber();
         setPreviewNumber(nextNum);
@@ -524,7 +505,6 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
       return;
     }
 
-    // Extra guardrail when sending: block if any sprint has empty title
     if (sendAfterSave) {
       const check = validateSprintsForSend(sprints);
       if (!check.valid) {
@@ -548,7 +528,6 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
       let savedInvoiceNumber = invoice?.invoice_number;
 
       if (isNew) {
-        // Wrap the insert with retry-on-unique-collision
         const inserted = await withInvoiceNumberRetry(async (newNumber) => {
           const { data, error } = await supabase
             .from('invoices')
@@ -585,7 +564,6 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
         if (error) throw error;
       }
 
-      // Save sprints (new ones get child sprint_number like NB260401-01)
       for (const sprint of sprints) {
         const sprintPayload = {
           title: sprint.title || 'Untitled Sprint',
@@ -660,6 +638,79 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
     }
   };
 
+  // ============================================================
+  // RESEND — same email, fresh delivery
+  // ============================================================
+  const handleResend = async () => {
+    if (!invoiceId) return;
+    setResending(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const res = await fetch('/.netlify/functions/resend-invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          invoiceId,
+          action: 'resend',
+          userId: user?.id,
+        }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Resend failed');
+
+      toast({
+        title: 'Invoice resent',
+        description: `Same email re-delivered to ${result.recipient}`,
+        status: 'success',
+        duration: 3000,
+      });
+      setHistoryRefreshKey((k) => k + 1);
+      onSaved();
+    } catch (err) {
+      toast({ title: 'Resend failed', description: err.message, status: 'error', duration: 4000 });
+    } finally {
+      setResending(false);
+    }
+  };
+
+  // ============================================================
+  // REMINDER — editorial nudge with custom subject + body
+  // ============================================================
+  const handleSendReminder = async ({ subject, body }) => {
+    if (!invoiceId) return;
+    setSendingReminder(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const res = await fetch('/.netlify/functions/resend-invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          invoiceId,
+          action: 'reminder',
+          subject,
+          body,
+          userId: user?.id,
+        }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Reminder failed');
+
+      toast({
+        title: 'Reminder sent',
+        description: `Editorial nudge delivered to ${result.recipient}`,
+        status: 'success',
+        duration: 3000,
+      });
+      setShowReminderModal(false);
+      setHistoryRefreshKey((k) => k + 1);
+      onSaved();
+    } catch (err) {
+      toast({ title: 'Reminder failed', description: err.message, status: 'error', duration: 4000 });
+    } finally {
+      setSendingReminder(false);
+    }
+  };
+
   const handleHardDelete = async () => {
     if (!confirmDelete) {
       setConfirmDelete(true);
@@ -677,10 +728,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
         action: 'invoice_deleted',
         entity_type: 'invoice',
         entity_id: invoiceId,
-        metadata: {
-          invoice_number: invoice?.invoice_number,
-          hard_delete: true,
-        },
+        metadata: { invoice_number: invoice?.invoice_number, hard_delete: true },
         created_at: new Date().toISOString(),
       });
 
@@ -758,13 +806,10 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
     .reduce((sum, s) => sum + parseFloat(s.amount || 0), 0);
   const billableCount = sprints.filter((s) => s.is_billable !== false).length;
 
-  // Number to show in the header. For new invoices use the previewed number,
-  // so the user sees NB260401 right away.
   const displayNumber = isNew
     ? (previewNumber || 'New Invoice')
     : (invoice?.invoice_number || 'Invoice');
 
-  // Same number passed to the preview so the email preview also shows it
   const previewInvoice = {
     ...invoice,
     invoice_number: isNew ? previewNumber : invoice?.invoice_number,
@@ -802,7 +847,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
           </Text>
         </HStack>
 
-        <VStack align="stretch" spacing={6} mb={8}>
+        <VStack align="stretch" spacing={6} mb={6}>
           <HStack justify="space-between" align="flex-end" flexWrap="wrap" gap={3}>
             <VStack align="start" spacing={1}>
               <HStack spacing={3}>
@@ -833,13 +878,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                       {invoice.status}
                     </Text>
                     {wasSent && (
-                      <Tooltip
-                        label="View sent email"
-                        placement="top"
-                        hasArrow
-                        bg="surface.800"
-                        fontSize="xs"
-                      >
+                      <Tooltip label="View sent email" placement="top" hasArrow bg="surface.800" fontSize="xs">
                         <Box
                           as="button"
                           onClick={() => setShowSnapshot(true)}
@@ -897,8 +936,67 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                   Save & Send
                 </Button>
               )}
+
+              {/* Resend + Reminder — only after invoice has been sent */}
+              {canResendOrRemind && (
+                <>
+                  <Tooltip
+                    label="Re-deliver the same email (lost / spam)"
+                    placement="top"
+                    hasArrow
+                    bg="surface.800"
+                    fontSize="xs"
+                  >
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      borderColor="brand.500"
+                      color="brand.500"
+                      fontWeight="700"
+                      borderRadius="lg"
+                      leftIcon={<TbRotateClockwise size={14} />}
+                      onClick={handleResend}
+                      isLoading={resending}
+                      loadingText="Resending"
+                      _hover={{ bg: 'rgba(0,229,229,0.08)' }}
+                    >
+                      Resend
+                    </Button>
+                  </Tooltip>
+                  <Tooltip
+                    label="Send an editorial reminder"
+                    placement="top"
+                    hasArrow
+                    bg="surface.800"
+                    fontSize="xs"
+                  >
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      borderColor="accent.banana"
+                      color="accent.banana"
+                      fontWeight="700"
+                      borderRadius="lg"
+                      leftIcon={<TbBellRinging size={14} />}
+                      onClick={() => setShowReminderModal(true)}
+                      _hover={{ bg: 'rgba(255,229,0,0.06)' }}
+                    >
+                      Remind
+                    </Button>
+                  </Tooltip>
+                </>
+              )}
             </HStack>
           </HStack>
+
+          {/* SEND HISTORY STRIP — visible whenever there's send history */}
+          {!isNew && (
+            <SendHistoryStrip
+              invoiceId={invoiceId}
+              refreshKey={historyRefreshKey}
+              onViewSnapshot={() => setShowSnapshot(true)}
+            />
+          )}
         </VStack>
 
         <HStack spacing={6} borderBottom="1px solid" borderColor="surface.900" mb={8}>
@@ -957,9 +1055,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                   fontFamily="body"
                   cursor="pointer"
                   isDisabled={isPaid}
-                  sx={{
-                    '& option': { bg: 'surface.950', color: 'white' },
-                  }}
+                  sx={{ '& option': { bg: 'surface.950', color: 'white' } }}
                 >
                   {clients.map((c) => (
                     <option key={c.id} value={c.id}>
@@ -979,9 +1075,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                     fontFamily="body"
                     cursor="pointer"
                     isDisabled={isPaid}
-                    sx={{
-                      '& option': { bg: 'surface.950', color: 'white' },
-                    }}
+                    sx={{ '& option': { bg: 'surface.950', color: 'white' } }}
                   >
                     <option value="">No project</option>
                     {projects.map((p) => (
@@ -1013,13 +1107,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
               </HStack>
 
               {sprints.length === 0 ? (
-                <Box
-                  py={12}
-                  textAlign="center"
-                  border="1px dashed"
-                  borderColor="surface.800"
-                  borderRadius="xl"
-                >
+                <Box py={12} textAlign="center" border="1px dashed" borderColor="surface.800" borderRadius="xl">
                   <Icon as={TbBolt} boxSize={8} color="surface.700" mb={2} />
                   <Text color="surface.500" fontSize="sm" mb={3}>No sprints yet</Text>
                   <Button
@@ -1166,6 +1254,15 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
         invoice={invoice}
         onConfirm={handleSoftCancel}
         processing={cancelling}
+      />
+
+      <ReminderModal
+        isOpen={showReminderModal}
+        onClose={() => setShowReminderModal(false)}
+        invoice={invoice}
+        client={client}
+        onSend={handleSendReminder}
+        sending={sendingReminder}
       />
 
       <InvoiceSnapshotModal
