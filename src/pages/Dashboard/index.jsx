@@ -1,9 +1,8 @@
 // src/pages/Dashboard/index.jsx
-// Dashboard — editorial hero + existing rich sections
-// - Hero: Fraunces serif number + inline stats, no clock
-// - FormInbox + ActivityStream as naked sections (already rich, kept as-is)
-// - TeamOnlineStrip pinned top-left, refresh top-right
-// - No dashboard-specific Container; AppShell handles width + gutters
+// Dashboard - hero number now uses JetBrains Mono to match every other
+// monetary value in Pulse. Fraunces removed; numbers stay tabulated.
+// FormInbox + ActivityStream as naked sections (already rich, kept as-is).
+// TeamOnlineStrip pinned top-left, refresh top-right.
 
 import { useState, useEffect } from 'react';
 import {
@@ -188,7 +187,7 @@ const Dashboard = () => {
           </Tooltip>
         </HStack>
 
-        {/* HERO BLOCK — editorial Fraunces number */}
+        {/* HERO BLOCK - JetBrains Mono number, matches the rest of Pulse */}
         <VStack align="stretch" spacing={6}>
           <HStack justify="space-between" align="flex-end" flexWrap="wrap" gap={4}>
             <VStack align="start" spacing={2} flex={1} minW={0}>
@@ -203,16 +202,16 @@ const Dashboard = () => {
                 Dashboard
               </Text>
 
-              {/* Hero: Fraunces serif, massive, editorial */}
+              {/* Hero number - JetBrains Mono, heavy weight, tabulated */}
               <HStack align="baseline" spacing={4} flexWrap="wrap">
                 <Text
-                  fontFamily="'Fraunces', Georgia, serif"
-                  fontSize={{ base: '5xl', md: '7xl', lg: '8xl' }}
-                  fontWeight="600"
+                  fontFamily="mono"
+                  fontSize={{ base: '5xl', md: '6xl', lg: '7xl' }}
+                  fontWeight="800"
                   color={heroColor}
-                  letterSpacing="-0.03em"
-                  lineHeight="0.9"
-                  sx={{ fontVariationSettings: "'opsz' 144" }}
+                  letterSpacing="-0.02em"
+                  lineHeight="1"
+                  sx={{ fontVariantNumeric: 'tabular-nums' }}
                 >
                   {currency(heroValue)}
                 </Text>
@@ -228,7 +227,7 @@ const Dashboard = () => {
               </HStack>
             </VStack>
 
-            {/* Action buttons — right side on desktop, below on mobile */}
+            {/* Action buttons - right side on desktop, below on mobile */}
             <HStack
               spacing={3}
               flexShrink={0}
@@ -285,7 +284,7 @@ const Dashboard = () => {
             </HStack>
           </HStack>
 
-          {/* Secondary stat strip — smaller, monospace, informational */}
+          {/* Secondary stat strip - smaller, monospace, informational */}
           <HStack
             spacing={0}
             color="surface.500"
@@ -340,7 +339,7 @@ const Dashboard = () => {
           </HStack>
         </VStack>
 
-        {/* Existing rich sections — these are already good */}
+        {/* Existing rich sections - these are already good */}
         <FormInbox />
 
         <ActivityStream
