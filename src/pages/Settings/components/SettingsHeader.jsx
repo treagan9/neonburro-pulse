@@ -1,15 +1,14 @@
 // src/pages/Settings/components/SettingsHeader.jsx
+// Aligned with new design language - kicker label only, no big title.
+// Subtle pulsing dot stays as a personal touch unique to this page.
+
 import { Box, HStack, Text, VStack } from '@chakra-ui/react';
 
 const SettingsHeader = () => {
   return (
     <VStack align="start" spacing={2}>
       <HStack spacing={3} align="center">
-        <Box
-          position="relative"
-          w="8px"
-          h="8px"
-        >
+        <Box position="relative" w="8px" h="8px">
           <Box
             position="absolute"
             inset={0}
@@ -39,18 +38,9 @@ const SettingsHeader = () => {
           textTransform="uppercase"
           fontFamily="mono"
         >
-          Account
+          Account Settings
         </Text>
       </HStack>
-      <Text
-        fontSize={{ base: '2xl', md: '3xl' }}
-        fontWeight="800"
-        color="white"
-        lineHeight="1"
-        letterSpacing="-0.03em"
-      >
-        Settings
-      </Text>
       <Text color="surface.500" fontSize="xs" fontFamily="mono">
         Manage your profile, security, and preferences
       </Text>

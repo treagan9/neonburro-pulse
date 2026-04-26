@@ -1,8 +1,14 @@
 // src/pages/Settings/index.jsx
+// Settings page - kicker only, no big title.
+// Form column stays narrow (640px) for focused editing - this page is
+// intentionally tighter than Dashboard/Clients/Invoicing because it's
+// a vertical edit surface, not a list.
+
 import { useState, useEffect } from 'react';
-import { Box, VStack, Container, Spinner, Divider } from '@chakra-ui/react';
+import { Box, VStack, Spinner, Divider } from '@chakra-ui/react';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
+import { PAGE_AMBIENT_GLOW_PROPS } from '../../lib/uiConstants';
 import SettingsHeader from './components/SettingsHeader';
 import SettingsAvatar from './components/SettingsAvatar';
 import SettingsProfile from './components/SettingsProfile';
@@ -47,25 +53,10 @@ const Settings = () => {
 
   return (
     <Box position="relative" minH="100%">
-      {/* Ambient background - same as login */}
-      <Box
-        position="absolute"
-        top="-200px"
-        left="50%"
-        transform="translateX(-50%)"
-        w="800px"
-        h="800px"
-        borderRadius="full"
-        bg="radial-gradient(circle, rgba(0,229,229,0.04) 0%, transparent 60%)"
-        pointerEvents="none"
-      />
+      <Box {...PAGE_AMBIENT_GLOW_PROPS} />
 
-      <Container
-        maxW={{ base: '100%', md: '640px' }}
-        px={{ base: 4, md: 8 }}
-        py={{ base: 6, md: 12 }}
-        position="relative"
-      >
+      {/* Centered narrow column - settings is a form surface, not a list */}
+      <Box maxW="640px" mx="auto" position="relative">
         <VStack spacing={{ base: 8, md: 10 }} align="stretch">
           <SettingsHeader />
 
@@ -100,7 +91,7 @@ const Settings = () => {
 
           <SettingsFooter user={user} />
         </VStack>
-      </Container>
+      </Box>
     </Box>
   );
 };
