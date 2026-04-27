@@ -9,8 +9,11 @@
 // Always logs to invoice_history with send_type so the editor can
 // show a complete timeline of every send.
 //
-// 2026-04-27: converted to ESM to match repo standard and to import
+// 2026-04-27 (1): converted to ESM to match repo standard and to import
 // the shared invoiceEmailTemplate (which is ESM-only).
+// 2026-04-27 (2): added admin notifications on resend + reminder so the
+// audit trail matches the initial-send symmetry. Admin email links back
+// to Pulse for snapshot review.
 
 import { Resend } from 'resend';
 import { createClient } from '@supabase/supabase-js';
@@ -20,6 +23,8 @@ const RESEND_API_KEY   = process.env.RESEND_API_KEY;
 const SUPABASE_URL     = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const FROM_EMAIL = 'NeonBurro <hello@neonburro.com>';
+const ADMIN_FROM = 'NeonBurro Pulse <notifications@neonburro.com>';
+const ADMIN_TO = ['hello@neonburro.com'];
 
 const resend = new Resend(RESEND_API_KEY);
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE);
@@ -36,6 +41,29 @@ const escapeHtml = (s) => String(s || '')
 const formatCurrency = (n) => {
   const num = parseFloat(n || 0);
   return `$${num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+};
+
+const getMST = () =>
+  new Date().toLocaleString('en-US', {
+    timeZone: 'America/Denver',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }) + ' MT';
+
+// Lookup the acting admin's display name for the audit trail
+const fetchAdminName = async (userId) => {
+  if (!userId) return 'Pulse';
+  const { data } = await supabase
+    .from('profiles')
+    .select('display_name, username')
+    .eq('id', userId)
+    .maybeSingle();
+  if (!data) return 'Pulse';
+  return data.display_name || data.username || 'Pulse';
 };
 
 // Rebuild the original client email from a stored invoice_snapshot.
@@ -100,7 +128,7 @@ const rebuildHtmlFromSnapshot = async ({ invoice, snapshot }) => {
 };
 
 // ============================================================
-// REMINDER EMAIL — editorial NeonBurro voice
+// CLIENT-FACING REMINDER EMAIL — editorial NeonBurro voice
 // ============================================================
 const buildReminderEmail = ({
   recipientName,
@@ -169,6 +197,111 @@ const buildReminderEmail = ({
 };
 
 // ============================================================
+// ADMIN NOTIFICATION — resend / reminder audit trail
+// ============================================================
+const buildAdminAuditEmail = ({
+  action,           // 'resend' or 'reminder'
+  invoice,
+  client,
+  recipientEmail,
+  adminName,
+  amountDue,
+  reminderSubject,  // only for reminder
+  reminderBody,     // only for reminder
+  rebuiltFromSnapshot, // only for resend
+}) => {
+  const safeNumber = escapeHtml(invoice.invoice_number);
+  const safeClient = escapeHtml(client?.name || 'Client');
+  const safeRecipient = escapeHtml(recipientEmail);
+  const safeAdmin = escapeHtml(adminName);
+
+  const accentColor = action === 'resend' ? '#00E5E5' : '#FFE500';
+  const actionLabel = action === 'resend' ? 'Invoice Resent' : 'Reminder Sent';
+  const actionSub = action === 'resend'
+    ? `Same email re-delivered${rebuiltFromSnapshot ? ' (rebuilt from archived snapshot)' : ''}`
+    : 'Editorial nudge dispatched';
+
+  const reminderBlock = action === 'reminder'
+    ? `
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#0A0A0A;border:1px solid #1f1f1f;border-radius:10px;margin-bottom:20px;">
+        <tr><td style="padding:14px 16px;">
+          ${reminderSubject ? `
+          <div style="color:#737373;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:3px;">Subject</div>
+          <div style="color:#ffffff;font-size:13px;font-weight:600;margin-bottom:10px;">${escapeHtml(reminderSubject)}</div>
+          ` : ''}
+          <div style="color:#737373;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:3px;">Body</div>
+          <div style="color:#a0a0a0;font-size:13px;line-height:1.6;white-space:pre-wrap;">${escapeHtml(reminderBody || '')}</div>
+        </td></tr>
+      </table>`
+    : '';
+
+  return `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>${actionLabel}</title></head>
+<body style="margin:0;padding:0;background:#000000;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#000000;padding:28px 12px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#0A0A0A;border:1px solid #1f1f1f;border-radius:16px;overflow:hidden;">
+        <tr>
+          <td style="background:#141414;border-bottom:2px solid ${accentColor};padding:20px 32px;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td>
+                  <div style="color:${accentColor};font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:2px;margin-bottom:4px;">${actionLabel}</div>
+                  <div style="color:#ffffff;font-size:22px;font-weight:800;font-family:'JetBrains Mono',monospace;">${safeNumber}</div>
+                  <div style="color:#737373;font-size:11px;margin-top:2px;">${getMST()} · by ${safeAdmin}</div>
+                </td>
+                <td style="text-align:right;vertical-align:top;">
+                  <div style="background:${accentColor};color:#0A0A0A;font-size:11px;font-weight:800;padding:5px 14px;border-radius:100px;display:inline-block;">${formatCurrency(amountDue)} due</div>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:24px 32px 8px 32px;">
+            <div style="color:#a0a0a0;font-size:13px;line-height:1.6;margin-bottom:20px;">${actionSub}.</div>
+
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#141414;border:1px solid #1f1f1f;border-radius:10px;margin-bottom:20px;">
+              <tr><td style="padding:14px 16px;">
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td>
+                      <div style="color:#737373;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:3px;">Client</div>
+                      <div style="color:#ffffff;font-size:14px;font-weight:700;">${safeClient}</div>
+                      <div style="color:#a0a0a0;font-size:12px;">${safeRecipient}</div>
+                    </td>
+                    <td style="text-align:right;">
+                      <div style="color:#737373;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:3px;">Sent By</div>
+                      <div style="color:#ffffff;font-size:14px;font-weight:700;">${safeAdmin}</div>
+                    </td>
+                  </tr>
+                </table>
+              </td></tr>
+            </table>
+
+            ${reminderBlock}
+
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr><td style="text-align:center;padding:8px 0 0 0;">
+                <a href="https://pulse.neonburro.com/invoicing/?invoice=${invoice.id}" style="display:inline-block;background:${accentColor};color:#0A0A0A;text-decoration:none;padding:12px 28px;border-radius:100px;font-weight:800;font-size:13px;">View in Pulse</a>
+              </td></tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:14px 32px;border-top:1px solid #1f1f1f;text-align:center;">
+            <div style="color:#737373;font-size:11px;">Pulse · ${getMST()}</div>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+};
+
+// ============================================================
 // RESEND HANDLER
 // Tries rendered_html first; falls back to rebuilding from
 // invoice_snapshot so all historical invoices remain resendable.
@@ -200,6 +333,7 @@ const handleResend = async ({ invoiceId, userId }) => {
   // Prefer the stored HTML for byte-identical resend; fall back to
   // rebuilding from the JSON snapshot if rendered_html was never written.
   let html = lastHistory.rendered_html;
+  const rebuiltFromSnapshot = !html;
   if (!html) {
     html = await rebuildHtmlFromSnapshot({
       invoice,
@@ -245,9 +379,29 @@ const handleResend = async ({ invoiceId, userId }) => {
       client_name: invoice.clients?.name,
       send_type: 'resend',
       recipient_email: recipientEmail,
-      rebuilt_from_snapshot: !lastHistory.rendered_html,
+      rebuilt_from_snapshot: rebuiltFromSnapshot,
     },
   });
+
+  // Admin audit notification — fire and forget
+  const adminName = await fetchAdminName(userId);
+  const amountDue = parseFloat(invoice.total || 0) - parseFloat(invoice.total_paid || 0);
+  const adminHtml = buildAdminAuditEmail({
+    action: 'resend',
+    invoice,
+    client: invoice.clients,
+    recipientEmail,
+    adminName,
+    amountDue,
+    rebuiltFromSnapshot,
+  });
+  resend.emails.send({
+    from: ADMIN_FROM,
+    to: ADMIN_TO,
+    reply_to: invoice.clients?.email || 'hello@neonburro.com',
+    subject: `Invoice Resent: ${invoice.invoice_number} - ${invoice.clients?.name || 'Client'}`,
+    html: adminHtml,
+  }).catch((err) => console.error('Admin resend notification failed:', err));
 
   return { success: true, recipient: recipientEmail, send_type: 'resend' };
 };
@@ -269,23 +423,14 @@ const handleReminder = async ({ invoiceId, subject, body, userId }) => {
   if (invoice.status === 'paid') throw new Error('Invoice is already paid');
   if (!invoice.clients?.email) throw new Error('Client has no email on file');
 
-  // Pull admin display name for signature
-  let adminName = 'The NeonBurro Team';
-  if (userId) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('display_name, username')
-      .eq('id', userId)
-      .maybeSingle();
-    if (profile) adminName = profile.display_name || profile.username || adminName;
-  }
+  const adminName = await fetchAdminName(userId);
 
   const amountDue =
     parseFloat(invoice.total || 0) - parseFloat(invoice.total_paid || 0);
 
   // Reuse last pay token if one exists; reminders should keep the original link working
   const payUrl = invoice.pay_token
-    ? `https://neonburro.com/pay/${invoice.pay_token}/`
+    ? `https://neonburro.com/pay/?token=${invoice.pay_token}`
     : 'https://neonburro.com/account/';
 
   const html = buildReminderEmail({
@@ -331,6 +476,25 @@ const handleReminder = async ({ invoiceId, subject, body, userId }) => {
       subject,
     },
   });
+
+  // Admin audit notification — fire and forget
+  const adminHtml = buildAdminAuditEmail({
+    action: 'reminder',
+    invoice,
+    client: invoice.clients,
+    recipientEmail: invoice.clients.email,
+    adminName,
+    amountDue,
+    reminderSubject: subject,
+    reminderBody: body,
+  });
+  resend.emails.send({
+    from: ADMIN_FROM,
+    to: ADMIN_TO,
+    reply_to: invoice.clients?.email || 'hello@neonburro.com',
+    subject: `Reminder Sent: ${invoice.invoice_number} - ${invoice.clients?.name || 'Client'}`,
+    html: adminHtml,
+  }).catch((err) => console.error('Admin reminder notification failed:', err));
 
   return { success: true, recipient: invoice.clients.email, send_type: 'reminder' };
 };
