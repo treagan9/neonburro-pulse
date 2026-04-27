@@ -2,6 +2,8 @@
 // NeonBurro Pulse - Invoice Email Sender
 // Uses the shared template at src/lib/invoiceEmailTemplate.js for client email
 // Admin notification email is defined inline below (much shorter than client email)
+// 2026-04-27 fix: now writes rendered_html + send_type to invoice_history so
+// resend-invoice can re-fire the exact email that went out.
 
 import { buildInvoiceEmailHTML, getDueNow } from '../../src/lib/invoiceEmailTemplate.js';
 
@@ -314,7 +316,8 @@ export const handler = async (event) => {
       clientHtml
     );
 
-    // Save snapshot
+    // Save snapshot — both rendered_html (for byte-identical resend) and
+    // invoice_snapshot (JSON for rebuilding/auditing)
     const snapshot = {
       invoice_number: invoice.invoice_number,
       invoice_date: invoiceDate,
@@ -341,6 +344,8 @@ export const handler = async (event) => {
       sent_to: client.email,
       amount: totalAmount,
       method: 'email',
+      send_type: 'initial',
+      rendered_html: clientHtml,
       invoice_snapshot: snapshot,
       notes: `Sent via Resend (ID: ${clientResult.id})`,
     });

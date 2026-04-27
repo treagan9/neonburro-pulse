@@ -1,13 +1,20 @@
 // netlify/functions/resend-invoice.js
 // Handles two send types beyond the initial send:
-//   - resend:    Same email, fresh delivery (lost email, spam, etc.)
+//   - resend:    Re-fire the same email (uses stored rendered_html when
+//                available, falls back to rebuilding from invoice_snapshot
+//                so historical invoices that pre-date the rendered_html
+//                column can still be resent)
 //   - reminder:  Editorial nudge with custom subject + body
 //
 // Always logs to invoice_history with send_type so the editor can
 // show a complete timeline of every send.
+//
+// 2026-04-27: converted to ESM to match repo standard and to import
+// the shared invoiceEmailTemplate (which is ESM-only).
 
-const { Resend } = require('resend');
-const { createClient } = require('@supabase/supabase-js');
+import { Resend } from 'resend';
+import { createClient } from '@supabase/supabase-js';
+import { buildInvoiceEmailHTML } from '../../src/lib/invoiceEmailTemplate.js';
 
 const RESEND_API_KEY   = process.env.RESEND_API_KEY;
 const SUPABASE_URL     = process.env.SUPABASE_URL;
@@ -16,6 +23,8 @@ const FROM_EMAIL = 'NeonBurro <hello@neonburro.com>';
 
 const resend = new Resend(RESEND_API_KEY);
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE);
+
+// ---------- helpers ----------
 
 const escapeHtml = (s) => String(s || '')
   .replace(/&/g, '&amp;')
@@ -27,6 +36,67 @@ const escapeHtml = (s) => String(s || '')
 const formatCurrency = (n) => {
   const num = parseFloat(n || 0);
   return `$${num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+};
+
+// Rebuild the original client email from a stored invoice_snapshot.
+// Used when rendered_html is missing (invoices sent before that column
+// was being populated). The result is logically equivalent to the
+// original send: same line items, same totals, same pay link.
+const rebuildHtmlFromSnapshot = async ({ invoice, snapshot }) => {
+  if (!snapshot) return null;
+
+  // Refetch client + project to feed the template — the snapshot has
+  // names but the template expects full records.
+  let client = {
+    name: snapshot.client_name || 'Client',
+    email: snapshot.client_email || '',
+    company: snapshot.client_company || null,
+  };
+  if (invoice.client_id) {
+    const { data } = await supabase
+      .from('clients')
+      .select('*')
+      .eq('id', invoice.client_id)
+      .maybeSingle();
+    if (data) client = data;
+  }
+
+  let project = null;
+  if (invoice.project_id) {
+    const { data } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('id', invoice.project_id)
+      .maybeSingle();
+    if (data) project = data;
+  } else if (snapshot.project_name) {
+    project = {
+      name: snapshot.project_name,
+      project_number: snapshot.project_number,
+    };
+  }
+
+  const lineItems = (snapshot.line_items || []).map((item) => ({
+    sprint_number: item.sprint_number,
+    title: item.title,
+    description: item.description,
+    amount: item.amount,
+    payment_mode: item.payment_mode,
+    is_billable: true,
+  }));
+
+  return buildInvoiceEmailHTML({
+    invoice,
+    client,
+    project,
+    lineItems,
+    invoiceDate: snapshot.invoice_date || new Date().toLocaleDateString('en-US', {
+      year: 'numeric', month: 'long', day: 'numeric',
+    }),
+    payUrl: snapshot.pay_url || (invoice.pay_token
+      ? `https://neonburro.com/pay/?token=${invoice.pay_token}`
+      : 'https://neonburro.com/account/'),
+  });
 };
 
 // ============================================================
@@ -99,7 +169,9 @@ const buildReminderEmail = ({
 };
 
 // ============================================================
-// RESEND HANDLER — fetches latest snapshot + re-sends identical email
+// RESEND HANDLER
+// Tries rendered_html first; falls back to rebuilding from
+// invoice_snapshot so all historical invoices remain resendable.
 // ============================================================
 const handleResend = async ({ invoiceId, userId }) => {
   const { data: invoice } = await supabase
@@ -112,7 +184,7 @@ const handleResend = async ({ invoiceId, userId }) => {
   if (invoice.cancelled_at) throw new Error('Cannot resend a cancelled invoice');
   if (!invoice.clients?.email) throw new Error('Client has no email on file');
 
-  // Get the most recent stored snapshot
+  // Get the most recent stored history row
   const { data: lastHistory } = await supabase
     .from('invoice_history')
     .select('rendered_html, invoice_snapshot, sent_to')
@@ -121,9 +193,23 @@ const handleResend = async ({ invoiceId, userId }) => {
     .limit(1)
     .maybeSingle();
 
-  if (!lastHistory?.rendered_html) {
+  if (!lastHistory) {
+    throw new Error('No prior send found for this invoice. Use the Send button instead.');
+  }
+
+  // Prefer the stored HTML for byte-identical resend; fall back to
+  // rebuilding from the JSON snapshot if rendered_html was never written.
+  let html = lastHistory.rendered_html;
+  if (!html) {
+    html = await rebuildHtmlFromSnapshot({
+      invoice,
+      snapshot: lastHistory.invoice_snapshot,
+    });
+  }
+
+  if (!html) {
     throw new Error(
-      'No prior email snapshot found for this invoice. Use the original Send button instead.'
+      'Could not rebuild this invoice email. The original snapshot is missing. Use the Send button to generate a fresh email.'
     );
   }
 
@@ -134,7 +220,7 @@ const handleResend = async ({ invoiceId, userId }) => {
     to: recipientEmail,
     reply_to: 'hello@neonburro.com',
     subject: `Invoice ${invoice.invoice_number} from NeonBurro (resent)`,
-    html: lastHistory.rendered_html,
+    html,
   });
 
   if (result.error) throw new Error(result.error.message || 'Resend failed');
@@ -145,7 +231,7 @@ const handleResend = async ({ invoiceId, userId }) => {
     sent_to: recipientEmail,
     sent_by: userId || null,
     send_type: 'resend',
-    rendered_html: lastHistory.rendered_html,
+    rendered_html: html,
     invoice_snapshot: lastHistory.invoice_snapshot,
   });
 
@@ -159,6 +245,7 @@ const handleResend = async ({ invoiceId, userId }) => {
       client_name: invoice.clients?.name,
       send_type: 'resend',
       recipient_email: recipientEmail,
+      rebuilt_from_snapshot: !lastHistory.rendered_html,
     },
   });
 
@@ -251,7 +338,7 @@ const handleReminder = async ({ invoiceId, subject, body, userId }) => {
 // ============================================================
 // HANDLER
 // ============================================================
-exports.handler = async (event) => {
+export const handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
