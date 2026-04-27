@@ -3,6 +3,8 @@
 // Design: editorial dark mode, matches client portal login (siblings).
 // Logo clickable to neonburro.com. No scroll. Centered. Fixed.
 // Forgot-password inline with banana easter egg preserved.
+// Username lookup goes through lookup_email_by_username RPC (security definer)
+// so the anon role never reads profiles directly.
 
 import { useState, useRef, useEffect } from 'react';
 import {
@@ -15,6 +17,8 @@ import { TbLock, TbAlertTriangle, TbEye, TbEyeOff, TbArrowRight } from 'react-ic
 import { useAuth } from '../../hooks/useAuth';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+
+// ---------- helpers ----------
 
 const tokens = {
   canvas: '#0A0A0A',
@@ -60,6 +64,26 @@ const inputStyle = {
   },
 };
 
+const isEmail = (value) => value.includes('@');
+
+const resolveEmail = async (input) => {
+  const trimmed = input.trim().toLowerCase();
+  if (!trimmed) throw new Error('Username not recognized');
+  if (isEmail(trimmed)) return trimmed;
+
+  const { data, error } = await supabase.rpc('lookup_email_by_username', {
+    p_username: trimmed,
+  });
+  if (error) {
+    console.error('lookup_email_by_username failed', error);
+    throw new Error('Could not check username, try again');
+  }
+  if (!data) throw new Error('Username not recognized');
+  return data;
+};
+
+// ---------- component ----------
+
 const Login = () => {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -89,18 +113,6 @@ const Login = () => {
   const triggerShake = () => {
     setErrorShake(true);
     setTimeout(() => setErrorShake(false), 500);
-  };
-
-  const resolveEmail = async (input) => {
-    const trimmed = input.trim().toLowerCase();
-    if (trimmed.includes('@')) return trimmed;
-    const { data } = await supabase
-      .from('profiles')
-      .select('email')
-      .eq('username', trimmed)
-      .maybeSingle();
-    if (!data) throw new Error('Username not recognized');
-    return data.email;
   };
 
   const handleSubmit = async (e) => {
