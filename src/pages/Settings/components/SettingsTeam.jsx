@@ -1,4 +1,9 @@
 // src/pages/Settings/components/SettingsTeam.jsx
+// Team management surface for super_admin and admin roles.
+// Post-role-migration: ROLE_CONFIG covers all five roles, super_admin is
+// protected from edits, role-change select offers admin/manager/team,
+// invite flow accepts admin/manager/team. super_admin promotion is SQL-only.
+
 import { useState, useEffect } from 'react';
 import {
   VStack, HStack, Text, Box, Icon, Button, Input, useToast,
@@ -6,16 +11,24 @@ import {
   ModalHeader, ModalBody, ModalFooter, ModalCloseButton,
   FormControl, FormLabel, useDisclosure,
 } from '@chakra-ui/react';
-import { TbUserPlus, TbCrown, TbShield, TbUser, TbMail } from 'react-icons/tb';
+import {
+  TbUserPlus, TbCrown, TbShield, TbBriefcase, TbUser, TbBuilding, TbMail,
+} from 'react-icons/tb';
 import { supabase } from '../../../lib/supabase';
 import Avatar from '../../../components/common/Avatar';
 import { usePresence } from '../../../hooks/usePresence';
 
 const ROLE_CONFIG = {
-  owner: { icon: TbCrown,  color: '#FFE500', label: 'Owner' },
-  admin: { icon: TbShield, color: '#00E5E5', label: 'Admin' },
-  team:  { icon: TbUser,   color: '#8B5CF6', label: 'Team' },
+  super_admin: { icon: TbCrown,     color: '#FFE500', label: 'Super Admin' },
+  admin:       { icon: TbShield,    color: '#00E5E5', label: 'Admin' },
+  manager:     { icon: TbBriefcase, color: '#39FF14', label: 'Manager' },
+  team:        { icon: TbUser,      color: '#8B5CF6', label: 'Team' },
+  client:      { icon: TbBuilding,  color: '#737373', label: 'Client' },
 };
+
+const STAFF_ROLES = ['super_admin', 'admin', 'manager', 'team'];
+const EDITABLE_ROLES = ['admin', 'manager', 'team'];
+const INVITABLE_ROLES = ['admin', 'manager', 'team'];
 
 const inputProps = {
   bg: 'transparent',
@@ -35,6 +48,7 @@ const TeamMemberRow = ({ member, currentUserId, onRoleChange }) => {
   const { getStatus } = usePresence();
   const status = getStatus(member.id);
   const isMe = member.id === currentUserId;
+  const isSuperAdmin = member.role === 'super_admin';
 
   return (
     <HStack
@@ -85,10 +99,10 @@ const TeamMemberRow = ({ member, currentUserId, onRoleChange }) => {
         </Box>
       </HStack>
 
-      {!isMe && member.role !== 'owner' && (
+      {!isMe && !isSuperAdmin && (
         <Select
           size="xs"
-          value={member.role}
+          value={EDITABLE_ROLES.includes(member.role) ? member.role : 'team'}
           onChange={(e) => onRoleChange(member.id, e.target.value)}
           bg="transparent"
           border="1px solid"
@@ -98,13 +112,16 @@ const TeamMemberRow = ({ member, currentUserId, onRoleChange }) => {
           fontWeight="700"
           h="32px"
           borderRadius="md"
-          w="90px"
+          w="110px"
           _hover={{ borderColor: 'surface.500' }}
           _focus={{ borderColor: 'brand.500', boxShadow: 'none' }}
           cursor="pointer"
         >
-          <option value="admin" style={{ background: '#0a0a0a' }}>Admin</option>
-          <option value="team" style={{ background: '#0a0a0a' }}>Team</option>
+          {EDITABLE_ROLES.map((r) => (
+            <option key={r} value={r} style={{ background: '#0a0a0a' }}>
+              {ROLE_CONFIG[r].label}
+            </option>
+          ))}
         </Select>
       )}
     </HStack>
@@ -207,7 +224,7 @@ const InviteModal = ({ isOpen, onClose, onInvited }) => {
                 Role
               </FormLabel>
               <HStack spacing={2}>
-                {['admin', 'team'].map((r) => (
+                {INVITABLE_ROLES.map((r) => (
                   <Box
                     key={r}
                     flex={1}
@@ -228,7 +245,7 @@ const InviteModal = ({ isOpen, onClose, onInvited }) => {
                 ))}
               </HStack>
               <Text fontSize="2xs" color="surface.600" mt={2}>
-                Admin has full Pulse access. Team has limited access.
+                Admin: full access. Manager: project access. Team: limited access.
               </Text>
             </FormControl>
           </VStack>
@@ -252,7 +269,7 @@ const InviteModal = ({ isOpen, onClose, onInvited }) => {
   );
 };
 
-const SettingsTeam = ({ currentUserId }) => {
+const SettingsTeam = ({ currentUserId, currentUserRole }) => {
   const toast = useToast();
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [members, setMembers] = useState([]);
@@ -264,17 +281,26 @@ const SettingsTeam = ({ currentUserId }) => {
 
   const fetchMembers = async () => {
     setLoading(true);
-    // Only team-side roles - exclude clients
     const { data } = await supabase
       .from('profiles')
       .select('*')
-      .in('role', ['owner', 'admin', 'team'])
+      .in('role', STAFF_ROLES)
       .order('role', { ascending: true });
     setMembers(data || []);
     setLoading(false);
   };
 
   const handleRoleChange = async (memberId, newRole) => {
+    if (!EDITABLE_ROLES.includes(newRole)) {
+      toast({
+        title: 'Cannot set that role',
+        description: 'Super admin promotion is SQL-only',
+        status: 'warning',
+        duration: 3000,
+      });
+      return;
+    }
+
     const { error } = await supabase
       .from('profiles')
       .update({ role: newRole, updated_at: new Date().toISOString() })

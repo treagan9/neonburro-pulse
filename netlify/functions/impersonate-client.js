@@ -2,10 +2,12 @@
 // Admin-only: mint an impersonation session token that lets an admin view
 // the client portal as a specific client for a short, audited window.
 //
+// Updated post role hierarchy migration: now allows super_admin and admin.
+//
 // Flow:
 //   1. Admin's Pulse session sends Authorization: Bearer <supabase_jwt>
 //   2. We verify the JWT, extract user_id
-//   3. We check their profiles.role is admin or owner
+//   3. We check their profiles.role is super_admin or admin
 //   4. We generate a 32-byte random token, hash it with sha256
 //   5. We call mint_impersonation_session(token_hash, ...)
 //   6. We return { token, redirect_url, expires_at, session_id }
@@ -21,6 +23,8 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const PORTAL_URL = 'https://neonburro.com/account/';
 const DEBUG = process.env.NODE_ENV !== 'production' || process.env.DEBUG_IMPERSONATE === 'true';
+
+const ALLOWED_ROLES = ['super_admin', 'admin'];
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
@@ -38,7 +42,6 @@ const getClientIp = (event) =>
   event.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
   'unknown';
 
-// Structured logging so Netlify logs are searchable
 const log = (level, step, data = {}) => {
   console.log(JSON.stringify({
     fn: 'impersonate-client',
@@ -62,7 +65,6 @@ exports.handler = async (event) => {
     };
   }
 
-  // Environment sanity check
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     log('error', 'env_missing', {
       has_url: !!SUPABASE_URL,
@@ -81,7 +83,6 @@ exports.handler = async (event) => {
   try {
     log('info', 'invocation_start', { ip: getClientIp(event) });
 
-    // 1. Extract and verify the admin's Supabase JWT
     const authHeader = event.headers.authorization || event.headers.Authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       log('warn', 'missing_auth_header');
@@ -125,7 +126,6 @@ exports.handler = async (event) => {
     const adminUserId = userData.user.id;
     log('info', 'admin_authenticated', { admin_user_id: adminUserId });
 
-    // 2. Parse request body
     let parsed;
     try {
       parsed = JSON.parse(event.body || '{}');
@@ -154,7 +154,6 @@ exports.handler = async (event) => {
       duration_minutes: duration_minutes || 30,
     });
 
-    // 3. Pre-flight profile check (better error messages than letting RPC fail)
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('id, role, display_name')
@@ -189,7 +188,7 @@ exports.handler = async (event) => {
       };
     }
 
-    if (!['admin', 'owner'].includes(profile.role)) {
+    if (!ALLOWED_ROLES.includes(profile.role)) {
       log('warn', 'role_not_authorized', {
         admin_user_id: adminUserId,
         role: profile.role,
@@ -209,13 +208,11 @@ exports.handler = async (event) => {
       display_name: profile.display_name,
     });
 
-    // 4. Generate token + hash
     const rawToken = crypto.randomBytes(32).toString('base64url');
     const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
 
     log('info', 'token_generated', { token_hash_prefix: tokenHash.slice(0, 8) });
 
-    // 5. Mint the session via RPC
     const { data: sessionId, error: mintError } = await supabase.rpc(
       'mint_impersonation_session',
       {
@@ -265,7 +262,6 @@ exports.handler = async (event) => {
 
     log('info', 'session_minted', { session_id: sessionId });
 
-    // 6. Build redirect URL
     const redirectUrl = `${PORTAL_URL}?impersonate=${encodeURIComponent(rawToken)}`;
     const expiresAt = new Date(Date.now() + (duration_minutes || 30) * 60 * 1000).toISOString();
 

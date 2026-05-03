@@ -3,6 +3,7 @@
 // Form column stays narrow (640px) for focused editing - this page is
 // intentionally tighter than Dashboard/Clients/Invoicing because it's
 // a vertical edit surface, not a list.
+// Post-role-migration: team management visible to super_admin and admin.
 
 import { useState, useEffect } from 'react';
 import { Box, VStack, Spinner, Divider } from '@chakra-ui/react';
@@ -41,7 +42,7 @@ const Settings = () => {
     setLoading(false);
   };
 
-  const isOwner = profile?.role === 'owner';
+  const canManageTeam = ['super_admin', 'admin'].includes(profile?.role);
 
   if (loading) {
     return (
@@ -55,7 +56,6 @@ const Settings = () => {
     <Box position="relative" minH="100%">
       <Box {...PAGE_AMBIENT_GLOW_PROPS} />
 
-      {/* Centered narrow column - settings is a form surface, not a list */}
       <Box maxW="640px" mx="auto" position="relative">
         <VStack spacing={{ base: 8, md: 10 }} align="stretch">
           <SettingsHeader />
@@ -78,10 +78,10 @@ const Settings = () => {
 
           <SettingsPassword user={user} />
 
-          {isOwner && (
+          {canManageTeam && (
             <>
               <SectionDivider />
-              <SettingsTeam currentUserId={user.id} />
+              <SettingsTeam currentUserId={user.id} currentUserRole={profile?.role} />
             </>
           )}
 

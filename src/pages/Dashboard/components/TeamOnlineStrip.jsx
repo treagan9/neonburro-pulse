@@ -1,5 +1,6 @@
 // src/pages/Dashboard/components/TeamOnlineStrip.jsx
 // Naked avatars of online team members. Click navigates to /clients/.
+// Post-role-migration: queries all four staff roles.
 
 import { useState, useEffect } from 'react';
 import { HStack, Tooltip, Box } from '@chakra-ui/react';
@@ -7,6 +8,8 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../../lib/supabase';
 import { usePresence } from '../../../hooks/usePresence';
 import Avatar from '../../../components/common/Avatar';
+
+const STAFF_ROLES = ['super_admin', 'admin', 'manager', 'team'];
 
 const TeamOnlineStrip = () => {
   const navigate = useNavigate();
@@ -18,7 +21,7 @@ const TeamOnlineStrip = () => {
       const { data } = await supabase
         .from('profiles')
         .select('id, display_name, username, avatar_url, role')
-        .in('role', ['owner', 'admin', 'team'])
+        .in('role', STAFF_ROLES)
         .order('display_name');
       if (data) setProfiles(data);
     };
