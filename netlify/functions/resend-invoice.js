@@ -9,11 +9,9 @@
 // Always logs to invoice_history with send_type so the editor can
 // show a complete timeline of every send.
 //
-// 2026-04-27 (1): converted to ESM to match repo standard and to import
-// the shared invoiceEmailTemplate (which is ESM-only).
-// 2026-04-27 (2): added admin notifications on resend + reminder so the
-// audit trail matches the initial-send symmetry. Admin email links back
-// to Pulse for snapshot review.
+// 2026-04-27 (1): converted to ESM, imports shared invoiceEmailTemplate.
+// 2026-04-27 (2): admin audit notifications on resend + reminder.
+// 2026-04-27 (3): per-invoice CC list passed to Resend (current state).
 
 import { Resend } from 'resend';
 import { createClient } from '@supabase/supabase-js';
@@ -54,7 +52,23 @@ const getMST = () =>
     hour12: true,
   }) + ' MT';
 
-// Lookup the acting admin's display name for the audit trail
+const sanitizeCcList = (raw, primaryEmail) => {
+  if (!Array.isArray(raw)) return [];
+  const primary = String(primaryEmail || '').trim().toLowerCase();
+  const seen = new Set();
+  const out = [];
+  for (const entry of raw) {
+    const e = String(entry || '').trim().toLowerCase();
+    if (!e) continue;
+    if (e === primary) continue;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) continue;
+    if (seen.has(e)) continue;
+    seen.add(e);
+    out.push(e);
+  }
+  return out;
+};
+
 const fetchAdminName = async (userId) => {
   if (!userId) return 'Pulse';
   const { data } = await supabase
@@ -66,15 +80,9 @@ const fetchAdminName = async (userId) => {
   return data.display_name || data.username || 'Pulse';
 };
 
-// Rebuild the original client email from a stored invoice_snapshot.
-// Used when rendered_html is missing (invoices sent before that column
-// was being populated). The result is logically equivalent to the
-// original send: same line items, same totals, same pay link.
 const rebuildHtmlFromSnapshot = async ({ invoice, snapshot }) => {
   if (!snapshot) return null;
 
-  // Refetch client + project to feed the template — the snapshot has
-  // names but the template expects full records.
   let client = {
     name: snapshot.client_name || 'Client',
     email: snapshot.client_email || '',
@@ -127,9 +135,8 @@ const rebuildHtmlFromSnapshot = async ({ invoice, snapshot }) => {
   });
 };
 
-// ============================================================
-// CLIENT-FACING REMINDER EMAIL — editorial NeonBurro voice
-// ============================================================
+// ---------- client-facing reminder email ----------
+
 const buildReminderEmail = ({
   recipientName,
   bodyText,
@@ -196,19 +203,19 @@ const buildReminderEmail = ({
   `.trim();
 };
 
-// ============================================================
-// ADMIN NOTIFICATION — resend / reminder audit trail
-// ============================================================
+// ---------- admin audit email ----------
+
 const buildAdminAuditEmail = ({
-  action,           // 'resend' or 'reminder'
+  action,
   invoice,
   client,
   recipientEmail,
+  ccList,
   adminName,
   amountDue,
-  reminderSubject,  // only for reminder
-  reminderBody,     // only for reminder
-  rebuiltFromSnapshot, // only for resend
+  reminderSubject,
+  reminderBody,
+  rebuiltFromSnapshot,
 }) => {
   const safeNumber = escapeHtml(invoice.invoice_number);
   const safeClient = escapeHtml(client?.name || 'Client');
@@ -220,6 +227,16 @@ const buildAdminAuditEmail = ({
   const actionSub = action === 'resend'
     ? `Same email re-delivered${rebuiltFromSnapshot ? ' (rebuilt from archived snapshot)' : ''}`
     : 'Editorial nudge dispatched';
+
+  const ccBlock = ccList && ccList.length > 0
+    ? `
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#0A0A0A;border:1px solid #1f1f1f;border-radius:10px;margin-bottom:20px;">
+        <tr><td style="padding:12px 16px;">
+          <div style="color:#737373;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">CC'd (${ccList.length})</div>
+          <div style="color:#a0a0a0;font-size:12px;line-height:1.6;">${ccList.map(escapeHtml).join(' · ')}</div>
+        </td></tr>
+      </table>`
+    : '';
 
   const reminderBlock = action === 'reminder'
     ? `
@@ -280,6 +297,7 @@ const buildAdminAuditEmail = ({
               </td></tr>
             </table>
 
+            ${ccBlock}
             ${reminderBlock}
 
             <table width="100%" cellpadding="0" cellspacing="0">
@@ -301,11 +319,8 @@ const buildAdminAuditEmail = ({
 </html>`;
 };
 
-// ============================================================
-// RESEND HANDLER
-// Tries rendered_html first; falls back to rebuilding from
-// invoice_snapshot so all historical invoices remain resendable.
-// ============================================================
+// ---------- resend handler ----------
+
 const handleResend = async ({ invoiceId, userId }) => {
   const { data: invoice } = await supabase
     .from('invoices')
@@ -317,7 +332,6 @@ const handleResend = async ({ invoiceId, userId }) => {
   if (invoice.cancelled_at) throw new Error('Cannot resend a cancelled invoice');
   if (!invoice.clients?.email) throw new Error('Client has no email on file');
 
-  // Get the most recent stored history row
   const { data: lastHistory } = await supabase
     .from('invoice_history')
     .select('rendered_html, invoice_snapshot, sent_to')
@@ -330,8 +344,6 @@ const handleResend = async ({ invoiceId, userId }) => {
     throw new Error('No prior send found for this invoice. Use the Send button instead.');
   }
 
-  // Prefer the stored HTML for byte-identical resend; fall back to
-  // rebuilding from the JSON snapshot if rendered_html was never written.
   let html = lastHistory.rendered_html;
   const rebuiltFromSnapshot = !html;
   if (!html) {
@@ -348,10 +360,14 @@ const handleResend = async ({ invoiceId, userId }) => {
   }
 
   const recipientEmail = lastHistory.sent_to || invoice.clients.email;
+  // CC list comes from CURRENT invoice state, not the historical snapshot —
+  // so if you added CCs after the original send, the resend includes them.
+  const ccList = sanitizeCcList(invoice.cc_emails, recipientEmail);
 
   const result = await resend.emails.send({
     from: FROM_EMAIL,
     to: recipientEmail,
+    cc: ccList.length > 0 ? ccList : undefined,
     reply_to: 'hello@neonburro.com',
     subject: `Invoice ${invoice.invoice_number} from NeonBurro (resent)`,
     html,
@@ -367,6 +383,7 @@ const handleResend = async ({ invoiceId, userId }) => {
     send_type: 'resend',
     rendered_html: html,
     invoice_snapshot: lastHistory.invoice_snapshot,
+    notes: ccList.length > 0 ? `cc: ${ccList.join(', ')}` : null,
   });
 
   await supabase.from('activity_log').insert({
@@ -379,11 +396,12 @@ const handleResend = async ({ invoiceId, userId }) => {
       client_name: invoice.clients?.name,
       send_type: 'resend',
       recipient_email: recipientEmail,
+      cc_count: ccList.length,
+      cc_emails: ccList,
       rebuilt_from_snapshot: rebuiltFromSnapshot,
     },
   });
 
-  // Admin audit notification — fire and forget
   const adminName = await fetchAdminName(userId);
   const amountDue = parseFloat(invoice.total || 0) - parseFloat(invoice.total_paid || 0);
   const adminHtml = buildAdminAuditEmail({
@@ -391,6 +409,7 @@ const handleResend = async ({ invoiceId, userId }) => {
     invoice,
     client: invoice.clients,
     recipientEmail,
+    ccList,
     adminName,
     amountDue,
     rebuiltFromSnapshot,
@@ -399,16 +418,15 @@ const handleResend = async ({ invoiceId, userId }) => {
     from: ADMIN_FROM,
     to: ADMIN_TO,
     reply_to: invoice.clients?.email || 'hello@neonburro.com',
-    subject: `Invoice Resent: ${invoice.invoice_number} - ${invoice.clients?.name || 'Client'}`,
+    subject: `Invoice Resent: ${invoice.invoice_number} - ${invoice.clients?.name || 'Client'}${ccList.length > 0 ? ` (+${ccList.length} cc)` : ''}`,
     html: adminHtml,
   }).catch((err) => console.error('Admin resend notification failed:', err));
 
-  return { success: true, recipient: recipientEmail, send_type: 'resend' };
+  return { success: true, recipient: recipientEmail, send_type: 'resend', ccCount: ccList.length };
 };
 
-// ============================================================
-// REMINDER HANDLER — custom subject + body, fresh nudge email
-// ============================================================
+// ---------- reminder handler ----------
+
 const handleReminder = async ({ invoiceId, subject, body, userId }) => {
   if (!body || !body.trim()) throw new Error('Reminder body is required');
 
@@ -424,11 +442,11 @@ const handleReminder = async ({ invoiceId, subject, body, userId }) => {
   if (!invoice.clients?.email) throw new Error('Client has no email on file');
 
   const adminName = await fetchAdminName(userId);
+  const ccList = sanitizeCcList(invoice.cc_emails, invoice.clients.email);
 
   const amountDue =
     parseFloat(invoice.total || 0) - parseFloat(invoice.total_paid || 0);
 
-  // Reuse last pay token if one exists; reminders should keep the original link working
   const payUrl = invoice.pay_token
     ? `https://neonburro.com/pay/?token=${invoice.pay_token}`
     : 'https://neonburro.com/account/';
@@ -445,6 +463,7 @@ const handleReminder = async ({ invoiceId, subject, body, userId }) => {
   const result = await resend.emails.send({
     from: FROM_EMAIL,
     to: invoice.clients.email,
+    cc: ccList.length > 0 ? ccList : undefined,
     reply_to: 'hello@neonburro.com',
     subject: subject || `A gentle reminder about ${invoice.invoice_number}`,
     html,
@@ -461,6 +480,7 @@ const handleReminder = async ({ invoiceId, subject, body, userId }) => {
     reminder_subject: subject || null,
     reminder_body: body,
     rendered_html: html,
+    notes: ccList.length > 0 ? `cc: ${ccList.join(', ')}` : null,
   });
 
   await supabase.from('activity_log').insert({
@@ -473,16 +493,18 @@ const handleReminder = async ({ invoiceId, subject, body, userId }) => {
       client_name: invoice.clients?.name,
       send_type: 'reminder',
       recipient_email: invoice.clients.email,
+      cc_count: ccList.length,
+      cc_emails: ccList,
       subject,
     },
   });
 
-  // Admin audit notification — fire and forget
   const adminHtml = buildAdminAuditEmail({
     action: 'reminder',
     invoice,
     client: invoice.clients,
     recipientEmail: invoice.clients.email,
+    ccList,
     adminName,
     amountDue,
     reminderSubject: subject,
@@ -492,16 +514,15 @@ const handleReminder = async ({ invoiceId, subject, body, userId }) => {
     from: ADMIN_FROM,
     to: ADMIN_TO,
     reply_to: invoice.clients?.email || 'hello@neonburro.com',
-    subject: `Reminder Sent: ${invoice.invoice_number} - ${invoice.clients?.name || 'Client'}`,
+    subject: `Reminder Sent: ${invoice.invoice_number} - ${invoice.clients?.name || 'Client'}${ccList.length > 0 ? ` (+${ccList.length} cc)` : ''}`,
     html: adminHtml,
   }).catch((err) => console.error('Admin reminder notification failed:', err));
 
-  return { success: true, recipient: invoice.clients.email, send_type: 'reminder' };
+  return { success: true, recipient: invoice.clients.email, send_type: 'reminder', ccCount: ccList.length };
 };
 
-// ============================================================
-// HANDLER
-// ============================================================
+// ---------- handler ----------
+
 export const handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
