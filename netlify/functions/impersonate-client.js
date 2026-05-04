@@ -2,11 +2,19 @@
 // Admin-only: mint an impersonation session token that lets an admin view
 // the client portal as a specific client for a short, audited window.
 //
-// Updated post role hierarchy migration: now allows super_admin and admin.
+// Role hierarchy: super_admin and admin are both allowed to impersonate.
 //
-// DIAGNOSTIC BUILD: when DEBUG_IMPERSONATE=true, response bodies include
-// the actual values seen by the function so we can pinpoint the role check
-// failure without guessing.
+// Flow:
+//   1. Admin's Pulse session sends Authorization: Bearer <supabase_jwt>
+//   2. We verify the JWT, extract user_id
+//   3. We check their profiles.role is super_admin or admin
+//   4. We generate a 32-byte random token, hash it with sha256
+//   5. We call mint_impersonation_session(token_hash, ...)
+//   6. We return { token, redirect_url, expires_at, session_id }
+//   7. Admin's browser opens neonburro.com/account/?impersonate=<token>
+//
+// The raw token exists only in this response and the admin's browser tab.
+// The DB only ever sees the hash.
 
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
@@ -44,18 +52,6 @@ const log = (level, step, data = {}) => {
   }));
 };
 
-// Diagnostic helper: surface invisible characters in role strings
-const inspectString = (s) => {
-  if (s === null || s === undefined) return { value: s, type: typeof s };
-  return {
-    value: s,
-    type: typeof s,
-    length: s.length,
-    json: JSON.stringify(s),
-    char_codes: Array.from(s).map((c) => c.charCodeAt(0)),
-  };
-};
-
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 204, headers: CORS_HEADERS, body: '' };
@@ -85,11 +81,7 @@ exports.handler = async (event) => {
   }
 
   try {
-    log('info', 'invocation_start', {
-      ip: getClientIp(event),
-      build: 'diagnostic-2026-05-03',
-      allowed_roles: ALLOWED_ROLES,
-    });
+    log('info', 'invocation_start', { ip: getClientIp(event) });
 
     const authHeader = event.headers.authorization || event.headers.Authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -122,6 +114,7 @@ exports.handler = async (event) => {
     }
 
     if (!userData?.user) {
+      log('error', 'jwt_no_user_returned');
       return {
         statusCode: 401,
         headers: CORS_HEADERS,
@@ -136,6 +129,7 @@ exports.handler = async (event) => {
     try {
       parsed = JSON.parse(event.body || '{}');
     } catch (e) {
+      log('error', 'body_parse_failed');
       return {
         statusCode: 400,
         headers: CORS_HEADERS,
@@ -146,12 +140,18 @@ exports.handler = async (event) => {
     const { client_id, duration_minutes, reason } = parsed;
 
     if (!client_id) {
+      log('warn', 'missing_client_id');
       return {
         statusCode: 400,
         headers: CORS_HEADERS,
         body: JSON.stringify({ error: 'client_id is required' }),
       };
     }
+
+    log('info', 'request_parsed', {
+      client_id,
+      duration_minutes: duration_minutes || 30,
+    });
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
@@ -183,26 +183,14 @@ exports.handler = async (event) => {
         body: JSON.stringify({
           error: 'Your user has no profile record',
           code: 'NO_PROFILE',
-          ...(DEBUG && { debug: { admin_user_id: adminUserId } }),
         }),
       };
     }
 
-    const roleInspection = inspectString(profile.role);
-    log('info', 'profile_loaded', {
-      admin_user_id: adminUserId,
-      profile_id: profile.id,
-      display_name: profile.display_name,
-      role_inspection: roleInspection,
-      allowed_roles: ALLOWED_ROLES,
-      includes_check: ALLOWED_ROLES.includes(profile.role),
-    });
-
     if (!ALLOWED_ROLES.includes(profile.role)) {
       log('warn', 'role_not_authorized', {
         admin_user_id: adminUserId,
-        role_inspection: roleInspection,
-        allowed_roles: ALLOWED_ROLES,
+        role: profile.role,
       });
       return {
         statusCode: 403,
@@ -210,14 +198,6 @@ exports.handler = async (event) => {
         body: JSON.stringify({
           error: `Your role (${profile.role || 'none'}) cannot impersonate clients`,
           code: 'ROLE_DENIED',
-          ...(DEBUG && {
-            debug: {
-              role_inspection: roleInspection,
-              allowed_roles: ALLOWED_ROLES,
-              admin_user_id: adminUserId,
-              profile_id: profile.id,
-            },
-          }),
         }),
       };
     }
@@ -229,6 +209,8 @@ exports.handler = async (event) => {
 
     const rawToken = crypto.randomBytes(32).toString('base64url');
     const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+    log('info', 'token_generated', { token_hash_prefix: tokenHash.slice(0, 8) });
 
     const { data: sessionId, error: mintError } = await supabase.rpc(
       'mint_impersonation_session',
@@ -281,6 +263,8 @@ exports.handler = async (event) => {
 
     const redirectUrl = `${PORTAL_URL}?impersonate=${encodeURIComponent(rawToken)}`;
     const expiresAt = new Date(Date.now() + (duration_minutes || 30) * 60 * 1000).toISOString();
+
+    log('info', 'invocation_success', { session_id: sessionId });
 
     return {
       statusCode: 200,
