@@ -1,7 +1,7 @@
 // src/pages/Dashboard/components/FormInbox.jsx
 // Condensed form inbox for the Dashboard — top 5 unread preview.
-// Full management lives on /forms/ page.
-// Reads from real schema (no "data" column).
+// Full management lives on /forms/. Type hues stay distinct; brand-colliding
+// ones (contact, project_brief) resolve to Topo Lime. No hardcoded cyan glow.
 
 import { useState, useEffect } from 'react';
 import {
@@ -11,6 +11,7 @@ import { TbInbox, TbArrowRight, TbCircleCheck } from 'react-icons/tb';
 import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../../lib/supabase';
+import colors from '../../../theme/colors';
 
 const FORM_TYPE_LABELS = {
   contact:            'Contact',
@@ -22,13 +23,15 @@ const FORM_TYPE_LABELS = {
   wild_request:       'Wild Request',
 };
 
+// Distinct hues per type. Brand-colliding ones use Topo Lime so the page reads
+// as one family; the rest stay differentiated.
 const FORM_TYPE_COLORS = {
-  contact:            '#00E5E5',
-  application:        '#8B5CF6',
+  contact:            colors.accent.signal,   // was #00E5E5
+  application:        colors.accent.purple,
   collective_request: '#EC4899',
-  hosting:            '#06B6D4',
-  nomination:         '#FFE500',
-  project_brief:      '#39FF14',
+  hosting:            colors.accent.cool,
+  nomination:         colors.accent.banana,
+  project_brief:      colors.status.green,    // was #39FF14
   wild_request:       '#FF6B35',
 };
 
@@ -104,7 +107,7 @@ const FormInbox = () => {
             h="6px"
             borderRadius="full"
             bg={totalUnread > 0 ? 'brand.500' : 'surface.700'}
-            boxShadow={totalUnread > 0 ? '0 0 8px rgba(0,229,229,0.6)' : 'none'}
+            boxShadow={totalUnread > 0 ? `0 0 8px ${colors.accent.signal}` : 'none'}
           />
           <Text
             color="brand.500"
@@ -160,11 +163,7 @@ const FormInbox = () => {
       ) : (
         <Box borderTop="1px solid" borderColor="surface.900">
           {submissions.map((s) => (
-            <PreviewRow
-              key={s.id}
-              submission={s}
-              onClick={() => navigate('/forms/')}
-            />
+            <PreviewRow key={s.id} submission={s} onClick={() => navigate('/forms/')} />
           ))}
         </Box>
       )}
@@ -175,7 +174,7 @@ const FormInbox = () => {
 const PreviewRow = ({ submission, onClick }) => {
   const formType = submission.form_type || 'contact';
   const typeLabel = FORM_TYPE_LABELS[formType] || formType.replace(/_/g, ' ');
-  const typeColor = FORM_TYPE_COLORS[formType] || '#737373';
+  const typeColor = FORM_TYPE_COLORS[formType] || colors.surface[500];
 
   const senderName = getSenderName(submission);
   const senderEmail = getSenderEmail(submission);
@@ -216,7 +215,7 @@ const PreviewRow = ({ submission, onClick }) => {
         <Box flex={1} minW={0}>
           <HStack spacing={2} align="baseline">
             <Text
-              color={isUnread ? 'white' : 'surface.400'}
+              color={isUnread ? 'text.primary' : 'surface.400'}
               fontSize="sm"
               fontWeight={isUnread ? '700' : '500'}
               noOfLines={1}

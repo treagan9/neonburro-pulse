@@ -1,6 +1,6 @@
 // src/pages/Dashboard/components/TeamOnlineStrip.jsx
 // Naked avatars of online team members. Click navigates to /clients/.
-// Post-role-migration: queries all four staff roles.
+// Queries all four staff roles. Tokens only.
 
 import { useState, useEffect } from 'react';
 import { HStack, Tooltip, Box } from '@chakra-ui/react';
@@ -40,7 +40,7 @@ const TeamOnlineStrip = () => {
           placement="bottom"
           hasArrow
           bg="surface.800"
-          color="white"
+          color="text.primary"
           fontSize="xs"
           openDelay={300}
         >

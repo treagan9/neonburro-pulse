@@ -1,13 +1,11 @@
 // src/pages/Dashboard/index.jsx
-// Design language v2: kicker label, mono hero number, teal-filled + Invoice
-// secondary outlined + Client. Explicit child color props on buttons.
+// Landing page. Kicker label, mono hero number, secondary +Client / primary
+// +Invoice. Uses SystemHeader (team strip + live clock + refresh). Tokens only.
 
 import { useState, useEffect } from 'react';
-import {
-  Box, VStack, HStack, Text, Icon, IconButton, Tooltip,
-} from '@chakra-ui/react';
+import { Box, VStack, HStack, Text, Icon } from '@chakra-ui/react';
 import { useNavigate } from 'react-router-dom';
-import { TbPlus, TbRefresh } from 'react-icons/tb';
+import { TbPlus } from 'react-icons/tb';
 import { supabase } from '../../lib/supabase';
 import {
   PRIMARY_BUTTON_PROPS,
@@ -18,7 +16,7 @@ import {
   PAGE_AMBIENT_GLOW_PROPS,
   formatCurrency,
 } from '../../lib/uiConstants';
-import TeamOnlineStrip from './components/TeamOnlineStrip';
+import SystemHeader from './components/SystemHeader';
 import FormInbox from './components/FormInbox';
 import ActivityStream from './components/ActivityStream';
 
@@ -132,43 +130,7 @@ const Dashboard = () => {
       <Box {...PAGE_AMBIENT_GLOW_PROPS} />
 
       <VStack spacing={{ base: 8, md: 12 }} align="stretch" position="relative">
-        {/* Top strip */}
-        <HStack justify="space-between" align="center" flexWrap="wrap" spacing={4}>
-          <Box flex={1} minW={0}>
-            <TeamOnlineStrip />
-          </Box>
-
-          <Tooltip
-            label="Refresh"
-            placement="bottom"
-            hasArrow
-            bg="surface.800"
-            color="white"
-            fontSize="xs"
-          >
-            <IconButton
-              icon={<TbRefresh size={14} />}
-              onClick={handleRefresh}
-              isLoading={refreshing}
-              variant="ghost"
-              size="sm"
-              color="surface.500"
-              h="32px"
-              w="32px"
-              minW="32px"
-              borderRadius="md"
-              border="1px solid"
-              borderColor="surface.800"
-              _hover={{
-                color: 'brand.500',
-                borderColor: 'brand.500',
-                bg: 'rgba(0,229,229,0.05)',
-              }}
-              transition="all 0.15s"
-              aria-label="Refresh dashboard"
-            />
-          </Tooltip>
-        </HStack>
+        <SystemHeader onRefresh={handleRefresh} refreshing={refreshing} />
 
         {/* HERO BLOCK */}
         <VStack align="stretch" spacing={5}>
@@ -200,7 +162,6 @@ const Dashboard = () => {
               </HStack>
             </VStack>
 
-            {/* Action buttons - secondary "+ Client", primary "+ Invoice" */}
             <HStack
               spacing={2}
               flexShrink={0}
@@ -210,7 +171,7 @@ const Dashboard = () => {
             >
               <Box as="button" onClick={() => navigate('/clients/')} {...SECONDARY_BUTTON_PROPS}>
                 <Icon as={TbPlus} {...SECONDARY_BUTTON_ICON_PROPS} />
-                <Text color="white" fontWeight="700">Client</Text>
+                <Text color="text.primary" fontWeight="700">Client</Text>
               </Box>
 
               <Box as="button" onClick={() => navigate('/invoicing/?invoice=new')} {...PRIMARY_BUTTON_PROPS}>
@@ -231,7 +192,7 @@ const Dashboard = () => {
           >
             <Text
               as="button"
-              color="white"
+              color="text.primary"
               fontWeight="700"
               onClick={() => navigate('/clients/')}
               _hover={{ color: 'brand.500' }}
@@ -245,7 +206,7 @@ const Dashboard = () => {
 
             <Text
               as="button"
-              color="white"
+              color="text.primary"
               fontWeight="700"
               onClick={() => navigate('/invoicing/')}
               _hover={{ color: 'brand.500' }}
