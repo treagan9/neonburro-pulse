@@ -12,6 +12,8 @@
     "@chakra-ui/react": "2.8.2",
     "@emotion/react": "11.11.3",
     "@emotion/styled": "11.11.0",
+    "@fontsource/geist-sans": "^5.2.5",
+    "@fontsource/jetbrains-mono": "^5.2.8",
     "@stripe/stripe-js": "^8.9.0",
     "@supabase/supabase-js": "^2.90.1",
     "date-fns": "^4.1.0",
