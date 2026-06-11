@@ -1,8 +1,9 @@
 // src/components/Layout/MobileNav.jsx
 // Bottom tab bar for mobile — 5 icon-only tabs + More sheet.
+// Repainted to Topo Lime + warmed near-black tokens. No hardcoded cyan.
 //
 // Primary tabs: Dashboard, Clients, Invoicing, Projects, More
-// More sheet opens a full-screen modal with Forms, Analytics, Calendar, Settings, Sign Out
+// More sheet: full-screen modal with Forms, Analytics, Calendar, Settings, Sign Out
 
 import { useState } from 'react';
 import {
@@ -15,6 +16,7 @@ import {
 } from 'react-icons/tb';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import colors from '../../theme/colors';
 
 const PRIMARY_TABS = [
   { path: '/dashboard/', icon: TbLayoutDashboard, label: 'Dashboard' },
@@ -29,6 +31,8 @@ const MORE_ITEMS = [
   { path: '/calendar/',  icon: TbCalendar,  label: 'Calendar',  desc: 'Scheduling and sprints' },
   { path: '/settings/',  icon: TbSettings,  label: 'Settings',  desc: 'Profile and preferences' },
 ];
+
+const SIGNAL_GLOW = `0 0 8px ${colors.accent.signal}`;
 
 const MobileNav = () => {
   const location = useLocation();
@@ -63,10 +67,10 @@ const MobileNav = () => {
         bottom={0}
         left={0}
         right={0}
-        bg="rgba(10, 10, 10, 0.92)"
+        bg="rgba(11, 11, 10, 0.92)"
         backdropFilter="saturate(180%) blur(20px)"
         borderTop="1px solid"
-        borderColor="rgba(255,255,255,0.06)"
+        borderColor="divider.soft"
         zIndex={20}
         pb="env(safe-area-inset-bottom)"
       >
@@ -87,24 +91,14 @@ const MobileNav = () => {
         </HStack>
       </Box>
 
-      <Modal
-        isOpen={moreOpen}
-        onClose={() => setMoreOpen(false)}
-        size="full"
-        motionPreset="slideInBottom"
-      >
+      <Modal isOpen={moreOpen} onClose={() => setMoreOpen(false)} size="full" motionPreset="slideInBottom">
         <ModalOverlay bg="blackAlpha.800" backdropFilter="blur(8px)" />
-        <ModalContent
-          bg="surface.950"
-          m={0}
-          borderRadius={0}
-          color="white"
-        >
+        <ModalContent bg="surface.950" m={0} borderRadius={0} color="text.primary">
           <ModalCloseButton
             top={4}
             right={4}
             color="surface.400"
-            _hover={{ color: 'white', bg: 'surface.900' }}
+            _hover={{ color: 'text.primary', bg: 'surface.900' }}
             borderRadius="full"
             size="lg"
           />
@@ -128,7 +122,7 @@ const MobileNav = () => {
                 <Text
                   fontSize="3xl"
                   fontWeight="700"
-                  color="white"
+                  color="text.primary"
                   letterSpacing="-0.02em"
                   lineHeight="1.1"
                 >
@@ -147,14 +141,10 @@ const MobileNav = () => {
                 ))}
               </VStack>
 
-              <Divider borderColor="rgba(255,255,255,0.06)" />
+              <Divider borderColor="divider.soft" />
 
               <SheetRow
-                item={{
-                  icon: TbLogout,
-                  label: 'Sign out',
-                  desc: 'See you next time',
-                }}
+                item={{ icon: TbLogout, label: 'Sign out', desc: 'See you next time' }}
                 destructive
                 onClick={handleSignOut}
               />
@@ -189,7 +179,7 @@ const TabButton = ({ item, active, onClick }) => (
         h="2px"
         borderRadius="full"
         bg="brand.500"
-        boxShadow="0 0 8px rgba(0,229,229,0.7)"
+        boxShadow={SIGNAL_GLOW}
       />
     )}
     <Icon
@@ -220,7 +210,7 @@ const SheetRow = ({ item, active, destructive, onClick }) => (
         w="40px"
         h="40px"
         borderRadius="lg"
-        bg={destructive ? 'rgba(255,51,102,0.08)' : 'surface.900'}
+        bg={destructive ? 'status.redMuted' : 'surface.900'}
         display="flex"
         alignItems="center"
         justifyContent="center"
@@ -236,7 +226,7 @@ const SheetRow = ({ item, active, destructive, onClick }) => (
         <Text
           fontSize="md"
           fontWeight="600"
-          color={destructive ? 'accent.coral' : 'white'}
+          color={destructive ? 'accent.coral' : 'text.primary'}
           lineHeight="1.2"
         >
           {item.label}

@@ -1,13 +1,11 @@
 // src/theme/index.js
-// NeonBurro Pulse — Chakra UI v2 theme
-// Editorial dark mode with fashion-tech signatures.
-// See docs/DESIGN_SYSTEM.md for the full spec.
+// NeonBurro Pulse — Chakra UI v2 theme. Aligned to marketing brand canon.
+// Topo Lime primary, Geist Sans, warmed near-black surfaces, Fraunces editorial.
 
 import { extendTheme } from '@chakra-ui/react';
 import colors from './colors';
 import typography from './typography';
 
-// Motion tokens — keep in sync across both repos
 const motion = {
   standard: '200ms cubic-bezier(0.4, 0, 0.2, 1)',
   fast: '120ms cubic-bezier(0.4, 0, 0.2, 1)',
@@ -16,10 +14,7 @@ const motion = {
 };
 
 const theme = extendTheme({
-  config: {
-    initialColorMode: 'dark',
-    useSystemColorMode: false,
-  },
+  config: { initialColorMode: 'dark', useSystemColorMode: false },
 
   colors,
 
@@ -30,79 +25,46 @@ const theme = extendTheme({
   letterSpacings: typography.letterSpacings,
   textStyles: typography.textStyles,
 
-  // Shared breakpoint tokens (match design doc)
-  breakpoints: {
-    base: '0px',
-    sm: '640px',
-    md: '1024px',
-    lg: '1440px',
-    xl: '1920px',
-  },
+  breakpoints: { base: '0px', sm: '640px', md: '1024px', lg: '1440px', xl: '1920px' },
 
-  // Shared radii
   radii: {
-    none: '0',
-    xs: '4px',
-    sm: '8px',     // Chips, small badges
-    md: '12px',    // Buttons
-    lg: '16px',    // Cards
-    xl: '20px',    // Modals, bottom sheets (top only)
-    '2xl': '24px',
-    full: '9999px',
+    none: '0', xs: '4px', sm: '8px', md: '12px', lg: '16px', xl: '20px', '2xl': '24px', full: '9999px',
   },
 
-  // Shared shadows — tone-based elevation, not heavy drop shadow
   shadows: {
     none: 'none',
     card: '0 2px 8px rgba(0, 0, 0, 0.3)',
     modal: '0 16px 64px rgba(0, 0, 0, 0.5)',
     sheet: '0 -8px 32px rgba(0, 0, 0, 0.4)',
-    focus: '0 0 0 2px rgba(0, 229, 229, 0.4)',
-    glow: '0 0 20px rgba(0, 229, 229, 0.25)',
+    focus: '0 0 0 2px rgba(197, 217, 87, 0.4)',   // lime, was cyan
+    glow:  '0 0 20px rgba(197, 217, 87, 0.25)',    // lime, was cyan
   },
 
-  // Export motion tokens for use in components via theme.motion
   motion,
 
   styles: {
     global: {
       'html, body': {
         bg: 'surface.950',
-        color: 'white',
+        color: 'text.primary',
         fontFamily: 'body',
         fontSize: 'md',
         lineHeight: 'base',
-        fontFeatureSettings: '"cv11", "ss01", "ss03"',
-        fontOpticalSizing: 'auto',
         WebkitFontSmoothing: 'antialiased',
         MozOsxFontSmoothing: 'grayscale',
         textRendering: 'optimizeLegibility',
       },
-      'body': {
-        minHeight: '100vh',
-      },
+      'body': { minHeight: '100vh' },
       '*::selection': {
-        bg: 'rgba(0, 229, 229, 0.3)',
+        bg: 'rgba(197, 217, 87, 0.3)',   // lime, was cyan
         color: 'brand.300',
       },
-      '::-webkit-scrollbar': {
-        width: '6px',
-        height: '6px',
-        bg: 'surface.950',
-      },
+      '::-webkit-scrollbar': { width: '6px', height: '6px', bg: 'surface.950' },
       '::-webkit-scrollbar-thumb': {
-        bg: 'surface.800',
-        borderRadius: '3px',
-        _hover: { bg: 'surface.700' },
+        bg: 'surface.800', borderRadius: '3px', _hover: { bg: 'surface.700' },
       },
-      'code, kbd, pre, samp': {
-        fontFamily: 'mono',
-      },
-      a: {
-        textDecoration: 'none',
-        _hover: { textDecoration: 'none' },
-      },
-      // Pulse animation for live dots — matches motion spec
+      'code, kbd, pre, samp': { fontFamily: 'mono' },
+      a: { textDecoration: 'none', _hover: { textDecoration: 'none' } },
       '@keyframes pulse': {
         '0%, 100%': { opacity: 1, transform: 'scale(1)' },
         '50%': { opacity: 0.6, transform: 'scale(1.05)' },
@@ -121,11 +83,8 @@ const theme = extendTheme({
   components: {
     Button: {
       baseStyle: {
-        fontWeight: 600,
-        borderRadius: 'full',
-        transition: motion.standard,
-        _focus: { boxShadow: 'focus' },
-        _focusVisible: { boxShadow: 'focus' },
+        fontWeight: 600, borderRadius: 'full', transition: motion.standard,
+        _focus: { boxShadow: 'focus' }, _focusVisible: { boxShadow: 'focus' },
       },
       sizes: {
         sm: { h: '36px', minW: '36px', fontSize: 'sm', px: 4 },
@@ -135,103 +94,55 @@ const theme = extendTheme({
       },
       variants: {
         solid: {
-          bg: 'brand.500',
-          color: 'surface.950',
+          bg: 'brand.500', color: 'surface.950',
           _hover: {
-            bg: 'brand.400',
-            transform: 'translateY(-2px)',
-            boxShadow: 'glow',
+            bg: 'brand.400', transform: 'translateY(-2px)', boxShadow: 'glow',
             _disabled: { bg: 'brand.500', transform: 'none', boxShadow: 'none' },
           },
           _active: { transform: 'scale(0.98)' },
         },
         outline: {
-          bg: 'transparent',
-          borderColor: 'whiteAlpha.200',
-          color: 'white',
-          _hover: {
-            bg: 'whiteAlpha.50',
-            borderColor: 'brand.500',
-            color: 'brand.500',
-            transform: 'translateY(-1px)',
-          },
+          bg: 'transparent', borderColor: 'whiteAlpha.200', color: 'white',
+          _hover: { bg: 'whiteAlpha.50', borderColor: 'brand.500', color: 'brand.500', transform: 'translateY(-1px)' },
           _active: { transform: 'scale(0.98)' },
         },
         ghost: {
           color: 'whiteAlpha.700',
-          _hover: {
-            bg: 'whiteAlpha.100',
-            color: 'white',
-          },
+          _hover: { bg: 'whiteAlpha.100', color: 'white' },
           _active: { transform: 'scale(0.98)' },
         },
         neon: {
-          bg: 'transparent',
-          color: 'brand.500',
-          borderWidth: '1px',
-          borderColor: 'brand.500',
-          _hover: {
-            bg: 'rgba(0, 229, 229, 0.08)',
-            transform: 'translateY(-2px)',
-            boxShadow: 'glow',
-          },
+          bg: 'transparent', color: 'brand.500', borderWidth: '1px', borderColor: 'brand.500',
+          _hover: { bg: 'rgba(197, 217, 87, 0.08)', transform: 'translateY(-2px)', boxShadow: 'glow' },
           _active: { transform: 'scale(0.98)' },
         },
         destructive: {
-          bg: 'accent.coral',
-          color: 'white',
-          _hover: {
-            bg: '#E62958',
-            transform: 'translateY(-1px)',
-          },
+          bg: 'accent.coral', color: 'white',
+          _hover: { bg: '#E62958', transform: 'translateY(-1px)' },
           _active: { transform: 'scale(0.98)' },
         },
       },
-      defaultProps: {
-        size: 'md',
-        variant: 'solid',
-      },
+      defaultProps: { size: 'md', variant: 'solid' },
     },
 
     Input: {
       variants: {
         naked: {
           field: {
-            bg: 'transparent',
-            border: 'none',
-            borderBottom: '1px solid',
-            borderColor: 'whiteAlpha.200',
-            borderRadius: 0,
-            px: 0,
-            fontSize: 'md',
-            height: '48px',
-            color: 'white',
-            transition: motion.fast,
+            bg: 'transparent', border: 'none', borderBottom: '1px solid',
+            borderColor: 'whiteAlpha.200', borderRadius: 0, px: 0, fontSize: 'md',
+            height: '48px', color: 'white', transition: motion.fast,
             _placeholder: { color: 'whiteAlpha.300' },
             _hover: { borderColor: 'whiteAlpha.400' },
-            _focus: {
-              borderColor: 'brand.500',
-              boxShadow: 'none',
-              outline: 'none',
-            },
-            _focusVisible: {
-              borderColor: 'brand.500',
-              boxShadow: 'none',
-              outline: 'none',
-            },
+            _focus: { borderColor: 'brand.500', boxShadow: 'none', outline: 'none' },
+            _focusVisible: { borderColor: 'brand.500', boxShadow: 'none', outline: 'none' },
           },
         },
       },
-      defaultProps: {
-        variant: 'naked',
-      },
+      defaultProps: { variant: 'naked' },
     },
 
-    Text: {
-      baseStyle: {
-        color: 'white',
-      },
-    },
+    Text: { baseStyle: { color: 'text.primary' } },
   },
 });
 

@@ -2,7 +2,7 @@
 // Desktop sidebar with expand/collapse toggle.
 // - Expanded (240px): avatar + name + full nav labels + settings footer
 // - Collapsed (64px): avatar + icon-only nav + tooltips on hover
-// - Uses custom Avatar component (same as SettingsAvatar/ActivityStream)
+// - Repainted to Topo Lime + warmed near-black tokens. No hardcoded cyan.
 // - Preference persists via profiles.sidebar_collapsed (passed from AppShell)
 
 import { useState, useEffect } from 'react';
@@ -17,6 +17,7 @@ import {
 } from 'react-icons/tb';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
+import colors from '../../theme/colors';
 import Avatar from '../common/Avatar';
 
 const NAV_ITEMS = [
@@ -30,17 +31,17 @@ const NAV_ITEMS = [
 
 const FOOTER_ITEM = { path: '/settings/', label: 'Settings', icon: TbSettings };
 
+const SIGNAL_GLOW = `0 0 8px ${colors.accent.signal}`;
+
 const Sidebar = ({ collapsed = false, onToggle }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [profile, setProfile] = useState(null);
 
-  // Refetch whenever user changes (not just on mount)
   useEffect(() => {
     if (!user?.id) return;
     let cancelled = false;
-
     const fetchProfile = async () => {
       const { data } = await supabase
         .from('profiles')
@@ -49,7 +50,6 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
         .maybeSingle();
       if (!cancelled && data) setProfile(data);
     };
-
     fetchProfile();
     return () => { cancelled = true; };
   }, [user?.id]);
@@ -69,7 +69,7 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
       h="100vh"
       bg="surface.950"
       borderRight="1px solid"
-      borderColor="rgba(255,255,255,0.06)"
+      borderColor="divider.soft"
       position="fixed"
       left={0}
       top={0}
@@ -78,7 +78,6 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
       transition="width 240ms cubic-bezier(0.4, 0, 0.2, 1)"
       zIndex={10}
     >
-      {/* Brand + user identity */}
       <HStack
         px={collapsed ? 2 : 4}
         py={5}
@@ -93,7 +92,7 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
         />
         {!collapsed && (
           <Box flex={1} minW={0}>
-            <Text color="white" fontWeight="700" fontSize="sm" lineHeight="1.2" noOfLines={1}>
+            <Text color="text.primary" fontWeight="700" fontSize="sm" lineHeight="1.2" noOfLines={1}>
               Pulse
             </Text>
             <Text color="surface.500" fontSize="2xs" fontFamily="mono" noOfLines={1}>
@@ -103,16 +102,9 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
         )}
       </HStack>
 
-      <Divider borderColor="rgba(255,255,255,0.06)" />
+      <Divider borderColor="divider.soft" />
 
-      {/* Primary nav */}
-      <VStack
-        spacing={0.5}
-        px={collapsed ? 2 : 3}
-        py={3}
-        align="stretch"
-        flex={1}
-      >
+      <VStack spacing={0.5} px={collapsed ? 2 : 3} py={3} align="stretch" flex={1}>
         {NAV_ITEMS.map((item) => (
           <NavButton
             key={item.path}
@@ -124,7 +116,6 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
         ))}
       </VStack>
 
-      {/* Footer: settings + collapse toggle */}
       <VStack
         spacing={0.5}
         px={collapsed ? 2 : 3}
@@ -132,7 +123,7 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
         pb={3}
         align="stretch"
         borderTop="1px solid"
-        borderColor="rgba(255,255,255,0.06)"
+        borderColor="divider.soft"
       >
         <NavButton
           item={FOOTER_ITEM}
@@ -146,7 +137,7 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
           placement="right"
           hasArrow
           bg="surface.800"
-          color="white"
+          color="text.primary"
           fontSize="xs"
           openDelay={300}
         >
@@ -163,13 +154,10 @@ const Sidebar = ({ collapsed = false, onToggle }) => {
             justifyContent={collapsed ? 'center' : 'flex-end'}
             px={collapsed ? 0 : 3}
             transition="all 160ms cubic-bezier(0.4, 0, 0.2, 1)"
-            _hover={{ bg: 'surface.900', color: 'white' }}
+            _hover={{ bg: 'surface.900', color: 'text.primary' }}
             mt={1}
           >
-            <Icon
-              as={collapsed ? TbChevronRight : TbChevronLeft}
-              boxSize={4}
-            />
+            <Icon as={collapsed ? TbChevronRight : TbChevronLeft} boxSize={4} />
           </Box>
         </Tooltip>
       </VStack>
@@ -195,7 +183,7 @@ const NavButton = ({ item, active, collapsed, onClick }) => {
       px={collapsed ? 0 : 4}
       borderRadius="lg"
       bg={active ? 'surface.900' : 'transparent'}
-      color={active ? 'white' : 'surface.500'}
+      color={active ? 'text.primary' : 'surface.500'}
       display="flex"
       alignItems="center"
       justifyContent={collapsed ? 'center' : 'flex-start'}
@@ -203,7 +191,7 @@ const NavButton = ({ item, active, collapsed, onClick }) => {
       cursor="pointer"
       position="relative"
       transition="all 160ms cubic-bezier(0.4, 0, 0.2, 1)"
-      _hover={{ bg: 'surface.900', color: 'white' }}
+      _hover={{ bg: 'surface.900', color: 'text.primary' }}
     >
       {active && (
         <Box
@@ -215,7 +203,7 @@ const NavButton = ({ item, active, collapsed, onClick }) => {
           h="18px"
           borderRadius="full"
           bg="brand.500"
-          boxShadow="0 0 8px rgba(0,229,229,0.6)"
+          boxShadow={SIGNAL_GLOW}
         />
       )}
       <Icon as={item.icon} boxSize={collapsed ? 5 : 4} flexShrink={0} />
@@ -238,7 +226,7 @@ const NavButton = ({ item, active, collapsed, onClick }) => {
         placement="right"
         hasArrow
         bg="surface.800"
-        color="white"
+        color="text.primary"
         fontSize="xs"
         openDelay={300}
       >
