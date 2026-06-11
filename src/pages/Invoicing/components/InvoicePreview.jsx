@@ -2,15 +2,15 @@
 // Pixel-exact preview of the client email.
 // Uses the SAME template module as netlify/functions/send-invoice.js
 // so this preview is literally what the client receives in their inbox.
+// Light-mode email: iframe frame uses bone, not black.
 
 import { useMemo } from 'react';
 import { Box, VStack, HStack, Text, Icon } from '@chakra-ui/react';
 import { TbClock, TbMailFast } from 'react-icons/tb';
 import { buildInvoiceEmailHTML } from '../../../lib/invoiceEmailTemplate';
+import { EMAIL } from '../../../lib/emailTokens';
 
 const InvoicePreview = ({ invoice, client, sprints }) => {
-  // Build the exact email HTML using the shared template.
-  // useMemo so we don't rebuild the iframe content on every parent re-render.
   const html = useMemo(() => {
     if (!client || !sprints || sprints.length === 0) return null;
 
@@ -25,7 +25,7 @@ const InvoicePreview = ({ invoice, client, sprints }) => {
         invoice_number: invoice?.invoice_number || 'NB______',
       },
       client,
-      project: null, // Project lookup happens server-side; preview shows just client
+      project: null,
       lineItems: sprints,
       invoiceDate,
       payUrl: '#preview',
@@ -58,7 +58,6 @@ const InvoicePreview = ({ invoice, client, sprints }) => {
 
   return (
     <VStack spacing={4} align="stretch">
-      {/* Preview indicator strip */}
       <HStack spacing={2} justify="center" pb={2}>
         <Icon as={TbMailFast} boxSize={3.5} color="brand.500" />
         <Text
@@ -73,14 +72,13 @@ const InvoicePreview = ({ invoice, client, sprints }) => {
         </Text>
       </HStack>
 
-      {/* The iframe containing the real email HTML */}
       <Box
         borderRadius="2xl"
         overflow="hidden"
         border="1px solid"
         borderColor="surface.800"
         boxShadow="0 8px 32px rgba(0,0,0,0.4)"
-        bg="#000000"
+        bg={EMAIL.page}
       >
         <Box
           as="iframe"
@@ -93,7 +91,6 @@ const InvoicePreview = ({ invoice, client, sprints }) => {
           display="block"
           sandbox="allow-same-origin"
           ref={(iframe) => {
-            // Auto-resize iframe to content height
             if (!iframe) return;
             const handleLoad = () => {
               try {
@@ -107,7 +104,6 @@ const InvoicePreview = ({ invoice, client, sprints }) => {
               }
             };
             iframe.addEventListener('load', handleLoad);
-            // Also try a delayed resize for image loading
             setTimeout(handleLoad, 500);
             setTimeout(handleLoad, 1500);
           }}
