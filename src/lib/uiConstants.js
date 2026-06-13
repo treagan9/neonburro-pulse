@@ -1,14 +1,11 @@
 // src/lib/uiConstants.js
-// Shared UI constants for Pulse - the design language.
-// Imported by Dashboard, Clients, Invoicing, Forms.
+// Shared UI constants for Pulse — the design language.
+// Imported by Dashboard, Clients, Invoicing, Forms. Topo Lime, tokens only.
 
-// PRIMARY ACTION BUTTON - teal fill, dark text
-// Used as <Box as="button" {...PRIMARY_BUTTON_PROPS}>
-//   <Icon as={TbPlus} {...PRIMARY_BUTTON_ICON_PROPS} />
-//   <Text {...PRIMARY_BUTTON_TEXT_PROPS}>Client</Text>
-// </Box>
-// We split into three because <Box as="button"> doesn't reliably cascade
-// `color` down to <Icon> + <Text> children in all Chakra versions.
+import colors from '../theme/colors';
+
+const SIGNAL = colors.accent.signal;
+
 export const PRIMARY_BUTTON_PROPS = {
   bg: 'brand.500',
   color: 'surface.950',
@@ -30,28 +27,17 @@ export const PRIMARY_BUTTON_PROPS = {
   _hover: {
     bg: 'brand.400',
     transform: 'translateY(-1px)',
-    boxShadow: '0 4px 16px rgba(0,229,229,0.25)',
+    boxShadow: `0 4px 16px ${SIGNAL}40`,
   },
   _active: { transform: 'translateY(0)' },
 };
 
-// Icon inside the primary button - explicit dark color
-export const PRIMARY_BUTTON_ICON_PROPS = {
-  boxSize: 3.5,
-  color: 'surface.950',
-};
+export const PRIMARY_BUTTON_ICON_PROPS = { boxSize: 3.5, color: 'surface.950' };
+export const PRIMARY_BUTTON_TEXT_PROPS = { color: 'surface.950', fontWeight: '700' };
 
-// Text inside the primary button - explicit dark color
-export const PRIMARY_BUTTON_TEXT_PROPS = {
-  color: 'surface.950',
-  fontWeight: '700',
-};
-
-// SECONDARY OUTLINED BUTTON - dark bg, white text, cyan border on hover
-// Used for "+ Client" on Dashboard (the secondary action next to + Invoice)
 export const SECONDARY_BUTTON_PROPS = {
   bg: 'surface.900',
-  color: 'white',
+  color: 'text.primary',
   fontWeight: '700',
   fontSize: 'xs',
   letterSpacing: '0.05em',
@@ -76,12 +62,8 @@ export const SECONDARY_BUTTON_PROPS = {
   _active: { transform: 'translateY(0)' },
 };
 
-export const SECONDARY_BUTTON_ICON_PROPS = {
-  boxSize: 3.5,
-  color: 'white',
-};
+export const SECONDARY_BUTTON_ICON_PROPS = { boxSize: 3.5, color: 'text.primary' };
 
-// SEARCH BAR WRAPPER - rounded card with focus glow
 export const SEARCH_INPUT_WRAP_PROPS = {
   bg: 'surface.900',
   border: '1px solid',
@@ -96,20 +78,18 @@ export const SEARCH_INPUT_WRAP_PROPS = {
   _hover: { borderColor: 'surface.700' },
   _focusWithin: {
     borderColor: 'brand.500',
-    bg: 'rgba(0,229,229,0.03)',
+    bg: colors.accent.signalAlpha?.['08'] || 'rgba(197,217,87,0.08)',
   },
 };
 
-// SEARCH INPUT - the unstyled input inside the wrapper
 export const SEARCH_INPUT_PROPS = {
   variant: 'unstyled',
   fontSize: 'sm',
-  color: 'white',
+  color: 'text.primary',
   flex: 1,
   _placeholder: { color: 'surface.600' },
 };
 
-// FILTER TAB - primary filter row (Active / Leads / Inactive)
 export const buildFilterTabProps = (active) => ({
   cursor: 'pointer',
   position: 'relative',
@@ -121,7 +101,7 @@ export const buildFilterTabProps = (active) => ({
 export const FILTER_TAB_LABEL_PROPS = (active) => ({
   fontSize: 'sm',
   fontWeight: '700',
-  color: active ? 'white' : 'surface.500',
+  color: active ? 'text.primary' : 'surface.500',
   letterSpacing: '-0.01em',
   transition: 'color 0.15s',
 });
@@ -141,10 +121,9 @@ export const FILTER_TAB_UNDERLINE_PROPS = {
   h: '2px',
   bg: 'brand.500',
   borderRadius: 'full',
-  boxShadow: '0 0 8px rgba(0,229,229,0.6)',
+  boxShadow: `0 0 8px ${SIGNAL}`,
 };
 
-// SORT TAB - secondary sort row, smaller and quieter
 export const SORT_TAB_LABEL_PROPS = (active) => ({
   fontSize: '2xs',
   fontWeight: '700',
@@ -157,18 +136,16 @@ export const SORT_TAB_LABEL_PROPS = (active) => ({
   _hover: !active ? { color: 'surface.500' } : {},
 });
 
-// PAGE WRAPPER - ambient glow + outer Box for any top-level page
 export const PAGE_AMBIENT_GLOW_PROPS = {
   position: 'absolute',
   top: 0,
   left: 0,
   right: 0,
   h: '500px',
-  bg: 'radial-gradient(ellipse at top center, rgba(0,229,229,0.04), transparent 70%)',
+  bg: `radial-gradient(ellipse at top center, ${colors.accent.signalAlpha?.['08'] || 'rgba(197,217,87,0.08)'}, transparent 70%)`,
   pointerEvents: 'none',
 };
 
-// Currency formatters - kept here for cross-page use
 export const formatCurrency = (val) => {
   const num = parseFloat(val || 0);
   if (num === 0) return '$0';

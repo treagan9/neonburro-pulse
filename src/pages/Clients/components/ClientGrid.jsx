@@ -1,6 +1,6 @@
 // src/pages/Clients/components/ClientGrid.jsx
-// Row-based list. Click row -> /clients/:id/ detail page
-// Hover shows an edit icon that opens the modal for quick edits
+// Row-based list. Click row -> /clients/:id/ detail. Hover reveals edit icon.
+// Status + tag colors resolve from tokens. No hardcoded cyan.
 
 import {
   Box, VStack, HStack, Text, Icon, Center, Spinner, Button,
@@ -8,25 +8,23 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { TbUsers, TbBolt, TbFolder, TbEdit } from 'react-icons/tb';
 import { getAvatarColor, timeAgo } from '../../../utils/phone';
+import colors from '../../../theme/colors';
 import Avatar from '../../../components/common/Avatar';
 
-// ============================================================
-// HELPERS
-// ============================================================
-
 const STATUS_DOT = {
-  active:   '#39FF14',
-  lead:     '#FFE500',
-  inactive: '#737373',
+  active:   colors.status.green,
+  lead:     colors.accent.banana,
+  inactive: colors.surface[500],
 };
 
+// Tag hues stay distinct; brand-colliding ones resolve to Topo Lime / green.
 const TAG_COLORS = {
-  local: '#00E5E5',
-  recurring: '#39FF14',
-  vip: '#FFE500',
-  lab: '#8B5CF6',
-  hosting: '#06B6D4',
-  web3: '#EC4899',
+  local:        colors.accent.signal,
+  recurring:    colors.status.green,
+  vip:          colors.accent.banana,
+  lab:          colors.accent.purple,
+  hosting:      colors.accent.cool,
+  web3:         '#EC4899',
   subscription: '#FF6B35',
 };
 
@@ -36,10 +34,6 @@ const currency = (val) => {
   if (num >= 1000) return `$${(num / 1000).toFixed(1)}k`;
   return `$${num.toLocaleString()}`;
 };
-
-// ============================================================
-// ROW
-// ============================================================
 
 const ClientRow = ({ client, onEdit }) => {
   const navigate = useNavigate();
@@ -75,7 +69,6 @@ const ClientRow = ({ client, onEdit }) => {
       }}
     >
       <HStack spacing={4} align="center">
-        {/* Status dot */}
         <Box
           w="6px"
           h="6px"
@@ -85,30 +78,17 @@ const ClientRow = ({ client, onEdit }) => {
           flexShrink={0}
         />
 
-        {/* Avatar - uses uploaded image or initials fallback */}
-        <Avatar
-          name={client.name}
-          url={client.avatar_url}
-          size="sm"
-          border={false}
-        />
+        <Avatar name={client.name} url={client.avatar_url} size="sm" border={false} />
 
-        {/* Name + company + tags */}
         <VStack align="start" spacing={0} flex={1} minW={0}>
           <HStack spacing={2}>
-            <Text color="white" fontSize="sm" fontWeight="700" noOfLines={1}>
+            <Text color="text.primary" fontSize="sm" fontWeight="700" noOfLines={1}>
               {client.name}
             </Text>
             {tags.length > 0 && (
               <HStack spacing={1}>
                 {tags.slice(0, 3).map((tag) => (
-                  <Box
-                    key={tag}
-                    w="5px"
-                    h="5px"
-                    borderRadius="full"
-                    bg={TAG_COLORS[tag] || '#737373'}
-                  />
+                  <Box key={tag} w="5px" h="5px" borderRadius="full" bg={TAG_COLORS[tag] || colors.surface[500]} />
                 ))}
                 {tags.length > 3 && (
                   <Text fontSize="2xs" color="surface.600" fontFamily="mono">
@@ -120,36 +100,27 @@ const ClientRow = ({ client, onEdit }) => {
           </HStack>
           <HStack spacing={1.5}>
             {client.company && (
-              <Text color="surface.500" fontSize="xs" noOfLines={1}>
-                {client.company}
-              </Text>
+              <Text color="surface.500" fontSize="xs" noOfLines={1}>{client.company}</Text>
             )}
             {!client.company && client.email && (
-              <Text color="surface.500" fontSize="xs" noOfLines={1}>
-                {client.email}
-              </Text>
+              <Text color="surface.500" fontSize="xs" noOfLines={1}>{client.email}</Text>
             )}
           </HStack>
         </VStack>
 
-        {/* Stats */}
         <HStack spacing={5} display={{ base: 'none', md: 'flex' }}>
           {projectCount > 0 && (
             <HStack spacing={1.5}>
               <Icon as={TbFolder} boxSize={3} color="surface.600" />
-              <Text color="surface.400" fontSize="xs" fontFamily="mono" fontWeight="700">
-                {projectCount}
-              </Text>
+              <Text color="surface.400" fontSize="xs" fontFamily="mono" fontWeight="700">{projectCount}</Text>
             </HStack>
           )}
           <HStack spacing={1.5}>
             <Icon as={TbBolt} boxSize={3} color="surface.600" />
-            <Text color="surface.400" fontSize="xs" fontFamily="mono" fontWeight="700">
-              {sprintCount}
-            </Text>
+            <Text color="surface.400" fontSize="xs" fontFamily="mono" fontWeight="700">{sprintCount}</Text>
           </HStack>
           <Text
-            color={totalFunded > 0 ? 'white' : 'surface.700'}
+            color={totalFunded > 0 ? 'text.primary' : 'surface.700'}
             fontSize="xs"
             fontFamily="mono"
             fontWeight="700"
@@ -160,7 +131,6 @@ const ClientRow = ({ client, onEdit }) => {
           </Text>
         </HStack>
 
-        {/* Timestamp */}
         <Text
           color="surface.700"
           fontSize="2xs"
@@ -172,7 +142,6 @@ const ClientRow = ({ client, onEdit }) => {
           {timeAgo(client.last_activity_at || client.created_at)}
         </Text>
 
-        {/* Edit icon - only visible on hover */}
         <Box
           as="button"
           onClick={handleEditClick}
@@ -191,19 +160,13 @@ const ClientRow = ({ client, onEdit }) => {
   );
 };
 
-// ============================================================
-// GRID
-// ============================================================
-
 const ClientGrid = ({ clients, loading, onEdit, onAdd, isEmpty }) => {
   if (loading) {
     return (
       <Center py={16}>
         <VStack spacing={3}>
           <Spinner size="md" color="brand.500" thickness="2px" />
-          <Text color="surface.600" fontSize="xs" fontFamily="mono">
-            Loading clients
-          </Text>
+          <Text color="surface.600" fontSize="xs" fontFamily="mono">Loading clients</Text>
         </VStack>
       </Center>
     );
@@ -215,7 +178,7 @@ const ClientGrid = ({ clients, loading, onEdit, onAdd, isEmpty }) => {
         <VStack spacing={4}>
           <Icon as={TbUsers} boxSize={10} color="surface.700" />
           <VStack spacing={1}>
-            <Text color="white" fontSize="md" fontWeight="700">
+            <Text color="text.primary" fontSize="md" fontWeight="700">
               {isEmpty ? 'No clients yet' : 'No matches'}
             </Text>
             <Text color="surface.500" fontSize="xs">
@@ -232,7 +195,7 @@ const ClientGrid = ({ clients, loading, onEdit, onAdd, isEmpty }) => {
               borderRadius="full"
               onClick={onAdd}
               mt={2}
-              _hover={{ bg: 'rgba(0,229,229,0.08)' }}
+              _hover={{ bg: 'divider.accent' }}
             >
               Add your first client
             </Button>
