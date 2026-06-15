@@ -1,10 +1,6 @@
 // src/pages/Clients/components/SitesTab.jsx
-// Sites tab on ClientDetail
-// - Top: connected Netlify sites for this client
-// - Below: merged deploy feed across all sites, filterable per-site
-// - Searchable Netlify picker when connecting
-// - Domain-first naming (pulls from client.website, falls back to Netlify slug)
-// - Deploy rows link to the deployed URL
+// Sites tab on ClientDetail: connected Netlify sites + merged deploy feed,
+// filterable per-site, searchable picker. Deploy-state colors from tokens.
 
 import { useState, useEffect, useMemo } from 'react';
 import {
@@ -16,15 +12,17 @@ import {
   TbLink, TbAlertCircle, TbGitBranch, TbGitCommit,
 } from 'react-icons/tb';
 import { supabase } from '../../../lib/supabase';
+import colors from '../../../theme/colors';
 import { formatSmart } from '../../../lib/time';
 
-// Strip protocol + trailing slash off a URL for clean display
+const SIGNAL_GLOW = `0 0 8px ${colors.accent.signal}`;
+const GREEN_GLOW = `0 0 6px ${colors.status.green}`;
+
 const cleanDomain = (url) => {
   if (!url) return '';
   return url.replace(/^https?:\/\//, '').replace(/\/$/, '');
 };
 
-// Format a duration in seconds -> "24s" or "2m 14s"
 const formatDuration = (seconds) => {
   if (!seconds || seconds <= 0) return '';
   if (seconds < 60) return `${Math.round(seconds)}s`;
@@ -33,18 +31,17 @@ const formatDuration = (seconds) => {
   return s > 0 ? `${m}m ${s}s` : `${m}m`;
 };
 
-// Which domain to show for a site - prefer the primary URL, fall back to Netlify slug
 const getSiteDomain = (site) => {
   if (site.primary_url) return cleanDomain(site.primary_url);
   return site.netlify_site_name;
 };
 
 const DEPLOY_STATE_COLORS = {
-  ready: '#39FF14',
-  error: '#FF3366',
-  building: '#FFE500',
-  enqueued: '#FFE500',
-  new: '#737373',
+  ready:    colors.status.green,
+  error:    colors.accent.coral,
+  building: colors.accent.banana,
+  enqueued: colors.accent.banana,
+  new:      colors.surface[500],
 };
 
 const SitesTab = ({ clientId, clientName }) => {
@@ -53,7 +50,6 @@ const SitesTab = ({ clientId, clientName }) => {
   const [loading, setLoading] = useState(true);
   const [activeSiteFilter, setActiveSiteFilter] = useState('all');
 
-  // Netlify picker state
   const [showPicker, setShowPicker] = useState(false);
   const [netlifySites, setNetlifySites] = useState([]);
   const [loadingNetlify, setLoadingNetlify] = useState(false);
@@ -70,7 +66,6 @@ const SitesTab = ({ clientId, clientName }) => {
 
   const fetchSitesAndDeploys = async () => {
     setLoading(true);
-    // Parallel fetch - sites for this client, then all their deploys
     const [sitesRes, deploysRes] = await Promise.all([
       supabase
         .from('client_sites')
@@ -202,22 +197,17 @@ const SitesTab = ({ clientId, clientName }) => {
     }
   };
 
-  // Build a lookup of siteId -> site for rendering deploy rows
   const siteLookup = useMemo(() => {
     const map = {};
-    sites.forEach((s) => {
-      map[s.id] = s;
-    });
+    sites.forEach((s) => { map[s.id] = s; });
     return map;
   }, [sites]);
 
-  // Filtered deploys based on site chip
   const filteredDeploys = useMemo(() => {
     if (activeSiteFilter === 'all') return deploys;
     return deploys.filter((d) => d.site_id === activeSiteFilter);
   }, [deploys, activeSiteFilter]);
 
-  // Counts per site for the filter chips
   const deployCounts = useMemo(() => {
     const counts = { all: deploys.length };
     deploys.forEach((d) => {
@@ -233,9 +223,6 @@ const SitesTab = ({ clientId, clientName }) => {
 
   return (
     <VStack spacing={0} align="stretch">
-      {/* ============================================ */}
-      {/* CONNECTED SITES LIST                         */}
-      {/* ============================================ */}
       {!hasSites && !showPicker && (
         <Center py={12}>
           <VStack spacing={3}>
@@ -258,7 +245,7 @@ const SitesTab = ({ clientId, clientName }) => {
             <Icon as={TbWorld} boxSize={3.5} color="surface.600" />
             <Box flex={1} minW={0}>
               <HStack spacing={2}>
-                <Text color="white" fontSize="sm" fontWeight="600" noOfLines={1}>
+                <Text color="text.primary" fontSize="sm" fontWeight="600" noOfLines={1}>
                   {domain}
                 </Text>
                 {site.is_internal && (
@@ -316,7 +303,7 @@ const SitesTab = ({ clientId, clientName }) => {
                   h="6px"
                   borderRadius="full"
                   bg="accent.neon"
-                  boxShadow="0 0 6px rgba(57,255,20,0.6)"
+                  boxShadow={GREEN_GLOW}
                 />
                 <Text color="surface.600" fontSize="2xs" fontFamily="mono">live</Text>
               </HStack>
@@ -325,9 +312,6 @@ const SitesTab = ({ clientId, clientName }) => {
         );
       })}
 
-      {/* ============================================ */}
-      {/* CONNECT NETLIFY SITE PICKER                  */}
-      {/* ============================================ */}
       {showPicker ? (
         <Box py={5} borderBottom="1px solid" borderColor="surface.900">
           <VStack spacing={4} align="stretch">
@@ -377,7 +361,7 @@ const SitesTab = ({ clientId, clientName }) => {
                   <HStack spacing={3}>
                     <Icon as={TbWorld} boxSize={5} color="brand.500" />
                     <Box flex={1}>
-                      <Text color="white" fontSize="sm" fontWeight="700">
+                      <Text color="text.primary" fontSize="sm" fontWeight="700">
                         {selectedSite.name}
                       </Text>
                       {selectedSite.url && (
@@ -436,7 +420,7 @@ const SitesTab = ({ clientId, clientName }) => {
                     borderBottom="1px solid"
                     borderColor="surface.700"
                     borderRadius={0}
-                    color="white"
+                    color="text.primary"
                     fontSize="md"
                     h="40px"
                     px={0}
@@ -450,7 +434,7 @@ const SitesTab = ({ clientId, clientName }) => {
                 <Checkbox
                   isChecked={isInternal}
                   onChange={(e) => setIsInternal(e.target.checked)}
-                  colorScheme="cyan"
+                  colorScheme="green"
                   size="sm"
                 >
                   <Text color="surface.400" fontSize="xs">
@@ -460,8 +444,9 @@ const SitesTab = ({ clientId, clientName }) => {
 
                 {connectError && (
                   <HStack
-                    bg="rgba(255,51,102,0.08)"
-                    border="1px solid rgba(255,51,102,0.25)"
+                    bg={`${colors.accent.coral}14`}
+                    border="1px solid"
+                    borderColor={`${colors.accent.coral}40`}
                     borderRadius="lg"
                     p={3}
                     spacing={2}
@@ -506,7 +491,7 @@ const SitesTab = ({ clientId, clientName }) => {
                     autoFocus
                     bg="transparent"
                     border="none"
-                    color="white"
+                    color="text.primary"
                     fontSize="sm"
                     h="32px"
                     px={0}
@@ -548,7 +533,7 @@ const SitesTab = ({ clientId, clientName }) => {
                           <Box flex={1} minW={0}>
                             <HStack spacing={2}>
                               <Text
-                                color="white"
+                                color="text.primary"
                                 fontSize="sm"
                                 fontWeight="600"
                                 fontFamily="mono"
@@ -617,9 +602,6 @@ const SitesTab = ({ clientId, clientName }) => {
         </HStack>
       )}
 
-      {/* ============================================ */}
-      {/* DEPLOY FEED                                  */}
-      {/* ============================================ */}
       {hasSites && (
         <Box pt={8} mt={2}>
           <HStack justify="space-between" align="baseline" mb={4}>
@@ -633,16 +615,11 @@ const SitesTab = ({ clientId, clientName }) => {
             >
               Recent Deploys
             </Text>
-            <Text
-              fontSize="2xs"
-              color="surface.700"
-              fontFamily="mono"
-            >
+            <Text fontSize="2xs" color="surface.700" fontFamily="mono">
               {deploys.length} total
             </Text>
           </HStack>
 
-          {/* Site filter chips - only show if >1 site */}
           {sites.length > 1 && (
             <HStack
               spacing={4}
@@ -664,7 +641,7 @@ const SitesTab = ({ clientId, clientName }) => {
                   <Text
                     fontSize="xs"
                     fontWeight="700"
-                    color={activeSiteFilter === 'all' ? 'white' : 'surface.600'}
+                    color={activeSiteFilter === 'all' ? 'text.primary' : 'surface.600'}
                     _hover={activeSiteFilter !== 'all' ? { color: 'surface.400' } : {}}
                     transition="color 0.15s"
                   >
@@ -688,7 +665,7 @@ const SitesTab = ({ clientId, clientName }) => {
                     h="2px"
                     bg="brand.500"
                     borderRadius="full"
-                    boxShadow="0 0 8px rgba(0,229,229,0.6)"
+                    boxShadow={SIGNAL_GLOW}
                   />
                 )}
               </Box>
@@ -709,7 +686,7 @@ const SitesTab = ({ clientId, clientName }) => {
                       <Text
                         fontSize="xs"
                         fontWeight="700"
-                        color={active ? 'white' : 'surface.600'}
+                        color={active ? 'text.primary' : 'surface.600'}
                         _hover={!active ? { color: 'surface.400' } : {}}
                         transition="color 0.15s"
                       >
@@ -733,7 +710,7 @@ const SitesTab = ({ clientId, clientName }) => {
                         h="2px"
                         bg="brand.500"
                         borderRadius="full"
-                        boxShadow="0 0 8px rgba(0,229,229,0.6)"
+                        boxShadow={SIGNAL_GLOW}
                       />
                     )}
                   </Box>
@@ -763,7 +740,7 @@ const SitesTab = ({ clientId, clientName }) => {
               {filteredDeploys.map((d) => {
                 const site = siteLookup[d.site_id];
                 const domain = site ? getSiteDomain(site) : d.netlify_site_id;
-                const stateColor = DEPLOY_STATE_COLORS[d.state] || '#737373';
+                const stateColor = DEPLOY_STATE_COLORS[d.state] || colors.surface[500];
                 const isReady = d.state === 'ready';
                 const isError = d.state === 'error';
                 const href = d.deploy_url || site?.primary_url;
@@ -793,7 +770,7 @@ const SitesTab = ({ clientId, clientName }) => {
                     />
                     <Box flex={1} minW={0}>
                       <Text
-                        color={isError ? 'red.300' : 'white'}
+                        color={isError ? 'red.300' : 'text.primary'}
                         fontSize="sm"
                         fontWeight="600"
                         noOfLines={1}

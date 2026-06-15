@@ -1,11 +1,8 @@
 // path: /clients/:clientId/
 //
 // Tabs: Overview / Sprints / Invoices / Projects / Sites / Messages
-// Admin can click the avatar to upload/replace/remove the client's photo
-// Admin can view/regenerate PIN from Portal Access section on Overview
-// Admin can "View as Client" to open the portal impersonation view
-// Admin can "Activate portal" to create auth user + send branded welcome email
-//   (only shown when portal_account_created_at is null)
+// Admin can manage avatar, PIN, impersonation, activation.
+// Colors resolve from theme tokens. No hardcoded cyan.
 
 import { useState, useEffect } from 'react';
 import {
@@ -19,6 +16,7 @@ import {
   TbMessageCircle, TbTrash, TbX, TbEdit,
 } from 'react-icons/tb';
 import { supabase } from '../../lib/supabase';
+import colors from '../../theme/colors';
 import { formatPhoneDisplay, timeAgo } from '../../utils/phone';
 import SitesTab from './components/SitesTab';
 import ClientModal from './components/ClientModal';
@@ -37,13 +35,15 @@ const TAB_OPTIONS = [
 ];
 
 const STATUS_COLORS = {
-  draft: '#737373',
-  sent: '#00E5E5',
-  viewed: '#FFE500',
-  partial: '#FFE500',
-  overdue: '#FF3366',
-  paid: '#39FF14',
+  draft:   colors.surface[500],
+  sent:    colors.accent.signal,
+  viewed:  colors.accent.banana,
+  partial: colors.accent.banana,
+  overdue: colors.accent.coral,
+  paid:    colors.status.green,
 };
+
+const SIGNAL_GLOW = `0 0 8px ${colors.accent.signal}`;
 
 const currency = (val) => {
   const num = parseFloat(val || 0);
@@ -59,10 +59,10 @@ const OverviewTab = ({ client, stats, activity, onClientUpdate }) => (
   <VStack spacing={8} align="stretch">
     <SimpleGrid columns={{ base: 2, md: 4 }} spacing={6}>
       {[
-        { label: 'Sprints', value: stats.totalSprints, color: '#00E5E5' },
-        { label: 'Funded', value: currency(stats.totalFunded), color: '#39FF14' },
-        { label: 'Outstanding', value: currency(stats.outstanding), color: '#FFE500' },
-        { label: 'Invoices', value: stats.totalInvoices, color: '#8B5CF6' },
+        { label: 'Sprints', value: stats.totalSprints, color: colors.accent.signal },
+        { label: 'Funded', value: currency(stats.totalFunded), color: colors.status.green },
+        { label: 'Outstanding', value: currency(stats.outstanding), color: colors.accent.banana },
+        { label: 'Invoices', value: stats.totalInvoices, color: colors.accent.purple },
       ].map((stat) => (
         <Box key={stat.label}>
           <Text
@@ -79,7 +79,7 @@ const OverviewTab = ({ client, stats, activity, onClientUpdate }) => (
           <Text
             fontSize="2xl"
             fontWeight="800"
-            color="white"
+            color="text.primary"
             fontFamily="mono"
             letterSpacing="-0.02em"
             lineHeight="1"
@@ -250,7 +250,7 @@ const SprintsTab = ({ sprints, loading }) => {
                 <Text
                   fontSize="xs"
                   fontWeight="700"
-                  color={active ? 'white' : 'surface.600'}
+                  color={active ? 'text.primary' : 'surface.600'}
                   _hover={!active ? { color: 'surface.400' } : {}}
                 >
                   {opt.label}
@@ -273,7 +273,7 @@ const SprintsTab = ({ sprints, loading }) => {
                   h="2px"
                   bg="brand.500"
                   borderRadius="full"
-                  boxShadow="0 0 8px rgba(0,229,229,0.6)"
+                  boxShadow={SIGNAL_GLOW}
                 />
               )}
             </Box>
@@ -293,7 +293,7 @@ const SprintsTab = ({ sprints, loading }) => {
           {filtered.map((s) => {
             const isPaid = s.payment_status === 'paid' || s.locked;
             const isDraft = s.is_billable === false;
-            const statusColor = isPaid ? '#39FF14' : isDraft ? '#737373' : '#FFE500';
+            const statusColor = isPaid ? colors.status.green : isDraft ? colors.surface[500] : colors.accent.banana;
             return (
               <HStack
                 key={s.id}
@@ -323,12 +323,12 @@ const SprintsTab = ({ sprints, loading }) => {
                       </Text>
                     )}
                   </HStack>
-                  <Text color="white" fontSize="sm" fontWeight="600" noOfLines={1}>
+                  <Text color="text.primary" fontSize="sm" fontWeight="600" noOfLines={1}>
                     {s.title}
                   </Text>
                 </Box>
                 <Text
-                  color={isPaid ? 'accent.neon' : 'white'}
+                  color={isPaid ? 'accent.neon' : 'text.primary'}
                   fontSize="sm"
                   fontFamily="mono"
                   fontWeight="700"
@@ -376,7 +376,7 @@ const InvoicesTab = ({ invoices, loading, navigate }) => {
   return (
     <VStack spacing={0} align="stretch">
       {invoices.map((inv) => {
-        const color = STATUS_COLORS[inv.status] || '#737373';
+        const color = STATUS_COLORS[inv.status] || colors.surface[500];
         const outstanding = parseFloat(inv.total || 0) - parseFloat(inv.total_paid || 0);
         return (
           <HStack
@@ -393,7 +393,7 @@ const InvoicesTab = ({ invoices, loading, navigate }) => {
             <Box w="6px" h="6px" borderRadius="full" bg={color} flexShrink={0} />
             <Box flex={1} minW={0}>
               <HStack spacing={2}>
-                <Text color="white" fontSize="sm" fontWeight="700" fontFamily="mono">
+                <Text color="text.primary" fontSize="sm" fontWeight="700" fontFamily="mono">
                   {inv.invoice_number}
                 </Text>
                 <Text
@@ -411,7 +411,7 @@ const InvoicesTab = ({ invoices, loading, navigate }) => {
               </Text>
             </Box>
             <VStack align="end" spacing={0}>
-              <Text color="white" fontSize="sm" fontWeight="700" fontFamily="mono">
+              <Text color="text.primary" fontSize="sm" fontWeight="700" fontFamily="mono">
                 {currency(inv.total)}
               </Text>
               {outstanding > 0 && (
@@ -500,7 +500,7 @@ const ProjectsTab = ({ clientId, toast }) => {
         >
           <Icon as={TbFolder} boxSize={3.5} color="surface.600" />
           <Box flex={1}>
-            <Text color="white" fontSize="sm" fontWeight="600">{p.name}</Text>
+            <Text color="text.primary" fontSize="sm" fontWeight="600">{p.name}</Text>
             {p.project_number && (
               <Text color="surface.600" fontSize="2xs" fontFamily="mono">{p.project_number}</Text>
             )}
@@ -540,7 +540,7 @@ const ProjectsTab = ({ clientId, toast }) => {
             borderBottom="1px solid"
             borderColor="surface.700"
             borderRadius={0}
-            color="white"
+            color="text.primary"
             fontSize="sm"
             h="36px"
             px={0}
@@ -666,7 +666,7 @@ const MessagesTab = ({ clientId }) => {
                 <VStack align={isTeam ? 'end' : 'start'} spacing={1} maxW="75%">
                   <Box
                     bg={isTeam ? 'brand.500' : 'surface.850'}
-                    color={isTeam ? 'surface.950' : 'white'}
+                    color={isTeam ? 'surface.950' : 'text.primary'}
                     borderRadius="2xl"
                     borderTopRightRadius={isTeam ? 'sm' : '2xl'}
                     borderTopLeftRadius={isTeam ? '2xl' : 'sm'}
@@ -697,7 +697,7 @@ const MessagesTab = ({ clientId }) => {
           borderBottom="1px solid"
           borderColor="surface.800"
           borderRadius={0}
-          color="white"
+          color="text.primary"
           fontSize="sm"
           h="44px"
           px={0}
@@ -829,6 +829,7 @@ const ClientDetail = () => {
   };
 
   const isActivated = !!client.portal_account_created_at;
+  const greenGlow = `0 0 8px ${colors.status.green}`;
 
   return (
     <Box position="relative" minH="100%" py={{ base: 6, md: 10 }}>
@@ -838,7 +839,7 @@ const ClientDetail = () => {
         left={0}
         right={0}
         h="400px"
-        bg="radial-gradient(ellipse at top center, rgba(0,229,229,0.025), transparent 70%)"
+        bg={`radial-gradient(ellipse at top center, ${colors.accent.signalAlpha?.['05'] || 'rgba(197,217,87,0.05)'}, transparent 70%)`}
         pointerEvents="none"
       />
 
@@ -857,7 +858,7 @@ const ClientDetail = () => {
               <Text
                 fontSize={{ base: '2xl', md: '3xl' }}
                 fontWeight="800"
-                color="white"
+                color="text.primary"
                 letterSpacing="-0.02em"
                 lineHeight="1"
               >
@@ -868,7 +869,7 @@ const ClientDetail = () => {
                 h="8px"
                 borderRadius="full"
                 bg={client.status === 'active' ? 'accent.neon' : 'surface.600'}
-                boxShadow={client.status === 'active' ? '0 0 8px rgba(57,255,20,0.6)' : 'none'}
+                boxShadow={client.status === 'active' ? greenGlow : 'none'}
               />
             </HStack>
             {client.company && (
@@ -937,7 +938,7 @@ const ClientDetail = () => {
                 <Text
                   fontSize="xs"
                   fontWeight="700"
-                  color={active ? 'white' : 'surface.600'}
+                  color={active ? 'text.primary' : 'surface.600'}
                   textTransform="uppercase"
                   letterSpacing="0.05em"
                   _hover={!active ? { color: 'surface.400' } : {}}
@@ -953,7 +954,7 @@ const ClientDetail = () => {
                     h="2px"
                     bg="brand.500"
                     borderRadius="full"
-                    boxShadow="0 0 8px rgba(0,229,229,0.6)"
+                    boxShadow={SIGNAL_GLOW}
                   />
                 )}
               </Box>

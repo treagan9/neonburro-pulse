@@ -1,8 +1,7 @@
 // src/pages/Clients/components/ClientModal.jsx
-// Tabbed, naked-input, login-DNA client modal
-// - Details tab: all contact info + status + tags + notes
-// - Portal tab: PIN + invite flow
-// - Inline projects list with quick-add
+// Tabbed, naked-input, login-DNA client modal.
+// Details / Portal / Projects. Tag + status colors resolve from tokens
+// to match ClientGrid. No hardcoded cyan glow.
 
 import { useState, useEffect } from 'react';
 import {
@@ -13,13 +12,16 @@ import {
 } from '@chakra-ui/react';
 import {
   TbAlertTriangle, TbCheck, TbMail, TbRefresh, TbPlus,
-  TbFolder, TbBolt, TbTrash, TbKey, TbX,
+  TbFolder, TbTrash, TbX,
 } from 'react-icons/tb';
 import { supabase } from '../../../lib/supabase';
+import colors from '../../../theme/colors';
 import {
   formatPhoneDisplay, formatPhoneStorage, isValidEmail, isValidPhone,
   generatePortalPin, getInitials, getAvatarColor,
 } from '../../../utils/phone';
+
+const SIGNAL_GLOW = `0 0 8px ${colors.accent.signal}`;
 
 // Naked input - bottom border only (login DNA)
 const nakedInput = {
@@ -28,7 +30,7 @@ const nakedInput = {
   borderBottom: '1px solid',
   borderColor: 'surface.800',
   borderRadius: 0,
-  color: 'white',
+  color: 'text.primary',
   fontSize: 'sm',
   h: '44px',
   px: 0,
@@ -48,20 +50,22 @@ const FIELD_LABEL_PROPS = {
 };
 
 const PRESET_TAGS = [
-  { value: 'local', label: 'Local', color: '#00E5E5' },
-  { value: 'recurring', label: 'Recurring', color: '#39FF14' },
-  { value: 'vip', label: 'VIP', color: '#FFE500' },
-  { value: 'lab', label: 'Lab', color: '#8B5CF6' },
-  { value: 'hosting', label: 'Hosting', color: '#06B6D4' },
-  { value: 'web3', label: 'Web3', color: '#EC4899' },
+  { value: 'local',        label: 'Local',        color: colors.accent.signal },
+  { value: 'recurring',    label: 'Recurring',    color: colors.status.green },
+  { value: 'vip',          label: 'VIP',          color: colors.accent.banana },
+  { value: 'lab',          label: 'Lab',          color: colors.accent.purple },
+  { value: 'hosting',      label: 'Hosting',      color: colors.accent.cool },
+  { value: 'web3',         label: 'Web3',         color: '#EC4899' },
   { value: 'subscription', label: 'Subscription', color: '#FF6B35' },
 ];
 
 const STATUS_OPTIONS = [
-  { value: 'active', label: 'Active', color: '#39FF14' },
-  { value: 'lead', label: 'Lead', color: '#FFE500' },
-  { value: 'inactive', label: 'Inactive', color: '#737373' },
+  { value: 'active',   label: 'Active',   color: colors.status.green },
+  { value: 'lead',     label: 'Lead',     color: colors.accent.banana },
+  { value: 'inactive', label: 'Inactive', color: colors.surface[500] },
 ];
+
+const PURPLE = colors.accent.purple;
 
 // ============================================
 // PROJECTS SUBSECTION - inline list + quick add
@@ -84,18 +88,6 @@ const ProjectsSection = ({ clientId, toast }) => {
       .select('id, name, status, project_number')
       .eq('client_id', clientId)
       .order('created_at', { ascending: false });
-
-    // Get sprint counts per project
-    const projectsWithCounts = await Promise.all(
-      (data || []).map(async (p) => {
-        const { count } = await supabase
-          .from('invoice_items')
-          .select('*', { count: 'exact', head: true })
-          .eq('invoice_id', p.id); // approximation
-        return { ...p, sprint_count: 0 }; // skip for now, can enrich later
-      })
-    );
-
     setProjects(data || []);
     setLoading(false);
   };
@@ -170,7 +162,7 @@ const ProjectsSection = ({ clientId, toast }) => {
             >
               <Icon as={TbFolder} boxSize={3.5} color="surface.600" />
               <Box flex={1}>
-                <Text color="white" fontSize="sm" fontWeight="600">
+                <Text color="text.primary" fontSize="sm" fontWeight="600">
                   {project.name}
                 </Text>
                 {project.project_number && (
@@ -202,7 +194,6 @@ const ProjectsSection = ({ clientId, toast }) => {
             </HStack>
           ))}
 
-          {/* Inline add */}
           {showAdd ? (
             <HStack spacing={2} pt={2}>
               <Input
@@ -236,7 +227,7 @@ const ProjectsSection = ({ clientId, toast }) => {
                 as="button"
                 onClick={() => { setShowAdd(false); setNewName(''); }}
                 color="surface.500"
-                _hover={{ color: 'white' }}
+                _hover={{ color: 'text.primary' }}
               >
                 <Icon as={TbX} boxSize={4} />
               </Box>
@@ -453,7 +444,6 @@ const ClientModal = ({ isOpen, onClose, client, onSave }) => {
       >
         <ModalHeader pb={3} pt={6} px={6}>
           <HStack spacing={3}>
-            {/* Avatar */}
             <Box
               w="40px"
               h="40px"
@@ -475,7 +465,7 @@ const ClientModal = ({ isOpen, onClose, client, onSave }) => {
               </Text>
             </Box>
             <VStack align="start" spacing={0}>
-              <Text color="white" fontSize="md" fontWeight="800" lineHeight="1.2">
+              <Text color="text.primary" fontSize="md" fontWeight="800" lineHeight="1.2">
                 {isEditing ? 'Edit Client' : 'New Client'}
               </Text>
               {name && (
@@ -488,7 +478,6 @@ const ClientModal = ({ isOpen, onClose, client, onSave }) => {
         </ModalHeader>
         <ModalCloseButton color="surface.500" top={5} right={5} />
 
-        {/* Tab strip */}
         <HStack spacing={6} px={6} mb={2} borderBottom="1px solid" borderColor="surface.900">
           {[
             { value: 'details', label: 'Details' },
@@ -507,7 +496,7 @@ const ClientModal = ({ isOpen, onClose, client, onSave }) => {
                 <Text
                   fontSize="xs"
                   fontWeight="700"
-                  color={active ? 'white' : 'surface.600'}
+                  color={active ? 'text.primary' : 'surface.600'}
                   letterSpacing="0.05em"
                   textTransform="uppercase"
                   _hover={!active ? { color: 'surface.400' } : {}}
@@ -524,7 +513,7 @@ const ClientModal = ({ isOpen, onClose, client, onSave }) => {
                     h="2px"
                     bg="brand.500"
                     borderRadius="full"
-                    boxShadow="0 0 8px rgba(0,229,229,0.6)"
+                    boxShadow={SIGNAL_GLOW}
                   />
                 )}
               </Box>
@@ -612,7 +601,6 @@ const ClientModal = ({ isOpen, onClose, client, onSave }) => {
                 </InputGroup>
               </Box>
 
-              {/* Status - text buttons, no boxes */}
               <Box>
                 <Text {...FIELD_LABEL_PROPS}>Status</Text>
                 <HStack spacing={5} pt={1}>
@@ -638,7 +626,7 @@ const ClientModal = ({ isOpen, onClose, client, onSave }) => {
                           <Text
                             fontSize="xs"
                             fontWeight="700"
-                            color={active ? 'white' : 'surface.600'}
+                            color={active ? 'text.primary' : 'surface.600'}
                             transition="color 0.15s"
                             _hover={!active ? { color: 'surface.400' } : {}}
                           >
@@ -651,7 +639,6 @@ const ClientModal = ({ isOpen, onClose, client, onSave }) => {
                 </HStack>
               </Box>
 
-              {/* Tags */}
               <Box>
                 <Text {...FIELD_LABEL_PROPS}>Tags</Text>
                 <Wrap spacing={1.5} pt={1}>
@@ -698,7 +685,7 @@ const ClientModal = ({ isOpen, onClose, client, onSave }) => {
                   borderBottom="1px solid"
                   borderColor="surface.800"
                   borderRadius={0}
-                  color="white"
+                  color="text.primary"
                   fontSize="sm"
                   rows={2}
                   px={0}
@@ -714,7 +701,6 @@ const ClientModal = ({ isOpen, onClose, client, onSave }) => {
           {/* ================= PORTAL TAB ================= */}
           {activeTab === 'portal' && (
             <VStack spacing={6} align="stretch">
-              {/* PIN */}
               <Box>
                 <Text {...FIELD_LABEL_PROPS}>Lookup PIN</Text>
                 <HStack spacing={3} pt={1}>
@@ -723,7 +709,7 @@ const ClientModal = ({ isOpen, onClose, client, onSave }) => {
                     fontFamily="mono"
                     fontSize="2xl"
                     fontWeight="800"
-                    color="white"
+                    color="text.primary"
                     letterSpacing="0.15em"
                   >
                     {portalPin || '——————'}
@@ -744,13 +730,12 @@ const ClientModal = ({ isOpen, onClose, client, onSave }) => {
                 </Text>
               </Box>
 
-              {/* Portal invite */}
               {isEditing && client?.email && (
                 <Box pt={4} borderTop="1px solid" borderColor="surface.900">
                   <HStack justify="space-between" align="start" mb={3}>
                     <Box flex={1}>
                       <Text {...FIELD_LABEL_PROPS}>Portal Account</Text>
-                      <Text color="white" fontSize="sm" fontWeight="600" mt={1}>
+                      <Text color="text.primary" fontSize="sm" fontWeight="600" mt={1}>
                         {client.portal_account_created_at
                           ? 'Active'
                           : client.portal_invite_sent_at
@@ -769,14 +754,14 @@ const ClientModal = ({ isOpen, onClose, client, onSave }) => {
                       <Button
                         size="xs"
                         variant="outline"
-                        borderColor="#8B5CF6"
-                        color="#8B5CF6"
+                        borderColor={PURPLE}
+                        color={PURPLE}
                         fontWeight="700"
                         leftIcon={<TbMail size={12} />}
                         onClick={handleSendPortalInvite}
                         isLoading={sendingInvite}
                         loadingText="Sending"
-                        _hover={{ bg: 'rgba(139,92,246,0.08)' }}
+                        _hover={{ bg: `${PURPLE}14` }}
                       >
                         {client.portal_invite_sent_at ? 'Resend' : 'Send Invite'}
                       </Button>
@@ -815,7 +800,6 @@ const ClientModal = ({ isOpen, onClose, client, onSave }) => {
           px={6}
         >
           <VStack w="100%" spacing={3}>
-            {/* Primary save button - single cyan, login DNA */}
             <Button
               w="100%"
               h="48px"
@@ -833,7 +817,6 @@ const ClientModal = ({ isOpen, onClose, client, onSave }) => {
               {isEditing ? 'Save Changes' : 'Add Client'}
             </Button>
 
-            {/* Delete - subtle text link */}
             {isEditing && (
               <HStack
                 spacing={1.5}
