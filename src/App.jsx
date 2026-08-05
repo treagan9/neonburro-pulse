@@ -51,6 +51,7 @@ function App() {
             <Route path="clients/:clientId/" element={<ClientDetail />} />
             <Route path="invoicing/" element={<Invoicing />} />
             <Route path="forms/" element={<Forms />} />
+            <Route path="messages/" element={<Messages />} />
             <Route path="calendar/" element={<Calendar />} />
             <Route path="analytics/" element={<Analytics />} />
             <Route path="settings/" element={<Settings />} />

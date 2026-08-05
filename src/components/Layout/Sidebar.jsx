@@ -11,7 +11,7 @@ import {
 } from '@chakra-ui/react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
-  TbLayoutDashboard, TbUsers, TbFileInvoice, TbInbox,
+  TbLayoutDashboard, TbUsers, TbFileInvoice, TbInbox, TbMessageCircle,
   TbCalendar, TbChartBar, TbSettings,
   TbChevronLeft, TbChevronRight,
 } from 'react-icons/tb';
@@ -25,6 +25,7 @@ const NAV_ITEMS = [
   { path: '/clients/',   label: 'Clients',   icon: TbUsers },
   { path: '/invoicing/', label: 'Invoicing', icon: TbFileInvoice },
   { path: '/forms/',     label: 'Forms',     icon: TbInbox },
+  { path: '/messages/',  label: 'Messages',  icon: TbMessageCircle },
   { path: '/calendar/',  label: 'Calendar',  icon: TbCalendar },
   { path: '/analytics/', label: 'Analytics', icon: TbChartBar },
 ];
