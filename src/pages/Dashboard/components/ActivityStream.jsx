@@ -21,6 +21,7 @@ import { useNavigate } from 'react-router-dom';
 import Avatar from '../../../components/common/Avatar';
 import { usePresence } from '../../../hooks/usePresence';
 import { formatSmart } from '../../../lib/time';
+import colors from '../../../theme/colors';
 
 const VERB_MAP = {
   client_created:   'added client',
@@ -45,24 +46,27 @@ const VERB_MAP = {
   deploy_failed:    'deploy failed for',
 };
 
+// Same language as the invoice list: slate for account/in-flight events, dim
+// lime for "seen", full Topo Lime for money landed and green builds, coral for
+// anything destroyed or failed, purple for communication.
 const ENTITY_COLORS = {
-  client_created:   '#00E5E5',
-  client_updated:   '#00E5E5',
-  client_deleted:   '#FF3366',
-  invoice_created:  '#FFE500',
-  invoice_sent:     '#00E5E5',
-  invoice_viewed:   '#FFE500',
-  invoice_paid:     '#39FF14',
-  invoice_cancelled:'#FF3366',
-  invoice_deleted:  '#FF3366',
-  payment_received: '#39FF14',
-  form_submitted:   '#8B5CF6',
-  message_sent:     '#06B6D4',
-  message_received: '#06B6D4',
-  note_added:       '#737373',
-  portal_activated: '#00E5E5',
-  deploy_succeeded: '#39FF14',
-  deploy_failed:    '#FF3366',
+  client_created:   colors.accent.cool,
+  client_updated:   colors.accent.cool,
+  client_deleted:   colors.accent.coral,
+  invoice_created:  colors.surface[500],
+  invoice_sent:     colors.accent.cool,
+  invoice_viewed:   colors.brand[600],
+  invoice_paid:     colors.accent.signal,
+  invoice_cancelled:colors.accent.coral,
+  invoice_deleted:  colors.accent.coral,
+  payment_received: colors.accent.signal,
+  form_submitted:   colors.accent.purple,
+  message_sent:     colors.accent.purple,
+  message_received: colors.accent.purple,
+  note_added:       colors.surface[500],
+  portal_activated: colors.accent.cool,
+  deploy_succeeded: colors.accent.signal,
+  deploy_failed:    colors.accent.coral,
 };
 
 const PaymentMethodIcon = ({ type, brand, wallet }) => {

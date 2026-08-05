@@ -17,22 +17,23 @@ import { TbLock, TbAlertTriangle, TbEye, TbEyeOff, TbArrowRight } from 'react-ic
 import { useAuth } from '../../hooks/useAuth';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import colors from '../../theme/colors';
 
 // ---------- helpers ----------
 
 const tokens = {
-  canvas: '#0A0A0A',
-  brand: '#00E5E5',
-  brandHover: '#26F2F2',
-  banana: '#FFE500',
+  canvas: colors.surface[950],
+  brand: colors.accent.signal,        // was cyan #00E5E5
+  brandHover: colors.brand[400],
+  banana: colors.accent.banana,
   text: {
-    primary: '#FFFFFF',
-    secondary: 'rgba(255, 255, 255, 0.65)',
-    tertiary: 'rgba(255, 255, 255, 0.45)',
-    muted: 'rgba(255, 255, 255, 0.30)',
+    primary: colors.text.primary,     // off-white, not pure #FFF
+    secondary: colors.text.secondary,
+    tertiary: colors.text.tertiary,
+    muted: colors.text.muted,
   },
   divider: {
-    soft: 'rgba(255, 255, 255, 0.12)',
+    soft: colors.divider.medium,
   },
 };
 

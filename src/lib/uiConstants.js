@@ -146,6 +146,28 @@ export const PAGE_AMBIENT_GLOW_PROPS = {
   pointerEvents: 'none',
 };
 
+// Form-type labels + colors — shared by Forms page and Dashboard FormInbox.
+// Distinct hues per type; brand-colliding ones resolve to Topo Lime / green.
+export const FORM_TYPE_LABELS = {
+  contact:            'Contact',
+  application:        'Application',
+  collective_request: 'Collective',
+  hosting:            'Hosting',
+  nomination:         'Nomination',
+  project_brief:      'Project Brief',
+  wild_request:       'Wild Request',
+};
+
+export const FORM_TYPE_COLORS = {
+  contact:            colors.accent.signal,
+  application:        colors.accent.purple,
+  collective_request: '#EC4899',
+  hosting:            colors.accent.cool,
+  nomination:         colors.accent.banana,
+  project_brief:      colors.status.green,
+  wild_request:       '#FF6B35',
+};
+
 export const formatCurrency = (val) => {
   const num = parseFloat(val || 0);
   if (num === 0) return '$0';

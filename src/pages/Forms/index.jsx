@@ -1,11 +1,8 @@
 // src/pages/Forms/index.jsx
-// Unified Forms Inbox — all submission types in one place
-// Desktop: split-pane (list left ~420px, detail right flex)
-// Mobile: list only, tap opens full-screen sheet for detail
-//
-// Schema match: form_submissions has top-level columns (name, email, phone, company,
-// message) + metadata JSONB. NO "data" column. reply_count + last_replied_at track
-// reply history; form_replies table stores each reply's full body.
+// Unified Forms Inbox — all submission types in one place.
+// Desktop: split-pane (list ~420px, detail flex). Mobile: list + full-screen sheet.
+// Form-type labels/colors imported from uiConstants (shared with FormInbox).
+// Tokens only, no hardcoded cyan.
 
 import { useState, useEffect, useMemo } from 'react';
 import {
@@ -21,26 +18,10 @@ import {
 import { formatDistanceToNow, format } from 'date-fns';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
+import colors from '../../theme/colors';
+import { FORM_TYPE_LABELS, FORM_TYPE_COLORS } from '../../lib/uiConstants';
 
-const FORM_TYPE_LABELS = {
-  contact:            'Contact',
-  application:        'Application',
-  collective_request: 'Collective',
-  hosting:            'Hosting',
-  nomination:         'Nomination',
-  project_brief:      'Project Brief',
-  wild_request:       'Wild Request',
-};
-
-const FORM_TYPE_COLORS = {
-  contact:            '#00E5E5',
-  application:        '#8B5CF6',
-  collective_request: '#EC4899',
-  hosting:            '#06B6D4',
-  nomination:         '#FFE500',
-  project_brief:      '#39FF14',
-  wild_request:       '#FF6B35',
-};
+const FALLBACK_COLOR = colors.surface[500];
 
 const STATUS_FILTERS = [
   { key: 'all',       label: 'All' },
@@ -49,9 +30,6 @@ const STATUS_FILTERS = [
   { key: 'archived',  label: 'Archived' },
 ];
 
-// ============================================================
-// Helpers — pull display values from submission + metadata
-// ============================================================
 const getSenderName = (s) =>
   s.name || s.metadata?.name || s.metadata?.full_name || s.metadata?.contact_name || 'Anonymous';
 
@@ -75,7 +53,7 @@ const Forms = () => {
   const toast = useToast();
 
   const [submissions, setSubmissions] = useState([]);
-  const [replies, setReplies] = useState({}); // { submission_id: [replies] }
+  const [replies, setReplies] = useState({});
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
@@ -151,7 +129,6 @@ const Forms = () => {
     }
   };
 
-  // Filtered + searched list
   const filtered = useMemo(() => {
     return submissions.filter((s) => {
       if (statusFilter === 'unread'    && s.status !== 'unread')        return false;
@@ -248,13 +225,12 @@ const Forms = () => {
 
   return (
     <Box position="relative" minH="100%">
-      {/* Header */}
       <VStack align="stretch" spacing={5} mb={6}>
         <HStack justify="space-between" align="flex-end" flexWrap="wrap" gap={4}>
           <VStack align="start" spacing={2}>
             <Text textStyle="kicker">Forms</Text>
             <HStack align="baseline" spacing={3}>
-              <Text textStyle="heroNumber" color="white">
+              <Text textStyle="heroNumber" color="text.primary">
                 {counts.unread}
               </Text>
               <Text textStyle="heroLabel" pb={1}>
@@ -264,7 +240,6 @@ const Forms = () => {
           </VStack>
         </HStack>
 
-        {/* Filter pills */}
         <HStack spacing={2} flexWrap="wrap">
           {STATUS_FILTERS.map((f) => (
             <FilterPill
@@ -300,7 +275,6 @@ const Forms = () => {
           )}
         </HStack>
 
-        {/* Search */}
         <HStack
           bg="surface.900"
           border="1px solid"
@@ -317,7 +291,7 @@ const Forms = () => {
             placeholder="Search by name, email, or message..."
             variant="unstyled"
             fontSize="sm"
-            color="white"
+            color="text.primary"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             _placeholder={{ color: 'surface.600' }}
@@ -331,7 +305,6 @@ const Forms = () => {
         </Center>
       ) : (
         <HStack align="start" spacing={6} minH="60vh">
-          {/* LIST */}
           <Box
             w={{ base: '100%', lg: '420px' }}
             flexShrink={0}
@@ -365,7 +338,6 @@ const Forms = () => {
             )}
           </Box>
 
-          {/* DETAIL (desktop) */}
           <Box display={{ base: 'none', lg: 'block' }} flex={1} minW={0}>
             {selected ? (
               <DetailPane
@@ -383,7 +355,6 @@ const Forms = () => {
         </HStack>
       )}
 
-      {/* DETAIL (mobile) */}
       <Modal
         isOpen={mobileDetailOpen && !!selected}
         onClose={() => setMobileDetailOpen(false)}
@@ -391,7 +362,7 @@ const Forms = () => {
         motionPreset="slideInRight"
       >
         <ModalOverlay />
-        <ModalContent bg="surface.950" m={0} borderRadius={0} color="white">
+        <ModalContent bg="surface.950" m={0} borderRadius={0} color="text.primary">
           <ModalBody p={0}>
             {selected && (
               <Box>
@@ -404,7 +375,7 @@ const Forms = () => {
                     aria-label="Back"
                     size="sm"
                   />
-                  <Text color="white" fontWeight="700" fontSize="sm">
+                  <Text color="text.primary" fontWeight="700" fontSize="sm">
                     Submission
                   </Text>
                 </HStack>
@@ -424,7 +395,6 @@ const Forms = () => {
         </ModalContent>
       </Modal>
 
-      {/* REPLY MODAL */}
       {selected && (
         <ReplyModal
           isOpen={replyOpen}
@@ -458,14 +428,14 @@ const FilterPill = ({ active, onClick, children, count, color = 'brand.500' }) =
     bg={active ? 'surface.800' : 'transparent'}
     border="1px solid"
     borderColor={active ? color : 'surface.800'}
-    color={active ? 'white' : 'surface.400'}
+    color={active ? 'text.primary' : 'surface.400'}
     fontSize="xs"
     fontFamily="mono"
     fontWeight="700"
     textTransform="uppercase"
     letterSpacing="0.05em"
     transition="all 0.15s"
-    _hover={{ color: 'white', borderColor: active ? color : 'surface.700' }}
+    _hover={{ color: 'text.primary', borderColor: active ? color : 'surface.700' }}
     display="flex"
     alignItems="center"
     gap={1.5}
@@ -485,7 +455,7 @@ const FilterPill = ({ active, onClick, children, count, color = 'brand.500' }) =
 const ListRow = ({ submission, replyCount, selected, onClick }) => {
   const formType = submission.form_type || 'contact';
   const typeLabel = FORM_TYPE_LABELS[formType] || formType.replace(/_/g, ' ');
-  const typeColor = FORM_TYPE_COLORS[formType] || '#737373';
+  const typeColor = FORM_TYPE_COLORS[formType] || FALLBACK_COLOR;
 
   const senderName = getSenderName(submission);
   const senderEmail = getSenderEmail(submission);
@@ -555,7 +525,7 @@ const ListRow = ({ submission, replyCount, selected, onClick }) => {
         </HStack>
       </HStack>
       <Text
-        color={isUnread ? 'white' : 'surface.300'}
+        color={isUnread ? 'text.primary' : 'surface.300'}
         fontSize="sm"
         fontWeight={isUnread ? '700' : '500'}
         noOfLines={1}
@@ -582,7 +552,7 @@ const ListRow = ({ submission, replyCount, selected, onClick }) => {
 const DetailPane = ({ submission, replies, onReply, onArchive, onUnarchive, onMarkUnread }) => {
   const formType = submission.form_type || 'contact';
   const typeLabel = FORM_TYPE_LABELS[formType] || formType.replace(/_/g, ' ');
-  const typeColor = FORM_TYPE_COLORS[formType] || '#737373';
+  const typeColor = FORM_TYPE_COLORS[formType] || FALLBACK_COLOR;
 
   const senderName = getSenderName(submission);
   const senderEmail = getSenderEmail(submission);
@@ -590,7 +560,6 @@ const DetailPane = ({ submission, replies, onReply, onArchive, onUnarchive, onMa
   const isArchived = !!submission.archived_at;
   const replyCount = submission.reply_count || 0;
 
-  // Build field list
   const skipMetadataKeys = new Set([
     'form_type', 'submitted_at', 'ip', 'user_agent', '_internal', 'website',
     'source', 'form', 'name', 'email', 'contact_name', 'contact_email',
@@ -621,6 +590,9 @@ const DetailPane = ({ submission, replies, onReply, onArchive, onUnarchive, onMa
     });
   }
 
+  const greenSoftBg = `${colors.status.green}14`;
+  const greenSoftBorder = `${colors.status.green}33`;
+
   return (
     <VStack align="stretch" spacing={5}>
       <VStack align="stretch" spacing={3}>
@@ -636,7 +608,7 @@ const DetailPane = ({ submission, replies, onReply, onArchive, onUnarchive, onMa
             >
               {typeLabel}
             </Text>
-            <Text color="white" fontSize="2xl" fontWeight="700" letterSpacing="-0.01em">
+            <Text color="text.primary" fontSize="2xl" fontWeight="700" letterSpacing="-0.01em">
               {senderName}
             </Text>
             {senderEmail && (
@@ -650,7 +622,6 @@ const DetailPane = ({ submission, replies, onReply, onArchive, onUnarchive, onMa
           </Text>
         </HStack>
 
-        {/* Status chips */}
         <HStack spacing={2} flexWrap="wrap">
           {isResponded && (
             <HStack
@@ -658,9 +629,9 @@ const DetailPane = ({ submission, replies, onReply, onArchive, onUnarchive, onMa
               px={2.5}
               py={1}
               borderRadius="full"
-              bg="rgba(57,255,20,0.08)"
+              bg={greenSoftBg}
               border="1px solid"
-              borderColor="rgba(57,255,20,0.2)"
+              borderColor={greenSoftBorder}
             >
               <Icon as={TbCircleCheck} boxSize={3} color="accent.neon" />
               <Text color="accent.neon" fontSize="2xs" fontWeight="700" fontFamily="mono" letterSpacing="0.05em" textTransform="uppercase">
@@ -687,7 +658,6 @@ const DetailPane = ({ submission, replies, onReply, onArchive, onUnarchive, onMa
         </HStack>
       </VStack>
 
-      {/* Actions */}
       <HStack spacing={2} flexWrap="wrap">
         <ActionButton
           icon={TbSend}
@@ -711,7 +681,6 @@ const DetailPane = ({ submission, replies, onReply, onArchive, onUnarchive, onMa
 
       <Divider borderColor="surface.900" />
 
-      {/* Form fields */}
       <VStack align="stretch" spacing={0} divider={<Box h="1px" bg="surface.900" />}>
         {fields.map(({ label, value }) => (
           <HStack key={label} align="start" spacing={6} py={3}>
@@ -742,7 +711,6 @@ const DetailPane = ({ submission, replies, onReply, onArchive, onUnarchive, onMa
         ))}
       </VStack>
 
-      {/* REPLY HISTORY */}
       {replies.length > 0 && (
         <>
           <Divider borderColor="surface.900" />
@@ -777,7 +745,6 @@ const DetailPane = ({ submission, replies, onReply, onArchive, onUnarchive, onMa
         </>
       )}
 
-      {/* Footer metadata */}
       <HStack spacing={4} pt={2} opacity={0.6}>
         <Text color="surface.600" fontSize="2xs" fontFamily="mono">
           ID {String(submission.id).slice(0, 8)}
@@ -793,10 +760,12 @@ const DetailPane = ({ submission, replies, onReply, onArchive, onUnarchive, onMa
 };
 
 // ============================================================
-// REPLY CARD — single reply in the history thread
+// REPLY CARD
 // ============================================================
 const ReplyCard = ({ reply, index }) => {
   const sentAt = format(new Date(reply.created_at), "MMM d 'at' h:mma");
+  const greenSoftBg = `${colors.status.green}1F`;
+  const greenSoftBorder = `${colors.status.green}4D`;
   return (
     <Box
       border="1px solid"
@@ -811,9 +780,9 @@ const ReplyCard = ({ reply, index }) => {
             w="20px"
             h="20px"
             borderRadius="full"
-            bg="rgba(57,255,20,0.12)"
+            bg={greenSoftBg}
             border="1px solid"
-            borderColor="rgba(57,255,20,0.3)"
+            borderColor={greenSoftBorder}
             display="flex"
             alignItems="center"
             justifyContent="center"
@@ -822,7 +791,7 @@ const ReplyCard = ({ reply, index }) => {
               {index}
             </Text>
           </Box>
-          <Text color="white" fontSize="xs" fontWeight="700">
+          <Text color="text.primary" fontSize="xs" fontWeight="700">
             {reply.sender_name || 'Admin'}
           </Text>
         </HStack>
@@ -880,7 +849,7 @@ const ActionButton = ({ icon, label, color, onClick, disabled, primary }) => (
       cursor={disabled ? 'not-allowed' : 'pointer'}
       transition="all 0.15s"
       _hover={disabled ? {} : {
-        color: 'white',
+        color: 'text.primary',
         bg: primary ? color || 'brand.500' : 'surface.900',
         borderColor: primary ? color || 'brand.500' : 'surface.700',
       }}
@@ -988,6 +957,9 @@ const ReplyModal = ({ isOpen, onClose, submission, replyCount, userId, onSuccess
     }
   };
 
+  const bananaSoftBg = `${colors.accent.banana}14`;
+  const bananaSoftBorder = `${colors.accent.banana}33`;
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="xl" motionPreset="slideInBottom">
       <ModalOverlay bg="blackAlpha.800" backdropFilter="blur(8px)" />
@@ -995,7 +967,7 @@ const ReplyModal = ({ isOpen, onClose, submission, replyCount, userId, onSuccess
         bg="surface.950"
         border="1px solid"
         borderColor="surface.800"
-        color="white"
+        color="text.primary"
         mx={4}
       >
         <ModalCloseButton color="surface.500" />
@@ -1005,7 +977,7 @@ const ReplyModal = ({ isOpen, onClose, submission, replyCount, userId, onSuccess
               <Text textStyle="kicker">
                 {isFollowUp ? `Follow-up #${replyCount + 1}` : 'Reply'}
               </Text>
-              <Text color="white" fontSize="xl" fontWeight="700" letterSpacing="-0.01em">
+              <Text color="text.primary" fontSize="xl" fontWeight="700" letterSpacing="-0.01em">
                 Sending to {senderName}
               </Text>
               <Text color="surface.500" fontSize="sm" fontFamily="mono">
@@ -1018,9 +990,9 @@ const ReplyModal = ({ isOpen, onClose, submission, replyCount, userId, onSuccess
                   px={2}
                   py={1}
                   borderRadius="full"
-                  bg="rgba(255,229,0,0.08)"
+                  bg={bananaSoftBg}
                   border="1px solid"
-                  borderColor="rgba(255,229,0,0.2)"
+                  borderColor={bananaSoftBorder}
                 >
                   <Icon as={TbHistory} boxSize={3} color="accent.banana" />
                   <Text color="accent.banana" fontSize="2xs" fontWeight="700" fontFamily="mono" letterSpacing="0.05em" textTransform="uppercase">
@@ -1039,7 +1011,7 @@ const ReplyModal = ({ isOpen, onClose, submission, replyCount, userId, onSuccess
                   bg="surface.900"
                   border="1px solid"
                   borderColor="surface.800"
-                  color="white"
+                  color="text.primary"
                   fontSize="sm"
                   _focus={{ borderColor: 'brand.500' }}
                   _placeholder={{ color: 'surface.600' }}
@@ -1054,7 +1026,7 @@ const ReplyModal = ({ isOpen, onClose, submission, replyCount, userId, onSuccess
                   bg="surface.900"
                   border="1px solid"
                   borderColor="surface.800"
-                  color="white"
+                  color="text.primary"
                   fontSize="sm"
                   minH="180px"
                   _focus={{ borderColor: 'brand.500' }}

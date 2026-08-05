@@ -12,19 +12,23 @@ import {
 import { timeAgo } from '../../../utils/phone';
 import Avatar from '../../../components/common/Avatar';
 import InvoiceSnapshotModal from './InvoiceSnapshotModal';
+import colors from '../../../theme/colors';
 
 // ============================================================
 // HELPERS
 // ============================================================
 
 const STATUS_COLORS = {
-  draft:   { color: '#737373', label: 'DRAFT' },
-  sent:    { color: '#00E5E5', label: 'SENT' },
-  viewed:  { color: '#FFE500', label: 'VIEWED' },
-  partial: { color: '#FFE500', label: 'PARTIAL' },
-  overdue: { color: '#FF3366', label: 'OVERDUE' },
-  paid:    { color: '#39FF14', label: 'PAID' },
-  cancelled: { color: '#525252', label: 'CANCELLED' },
+  // Warms toward lime as the invoice progresses: slate (sent) -> dim lime
+  // (viewed) -> full Topo Lime (paid). Banana marks money partially in, coral
+  // marks trouble. Lime is the win state and is not spent anywhere else here.
+  draft:   { color: colors.surface[500],   label: 'DRAFT' },
+  sent:    { color: colors.accent.cool,    label: 'SENT' },
+  viewed:  { color: colors.brand[600],     label: 'VIEWED' },
+  partial: { color: colors.accent.banana,  label: 'PARTIAL' },
+  overdue: { color: colors.accent.coral,   label: 'OVERDUE' },
+  paid:    { color: colors.accent.signal,  label: 'PAID' },
+  cancelled: { color: colors.surface[600], label: 'CANCELLED' },
 };
 
 const SENT_LIKE_STATUSES = ['sent', 'viewed', 'partial', 'overdue', 'paid'];

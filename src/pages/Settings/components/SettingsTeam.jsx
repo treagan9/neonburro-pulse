@@ -17,13 +17,14 @@ import {
 import { supabase } from '../../../lib/supabase';
 import Avatar from '../../../components/common/Avatar';
 import { usePresence } from '../../../hooks/usePresence';
+import colors from '../../../theme/colors';
 
 const ROLE_CONFIG = {
-  super_admin: { icon: TbCrown,     color: '#FFE500', label: 'Super Admin' },
-  admin:       { icon: TbShield,    color: '#00E5E5', label: 'Admin' },
-  manager:     { icon: TbBriefcase, color: '#39FF14', label: 'Manager' },
-  team:        { icon: TbUser,      color: '#8B5CF6', label: 'Team' },
-  client:      { icon: TbBuilding,  color: '#737373', label: 'Client' },
+  super_admin: { icon: TbCrown,     color: colors.accent.banana, label: 'Super Admin' },
+  admin:       { icon: TbShield,    color: colors.accent.signal, label: 'Admin' },
+  manager:     { icon: TbBriefcase, color: colors.accent.cool,   label: 'Manager' },
+  team:        { icon: TbUser,      color: colors.accent.purple, label: 'Team' },
+  client:      { icon: TbBuilding,  color: colors.surface[500],  label: 'Client' },
 };
 
 const STAFF_ROLES = ['super_admin', 'admin', 'manager', 'team'];

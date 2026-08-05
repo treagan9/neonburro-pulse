@@ -11,15 +11,19 @@ import {
 } from '@chakra-ui/react';
 import { useSearchParams } from 'react-router-dom';
 import { TbKey, TbCheck, TbX, TbAlertTriangle, TbShield } from 'react-icons/tb';
+import colors from '../../theme/colors';
 
-const colors = {
-  space: '#0A0A0A',
-  surface: '#141414',
-  border: '#1f1f1f',
-  cyan: '#00E5E5',
-  lime: '#39FF14',
-  amber: '#FFE500',
-  red: '#FF3366',
+// This page renders standalone (emailed PIN link), so it keeps a local role map
+// rather than pulling the Chakra theme. Values are read from the same tokens the
+// rest of Pulse uses, so it repaints with the brand instead of drifting.
+const T = {
+  canvas:  colors.surface[950],
+  panel:   colors.surface[900],
+  line:    colors.surface[800],
+  signal:  colors.accent.signal,   // CTA / brand, was cyan #00E5E5
+  success: colors.accent.signal,   // approved, was #39FF14
+  warn:    colors.accent.banana,
+  danger:  colors.accent.coral,
 };
 
 const PinApproval = () => {
@@ -93,10 +97,10 @@ const PinApproval = () => {
 
   if (loading) {
     return (
-      <Box minH="100vh" bg={colors.space}>
+      <Box minH="100vh" bg={T.canvas}>
         <Center minH="100vh">
           <VStack spacing={4}>
-            <Spinner size="lg" color={colors.cyan} thickness="3px" />
+            <Spinner size="lg" color={T.signal} thickness="3px" />
             <Text color="gray.500" fontSize="sm">Loading request</Text>
           </VStack>
         </Center>
@@ -106,15 +110,15 @@ const PinApproval = () => {
 
   if (error) {
     return (
-      <Box minH="100vh" bg={colors.space}>
+      <Box minH="100vh" bg={T.canvas}>
         <Center minH="100vh" px={4}>
           <Container maxW="480px">
             <VStack
               spacing={5}
               p={8}
-              bg={colors.surface}
+              bg={T.panel}
               border="1px solid"
-              borderColor={colors.border}
+              borderColor={T.line}
               borderRadius="2xl"
               textAlign="center"
             >
@@ -122,13 +126,13 @@ const PinApproval = () => {
                 w="64px"
                 h="64px"
                 borderRadius="full"
-                bg={`${colors.amber}15`}
-                border={`1px solid ${colors.amber}40`}
+                bg={`${T.warn}15`}
+                border={`1px solid ${T.warn}40`}
                 display="flex"
                 alignItems="center"
                 justifyContent="center"
               >
-                <Icon as={TbAlertTriangle} boxSize={7} color={colors.amber} />
+                <Icon as={TbAlertTriangle} boxSize={7} color={T.warn} />
               </Box>
               <Heading size="md" color="white">Request Unavailable</Heading>
               <Text color="gray.400" fontSize="sm" lineHeight="1.6">{error}</Text>
@@ -137,8 +141,8 @@ const PinApproval = () => {
                 href="/dashboard/"
                 size="sm"
                 variant="outline"
-                borderColor={colors.cyan}
-                color={colors.cyan}
+                borderColor={T.signal}
+                color={T.signal}
                 borderRadius="full"
               >
                 Go to Dashboard
@@ -152,15 +156,15 @@ const PinApproval = () => {
 
   if (done) {
     return (
-      <Box minH="100vh" bg={colors.space}>
+      <Box minH="100vh" bg={T.canvas}>
         <Center minH="100vh" px={4}>
           <Container maxW="480px">
             <VStack
               spacing={5}
               p={8}
-              bg={colors.surface}
+              bg={T.panel}
               border="1px solid"
-              borderColor={done === 'approved' ? `${colors.lime}30` : colors.border}
+              borderColor={done === 'approved' ? `${T.success}30` : T.line}
               borderRadius="2xl"
               textAlign="center"
             >
@@ -168,17 +172,17 @@ const PinApproval = () => {
                 w="72px"
                 h="72px"
                 borderRadius="full"
-                bg={done === 'approved' ? `${colors.lime}15` : `${colors.red}15`}
-                border={done === 'approved' ? `2px solid ${colors.lime}40` : `2px solid ${colors.red}40`}
+                bg={done === 'approved' ? `${T.success}15` : `${T.danger}15`}
+                border={done === 'approved' ? `2px solid ${T.success}40` : `2px solid ${T.danger}40`}
                 display="flex"
                 alignItems="center"
                 justifyContent="center"
-                boxShadow={done === 'approved' ? `0 0 40px ${colors.lime}30` : 'none'}
+                boxShadow={done === 'approved' ? `0 0 40px ${T.success}30` : 'none'}
               >
                 <Icon
                   as={done === 'approved' ? TbCheck : TbX}
                   boxSize={8}
-                  color={done === 'approved' ? colors.lime : colors.red}
+                  color={done === 'approved' ? T.success : T.danger}
                 />
               </Box>
               <Heading size="md" color="white">
@@ -193,7 +197,7 @@ const PinApproval = () => {
                 as="a"
                 href="/dashboard/"
                 size="sm"
-                bg={colors.cyan}
+                bg={T.signal}
                 color="black"
                 fontWeight="700"
                 borderRadius="full"
@@ -208,7 +212,7 @@ const PinApproval = () => {
   }
 
   return (
-    <Box minH="100vh" bg={colors.space} position="relative">
+    <Box minH="100vh" bg={T.canvas} position="relative">
       <Box
         position="absolute"
         top="-200px"
@@ -217,7 +221,7 @@ const PinApproval = () => {
         w="800px"
         h="800px"
         borderRadius="full"
-        bg={`radial-gradient(circle, ${colors.cyan}06 0%, transparent 60%)`}
+        bg={`radial-gradient(circle, ${T.signal}06 0%, transparent 60%)`}
         pointerEvents="none"
       />
 
@@ -228,11 +232,11 @@ const PinApproval = () => {
             <VStack spacing={3} textAlign="center">
               <Image src="/neon-burro-email-logo.png" alt="NeonBurro" w="48px" h="48px" borderRadius="full" mx="auto" />
               <HStack spacing={2.5} justify="center">
-                <Box w="6px" h="6px" borderRadius="full" bg={colors.amber} boxShadow={`0 0 8px ${colors.amber}`} />
+                <Box w="6px" h="6px" borderRadius="full" bg={T.warn} boxShadow={`0 0 8px ${T.warn}`} />
                 <Text
                   fontSize="xs"
                   fontWeight="700"
-                  color={colors.amber}
+                  color={T.warn}
                   letterSpacing="0.14em"
                   textTransform="uppercase"
                   fontFamily="mono"
@@ -250,9 +254,9 @@ const PinApproval = () => {
 
             {/* Request details */}
             <Box
-              bg={colors.surface}
+              bg={T.panel}
               border="1px solid"
-              borderColor={colors.border}
+              borderColor={T.line}
               borderRadius="2xl"
               p={6}
             >
@@ -275,7 +279,7 @@ const PinApproval = () => {
                       <Text color="gray.600" fontSize="2xs" fontWeight="700" letterSpacing="0.08em" textTransform="uppercase" mb={1}>
                         Email on file
                       </Text>
-                      <Text color={colors.cyan} fontSize="sm" fontWeight="600" fontFamily="mono">
+                      <Text color={T.signal} fontSize="sm" fontWeight="600" fontFamily="mono">
                         {request.client.email}
                       </Text>
                     </Box>
@@ -283,13 +287,13 @@ const PinApproval = () => {
                 ) : (
                   <Box
                     p={4}
-                    bg={`${colors.red}08`}
-                    border={`1px solid ${colors.red}30`}
+                    bg={`${T.danger}08`}
+                    border={`1px solid ${T.danger}30`}
                     borderRadius="lg"
                   >
                     <HStack spacing={2} mb={2}>
-                      <Icon as={TbAlertTriangle} boxSize={4} color={colors.red} />
-                      <Text color={colors.red} fontSize="xs" fontWeight="700" textTransform="uppercase" letterSpacing="0.05em">
+                      <Icon as={TbAlertTriangle} boxSize={4} color={T.danger} />
+                      <Text color={T.danger} fontSize="xs" fontWeight="700" textTransform="uppercase" letterSpacing="0.05em">
                         No Client Match
                       </Text>
                     </HStack>
@@ -299,7 +303,7 @@ const PinApproval = () => {
                   </Box>
                 )}
 
-                <Box borderTop="1px solid" borderColor={colors.border} pt={3}>
+                <Box borderTop="1px solid" borderColor={T.line} pt={3}>
                   <HStack justify="space-between" mb={1}>
                     <Text color="gray.600" fontSize="2xs" fontWeight="600">Requested</Text>
                     <Text color="gray.400" fontSize="xs" fontFamily="mono">
@@ -320,11 +324,11 @@ const PinApproval = () => {
             <HStack
               spacing={3}
               p={4}
-              bg={`${colors.amber}06`}
-              border={`1px solid ${colors.amber}25`}
+              bg={`${T.warn}06`}
+              border={`1px solid ${T.warn}25`}
               borderRadius="xl"
             >
-              <Icon as={TbShield} boxSize={5} color={colors.amber} flexShrink={0} />
+              <Icon as={TbShield} boxSize={5} color={T.warn} flexShrink={0} />
               <Text color="gray.400" fontSize="xs" lineHeight="1.5">
                 Only approve if you recognize this client. Approving will email their PIN to the address shown above. This link expires in 24 hours.
               </Text>
@@ -337,7 +341,7 @@ const PinApproval = () => {
                 size="lg"
                 h="56px"
                 variant="outline"
-                borderColor={colors.border}
+                borderColor={T.line}
                 color="gray.400"
                 fontWeight="700"
                 borderRadius="xl"
@@ -345,9 +349,9 @@ const PinApproval = () => {
                 onClick={() => handleAction('deny')}
                 isLoading={processing}
                 _hover={{
-                  borderColor: colors.red,
-                  color: colors.red,
-                  bg: `${colors.red}08`,
+                  borderColor: T.danger,
+                  color: T.danger,
+                  bg: `${T.danger}08`,
                 }}
               >
                 Deny
@@ -356,7 +360,7 @@ const PinApproval = () => {
                 flex={2}
                 size="lg"
                 h="56px"
-                bg={colors.cyan}
+                bg={T.signal}
                 color="black"
                 fontWeight="800"
                 borderRadius="xl"
@@ -368,7 +372,7 @@ const PinApproval = () => {
                 _hover={{
                   bg: '#00CCCC',
                   transform: 'translateY(-1px)',
-                  boxShadow: `0 16px 40px ${colors.cyan}40`,
+                  boxShadow: `0 16px 40px ${T.signal}40`,
                 }}
                 _disabled={{ opacity: 0.3, cursor: 'not-allowed' }}
               >

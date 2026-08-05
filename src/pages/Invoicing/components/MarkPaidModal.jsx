@@ -207,7 +207,7 @@ const MarkPaidModal = ({ isOpen, onClose, invoice, onConfirm, processing }) => {
               isDisabled={!canConfirm}
               isLoading={processing}
               loadingText="Recording"
-              _hover={canConfirm ? { bg: '#2DD30F' } : {}}
+              _hover={canConfirm ? { bg: 'brand.400' } : {}}
             >
               Mark Paid
             </Button>

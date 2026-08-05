@@ -9,6 +9,7 @@
 
 import { Box, Image, Text } from '@chakra-ui/react';
 import { getInitials, getAvatarColor } from '../../utils/phone';
+import colors from '../../theme/colors';
 
 const SIZE_MAP = {
   xs: { box: '24px', text: '2xs', dot: '6px', dotPos: '0px', border: '1px' },
@@ -19,9 +20,9 @@ const SIZE_MAP = {
 };
 
 const PRESENCE_COLORS = {
-  online: '#39FF14',
-  away:   '#FFE500',
-  offline: '#525252',
+  online:  colors.accent.signal,
+  away:    colors.accent.banana,
+  offline: colors.surface[600],
 };
 
 const Avatar = ({

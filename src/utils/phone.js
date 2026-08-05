@@ -3,6 +3,8 @@
 // Display: (970) 973-8550
 // Storage: 9709738550 (digits only) or +19709738550 (E.164)
 
+import palette from '../theme/colors';
+
 export const formatPhoneDisplay = (input) => {
   if (!input) return '';
   const digits = String(input).replace(/\D/g, '');
@@ -54,8 +56,13 @@ export const getInitials = (name) => {
 };
 
 export const getAvatarColor = (name) => {
-  if (!name) return '#737373';
-  const colors = ['#00E5E5', '#39FF14', '#FFE500', '#FF6B35', '#8B5CF6', '#EC4899', '#06B6D4'];
+  if (!name) return palette.surface[500];
+  // Brand-family spread: lime, slate, banana, the burro browns, purple.
+  const colors = [
+    palette.accent.signal, palette.accent.cool, palette.accent.banana,
+    palette.brown[400], palette.brown[600], palette.brand[600],
+    palette.accent.purple,
+  ];
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);

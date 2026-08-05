@@ -11,11 +11,12 @@ import {
 } from 'react-icons/tb';
 import { formatDistanceToNow, format } from 'date-fns';
 import { supabase } from '../../../lib/supabase';
+import colors from '../../../theme/colors';
 
 const SEND_TYPE_META = {
-  initial:  { icon: TbSend,           label: 'Sent',     color: '#00E5E5' },
-  resend:   { icon: TbRotateClockwise,label: 'Resent',   color: '#06B6D4' },
-  reminder: { icon: TbBellRinging,    label: 'Reminder', color: '#FFE500' },
+  initial:  { icon: TbSend,           label: 'Sent',     color: colors.accent.cool },
+  resend:   { icon: TbRotateClockwise,label: 'Resent',   color: colors.brand[600] },
+  reminder: { icon: TbBellRinging,    label: 'Reminder', color: colors.accent.banana },
 };
 
 const SendHistoryStrip = ({ invoiceId, refreshKey, onViewSnapshot }) => {

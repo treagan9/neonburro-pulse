@@ -211,7 +211,7 @@ const ReminderModal = ({
               isLoading={sending}
               loadingText="Sending"
               isDisabled={!body.trim()}
-              _hover={{ bg: '#FFD700' }}
+              _hover={{ bg: '#FFEF33' }}
             >
               Send Reminder
             </Button>

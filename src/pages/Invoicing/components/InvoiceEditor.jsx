@@ -819,7 +819,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                     borderRadius="lg"
                     leftIcon={<TbCash size={14} />}
                     onClick={() => setShowMarkPaidModal(true)}
-                    _hover={{ bg: '#2DD30F', transform: 'translateY(-1px)' }}
+                    _hover={{ bg: 'brand.400', transform: 'translateY(-1px)' }}
                   >
                     Mark Paid
                   </Button>
