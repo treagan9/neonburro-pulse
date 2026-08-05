@@ -19,6 +19,7 @@ import Clients       from './pages/Clients';
 import ClientDetail  from './pages/Clients/ClientDetail';
 import Invoicing     from './pages/Invoicing';
 import Forms         from './pages/Forms';
+import Messages      from './pages/Messages';
 import Calendar      from './pages/Calendar';
 import Analytics     from './pages/Analytics';
 import Settings      from './pages/Settings';
