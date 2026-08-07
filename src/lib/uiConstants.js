@@ -167,6 +167,7 @@ const LABELS = {
   nomination:         'Nomination',
   project_brief:      'Project Brief',
   wild_request:       'Wild Request',
+  signup:             'Signup',
 };
 
 // Hyphen or underscore, upper or lower, one key.
@@ -188,6 +189,7 @@ const COLORS_BY_TYPE = {
   nomination:         colors.accent.banana,
   project_brief:      colors.status.green,
   wild_request:       '#FF6B35',
+  signup:             colors.accent.signal,
 };
 
 // Same normalisation as the labels, so a hyphenated type gets its colour too
