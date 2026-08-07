@@ -148,7 +148,18 @@ export const PAGE_AMBIENT_GLOW_PROPS = {
 
 // Form-type labels + colors — shared by Forms page and Dashboard FormInbox.
 // Distinct hues per type; brand-colliding ones resolve to Topo Lime / green.
-export const FORM_TYPE_LABELS = {
+// The site writes hyphens. This file used to key on underscores. Three of the
+// seven form types therefore arrived in the inbox with no label and no colour,
+// which read as a broken row rather than a project brief:
+//
+//   site writes            this file expected
+//   project-brief          project_brief
+//   collective-request     collective_request
+//   wild-request           wild_request
+//
+// Fixing it at the write side would orphan every row already in the table, so
+// both spellings are accepted here and everything resolves through normalise().
+const LABELS = {
   contact:            'Contact',
   application:        'Application',
   collective_request: 'Collective',
@@ -158,7 +169,18 @@ export const FORM_TYPE_LABELS = {
   wild_request:       'Wild Request',
 };
 
-export const FORM_TYPE_COLORS = {
+// Hyphen or underscore, upper or lower, one key.
+export const normaliseFormType = (t) =>
+  String(t || 'contact').trim().toLowerCase().replace(/-/g, '_');
+
+export const FORM_TYPE_LABELS = new Proxy(LABELS, {
+  get: (target, key) =>
+    typeof key === 'string' ? target[normaliseFormType(key)] : target[key],
+  has: (target, key) =>
+    typeof key === 'string' ? normaliseFormType(key) in target : key in target,
+});
+
+const COLORS_BY_TYPE = {
   contact:            colors.accent.signal,
   application:        colors.accent.purple,
   collective_request: '#EC4899',
@@ -167,6 +189,15 @@ export const FORM_TYPE_COLORS = {
   project_brief:      colors.status.green,
   wild_request:       '#FF6B35',
 };
+
+// Same normalisation as the labels, so a hyphenated type gets its colour too
+// instead of falling through to undefined and rendering an uncoloured pill.
+export const FORM_TYPE_COLORS = new Proxy(COLORS_BY_TYPE, {
+  get: (target, key) =>
+    typeof key === 'string' ? target[normaliseFormType(key)] : target[key],
+  has: (target, key) =>
+    typeof key === 'string' ? normaliseFormType(key) in target : key in target,
+});
 
 export const formatCurrency = (val) => {
   const num = parseFloat(val || 0);
