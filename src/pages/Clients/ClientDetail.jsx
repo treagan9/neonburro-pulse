@@ -1,6 +1,6 @@
 // path: /clients/:clientId/
 //
-// Tabs: Overview / Sprints / Invoices / Projects / Sites / Messages
+// Tabs: Overview / Sprints / Invoices / Recurring / Projects / Sites / Messages
 // Admin can manage avatar, PIN, impersonation, activation.
 // Colors resolve from theme tokens. No hardcoded cyan.
 
@@ -19,6 +19,7 @@ import { supabase } from '../../lib/supabase';
 import colors from '../../theme/colors';
 import { formatPhoneDisplay, timeAgo } from '../../utils/phone';
 import SitesTab from './components/SitesTab';
+import SubscriptionsTab from './components/SubscriptionsTab';
 import ClientModal from './components/ClientModal';
 import ClientAvatarUpload from '../../components/common/ClientAvatarUpload';
 import PortalAccessCard from '../../components/common/PortalAccessCard';
@@ -29,6 +30,7 @@ const TAB_OPTIONS = [
   { value: 'overview', label: 'Overview' },
   { value: 'sprints', label: 'Sprints' },
   { value: 'invoices', label: 'Invoices' },
+  { value: 'subscriptions', label: 'Recurring' },
   { value: 'projects', label: 'Projects' },
   { value: 'sites', label: 'Sites' },
   { value: 'messages', label: 'Messages' },
@@ -974,6 +976,9 @@ const ClientDetail = () => {
           {activeTab === 'sprints' && <SprintsTab sprints={sprints} loading={false} />}
           {activeTab === 'invoices' && (
             <InvoicesTab invoices={invoices} loading={false} navigate={navigate} />
+          )}
+          {activeTab === 'subscriptions' && (
+            <SubscriptionsTab clientId={clientId} clientName={client.name} />
           )}
           {activeTab === 'projects' && <ProjectsTab clientId={clientId} toast={toast} />}
           {activeTab === 'sites' && <SitesTab clientId={clientId} clientName={client.name} />}
