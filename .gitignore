@@ -6,3 +6,6 @@ dist
 
 # Local Netlify folder
 .netlify
+
+# Working scratch. Retired source kept on disk, never in history.
+_to_delete/
