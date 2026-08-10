@@ -46,8 +46,11 @@ function App() {
         {/* Protected admin routes */}
         <Route element={<ProtectedRoute />}>
           <Route element={<PresenceWrappedShell />}>
-            <Route index element={<Navigate to="/dashboard/" replace />} />
-            <Route path="dashboard/" element={<Dashboard />} />
+            {/* Today is the canonical landing page. /dashboard/ still resolves
+                so bookmarks, old emails and anything already sent keep working. */}
+            <Route index element={<Navigate to="/today/" replace />} />
+            <Route path="today/" element={<Dashboard />} />
+            <Route path="dashboard/" element={<Navigate to="/today/" replace />} />
             <Route path="clients/" element={<Clients />} />
             <Route path="clients/:clientId/" element={<ClientDetail />} />
             <Route path="invoicing/" element={<Invoicing />} />
@@ -59,7 +62,7 @@ function App() {
             {/* Projects redirect to clients - the source of truth now */}
             <Route path="projects/" element={<Navigate to="/clients/" replace />} />
             <Route path="projects/*" element={<Navigate to="/clients/" replace />} />
-            <Route path="*" element={<Navigate to="/dashboard/" replace />} />
+            <Route path="*" element={<Navigate to="/today/" replace />} />
           </Route>
         </Route>
       </Routes>

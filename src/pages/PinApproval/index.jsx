@@ -138,7 +138,7 @@ const PinApproval = () => {
               <Text color="gray.400" fontSize="sm" lineHeight="1.6">{error}</Text>
               <Button
                 as="a"
-                href="/dashboard/"
+                href="/today/"
                 size="sm"
                 variant="outline"
                 borderColor={T.signal}
@@ -195,7 +195,7 @@ const PinApproval = () => {
               </Text>
               <Button
                 as="a"
-                href="/dashboard/"
+                href="/today/"
                 size="sm"
                 bg={T.signal}
                 color="black"

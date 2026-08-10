@@ -104,7 +104,7 @@ const Login = () => {
   const identifierRef = useRef(null);
   const passwordRef = useRef(null);
 
-  const from = location.state?.from?.pathname || '/dashboard/';
+  const from = location.state?.from?.pathname || '/today/';
 
   useEffect(() => {
     const id = setTimeout(() => identifierRef.current?.focus(), 100);

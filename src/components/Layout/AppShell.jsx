@@ -1,8 +1,28 @@
 // src/components/Layout/AppShell.jsx
-// Admin shell — unified layout that wraps every protected page.
-// - Sidebar: fixed left, 240px expanded / 64px collapsed, persisted via profile
-// - Content: max 1400px centered, responsive gutters, consistent rhythm
-// - Mobile: full-bleed with bottom tab bar (5 icons + More sheet)
+// SENTINEL: NB_PULSE_SHELL_V2
+//
+// The frame every protected page renders inside.
+//
+// ── THE ONE REAL CHANGE ─────────────────────────────────────────────────────
+// V1 wrapped content in maxW 1400px with mx auto, so on any monitor wider than
+// about 1650px the app drifted into the middle of the screen while the sidebar
+// stayed pinned to the left edge. The gap between the nav and the first column
+// of a table grew as the window did, which is the opposite of what a dense tool
+// should do with more room.
+//
+// Content is left aligned now. SHEET still caps the width so a table cannot run
+// three thousand pixels wide, it just does not centre what it caps. That is the
+// same call the marketing site documents in its own layout file, and it is the
+// only call that lets a fixed sidebar and a page heading share a left edge.
+//
+// The gutter also went from five steps to one. base 20px, md and up 28px.
+//
+// ── MOBILE ──────────────────────────────────────────────────────────────────
+// Bottom padding is TABBAR_PAD, which is the bar height plus the iOS safe area
+// plus breathing room, so the last row of any list clears the tabs on a notched
+// phone instead of sitting one pixel under them.
+//
+// No oxford commas, no em dashes.
 
 import { useState, useEffect } from 'react';
 import { Box, Flex } from '@chakra-ui/react';
@@ -12,13 +32,17 @@ import Header from './Header';
 import MobileNav from './MobileNav';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
+import {
+  RAIL, SHEET, SIDEBAR_W, SIDEBAR_W_COLLAPSED, TABBAR_PAD, BAND_Y, EASE, SLOW,
+} from '../../theme/layout';
 
 const AppShell = ({ children }) => {
   const { user } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
 
-  // Load collapsed preference from profiles in background.
-  // Sidebar shows expanded by default — no blocking hide/show.
+  // Loaded in the background. The sidebar renders expanded immediately rather
+  // than waiting on a round trip, because a nav that appears half a second late
+  // is worse than one that occasionally starts a pixel wide.
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
@@ -28,34 +52,28 @@ const AppShell = ({ children }) => {
         .select('sidebar_collapsed')
         .eq('id', user.id)
         .maybeSingle();
-      if (!cancelled && data && data.sidebar_collapsed) {
-        setCollapsed(true);
-      }
+      if (!cancelled && data?.sidebar_collapsed) setCollapsed(true);
     })();
     return () => { cancelled = true; };
   }, [user]);
 
-  const toggleCollapsed = async () => {
+  const toggle = async () => {
     const next = !collapsed;
     setCollapsed(next);
     if (!user) return;
-    await supabase
-      .from('profiles')
-      .update({ sidebar_collapsed: next })
-      .eq('id', user.id);
+    await supabase.from('profiles').update({ sidebar_collapsed: next }).eq('id', user.id);
   };
-
-  const sidebarWidth = collapsed ? '64px' : '240px';
 
   return (
     <Flex minH="100vh" bg="surface.950">
-      <Sidebar collapsed={collapsed} onToggle={toggleCollapsed} />
+      <Sidebar collapsed={collapsed} onToggle={toggle} />
 
       <Box
         flex={1}
-        ml={{ base: 0, lg: sidebarWidth }}
+        minW={0}
+        ml={{ base: 0, lg: collapsed ? SIDEBAR_W_COLLAPSED : SIDEBAR_W }}
         minH="100vh"
-        transition="margin-left 240ms cubic-bezier(0.4, 0, 0.2, 1)"
+        transition={`margin-left ${SLOW} ${EASE}`}
         display="flex"
         flexDirection="column"
       >
@@ -64,12 +82,11 @@ const AppShell = ({ children }) => {
         <Box
           as="main"
           w="100%"
-          maxW="1400px"
-          mx="auto"
+          maxW={SHEET}
           flex={1}
-          px={{ base: 4, sm: 5, md: 6, lg: 8, xl: 10 }}
-          py={{ base: 5, md: 8, lg: 10 }}
-          pb={{ base: '88px', lg: 10 }}
+          px={RAIL}
+          pt={BAND_Y}
+          pb={{ base: TABBAR_PAD, lg: 10 }}
         >
           {children || <Outlet />}
         </Box>
