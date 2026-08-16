@@ -1,21 +1,65 @@
 // netlify/functions/stripe-payment-webhook.js
-// Receives Stripe events and updates NeonBurro invoice/sprint payment state
-// Events handled:
-//   - checkout.session.completed (card + Apple Pay + Google Pay)
-//   - checkout.session.async_payment_succeeded (ACH clears later)
-//   - checkout.session.async_payment_failed
-//   - charge.refunded
+// SENTINEL: NB_STRIPE_WEBHOOK_V2 (pulse copy)
 //
-// All DB writes go through the service role key (RLS bypass needed for webhook).
-// Dedup via payments.stripe_session_id UNIQUE constraint.
-// Fires admin + client emails on success.
+// Receives Stripe events and updates NeonBurro invoice and sprint payment state.
+//
+// Events handled:
+//   checkout.session.completed               card, Apple Pay, Google Pay, and
+//                                            stablecoins when Stripe reports
+//                                            the session paid straight away
+//   checkout.session.async_payment_succeeded ACH and stablecoins that clear
+//                                            after the redirect
+//   checkout.session.async_payment_failed
+//   charge.refunded
+//
+// All DB writes go through the service role key (RLS bypass, this is a server).
+// Dedup is payments.stripe_session_id. Fires admin and client emails on success.
+//
+// ── two vocabularies, do not pass one through as the other ─────────────────
+// Stripe names a payment method type in its own words: card, us_bank_account,
+// crypto, link, cashapp. Our payments.method column has its own short list,
+// enforced by a check constraint in the database:
+//
+//   ach, card, check, cash, crypto, other
+//
+// The first version of this file wrote Stripe's string straight into
+// payments.method. That worked for card and would have failed the constraint
+// on the very first ACH ('us_bank_account') or stablecoin ('crypto') payment,
+// and because the handler returns 200 on application errors so Stripe does not
+// retry forever, the failure would have been silent: sprints marked paid, the
+// payments row missing, total_paid never recomputed, invoice never flipped,
+// no receipt sent. methodFor() below is the translation and it is the only
+// place the mapping lives. Stripe's raw type is still kept in the payments
+// notes and in the emails so nothing is lost. If you add a value to the
+// database check, add it here, and the other way round.
+//
+// ── invoices.rail_settled is deliberately not written here ─────────────────
+// That column knows two rails, card (Stripe pulls) and stablecoin (a push to a
+// wallet we hold, recorded in public.settlements, which stamps rail_settled
+// through its trigger). USDC through Stripe is neither, it settles into the
+// Stripe balance in dollars like a card. Nothing in Pulse reads rail_settled
+// on invoices yet, so rather than mislabel it this file leaves it null and the
+// vocabulary gets settled when the direct Solana rail is built. payment_method
+// carries the truth in the meantime.
+//
+// ── this copy versus neonburro.com's ───────────────────────────────────────
+// neonburro/netlify/functions/stripe-payment-webhook.js is the same handler
+// plus subscription events. Pulse has no _shared.js so the Supabase key is
+// resolved inline below, newest key format first. Both sites hold a
+// STRIPE_WEBHOOK_SECRET, both process checkout events, and the payments
+// dedup by stripe_session_id keeps a double delivery from double counting.
+// Keep the two files in step, they are the same system of record.
+//
+// No oxford commas, no em dashes.
 
 import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// Newest key format first. A project that has disabled legacy keys returns
+// 401 on the old service_role JWT with no other symptom.
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
 const FROM_EMAIL = 'NeonBurro <invoices@neonburro.com>';
@@ -42,6 +86,34 @@ const getMST = () =>
     minute: '2-digit',
     hour12: true,
   }) + ' MT';
+
+// Stripe payment_method.type -> payments.method. See the header.
+const methodFor = (stripeType) => {
+  switch (stripeType) {
+    case null:
+    case undefined:
+    case '':
+    case 'card':
+      return 'card';
+    case 'us_bank_account':
+      return 'ach';
+    case 'crypto':
+      return 'crypto';
+    default:
+      return 'other';
+  }
+};
+
+// Human line for the emails. Wallet first because Apple Pay and Google Pay
+// arrive as type card with a wallet stamped on it.
+const describeMethod = ({ stripeType, brand, last4, wallet, forClient }) => {
+  if (wallet === 'apple_pay') return forClient ? 'Apple Pay' : `Apple Pay · ${brand || 'Card'} · ···· ${last4 || '----'}`;
+  if (wallet === 'google_pay') return forClient ? 'Google Pay' : `Google Pay · ${brand || 'Card'} · ···· ${last4 || '----'}`;
+  if (wallet) return forClient ? 'Digital wallet' : `${wallet} · ${brand || 'Card'} · ···· ${last4 || '----'}`;
+  if (stripeType === 'us_bank_account') return forClient ? 'Bank transfer (ACH)' : 'ACH Bank Transfer';
+  if (stripeType === 'crypto') return forClient ? 'Stablecoin (USDC via Stripe)' : 'Stablecoin · USDC via Stripe';
+  return forClient ? `${brand || 'Card'} ending ···· ${last4 || '----'}` : `${brand || 'Card'} · ···· ${last4 || '----'}`;
+};
 
 // ============================================================
 // SUPABASE REST HELPERS (service role, bypasses RLS)
@@ -103,12 +175,8 @@ const sendEmail = async (from, to, subject, html, replyTo) => {
 // ADMIN EMAIL (payment received)
 // ============================================================
 
-const buildAdminPaymentEmail = ({ invoice, client, paymentMethod, brand, last4, wallet, amount, totalPaid, invoiceTotal, isFull }) => {
-  const methodLine = wallet
-    ? `${wallet === 'apple_pay' ? 'Apple Pay' : wallet === 'google_pay' ? 'Google Pay' : wallet} · ${brand || 'Card'} · ···· ${last4 || '----'}`
-    : paymentMethod === 'us_bank_account'
-      ? 'ACH Bank Transfer'
-      : `${brand || 'Card'} · ···· ${last4 || '----'}`;
+const buildAdminPaymentEmail = ({ invoice, client, stripeType, brand, last4, wallet, amount, totalPaid, invoiceTotal, isFull }) => {
+  const methodLine = describeMethod({ stripeType, brand, last4, wallet, forClient: false });
 
   return `<!DOCTYPE html>
 <html>
@@ -191,12 +259,8 @@ const buildAdminPaymentEmail = ({ invoice, client, paymentMethod, brand, last4, 
 // CLIENT RECEIPT EMAIL
 // ============================================================
 
-const buildClientReceiptEmail = ({ invoice, client, amount, totalPaid, invoiceTotal, isFull, paymentMethod, brand, last4, wallet }) => {
-  const methodLine = wallet
-    ? (wallet === 'apple_pay' ? 'Apple Pay' : wallet === 'google_pay' ? 'Google Pay' : 'Digital wallet')
-    : paymentMethod === 'us_bank_account'
-      ? 'Bank transfer (ACH)'
-      : `${brand || 'Card'} ending ···· ${last4 || '----'}`;
+const buildClientReceiptEmail = ({ invoice, client, amount, totalPaid, invoiceTotal, isFull, stripeType, brand, last4, wallet }) => {
+  const methodLine = describeMethod({ stripeType, brand, last4, wallet, forClient: true });
 
   return `<!DOCTYPE html>
 <html>
@@ -296,7 +360,7 @@ const processCheckoutSuccess = async (session) => {
     return { success: false, reason: 'missing metadata' };
   }
 
-  // Dedup check - was this session already processed?
+  // Dedup. Was this session already processed?
   const existing = await sbGet('payments', `stripe_session_id=eq.${session.id}&select=id`);
   if (existing && existing.length > 0) {
     console.log(`Session ${session.id} already processed, skipping`);
@@ -307,7 +371,7 @@ const processCheckoutSuccess = async (session) => {
   let brand = null;
   let last4 = null;
   let wallet = null;
-  let paymentMethodType = null;
+  let stripeType = null;
 
   if (session.payment_intent) {
     try {
@@ -316,7 +380,7 @@ const processCheckoutSuccess = async (session) => {
       });
       const pm = pi.payment_method;
       if (pm) {
-        paymentMethodType = pm.type;
+        stripeType = pm.type;
         if (pm.card) {
           brand = pm.card.brand;
           last4 = pm.card.last4;
@@ -331,7 +395,10 @@ const processCheckoutSuccess = async (session) => {
     }
   }
 
-  // Fetch invoice + items
+  // Our vocabulary from here on. See the header.
+  const method = methodFor(stripeType);
+
+  // Fetch invoice and items
   const invoices = await sbGet('invoices', `id=eq.${invoice_id}&select=*`);
   const invoice = invoices?.[0];
   if (!invoice) {
@@ -348,7 +415,6 @@ const processCheckoutSuccess = async (session) => {
   // Distribute the received amount across the sprints by their due_now
   const now = new Date().toISOString();
   for (const sprint of paidSprints) {
-    // Mark each sprint paid for its own due_now amount
     const amount = parseFloat(sprint.amount || 0);
     const alreadyPaid = parseFloat(sprint.payment_amount || 0);
     const mode = sprint.payment_mode || 'approve_only';
@@ -360,7 +426,7 @@ const processCheckoutSuccess = async (session) => {
     await sbUpdate('invoice_items', sprint.id, {
       payment_status: 'paid',
       payment_amount: newPaymentAmount,
-      payment_method: paymentMethodType || 'card',
+      payment_method: method,
       payment_method_brand: brand,
       payment_method_last4: last4,
       payment_method_wallet: wallet,
@@ -371,12 +437,13 @@ const processCheckoutSuccess = async (session) => {
     });
   }
 
-  // Insert payments row (one per session)
+  // Insert payments row (one per session). method must satisfy the database
+  // check constraint, which is why it went through methodFor above.
   await sbInsert('payments', {
     invoice_id,
     client_id: invoice.client_id,
     amount: amountReceived,
-    method: paymentMethodType || 'card',
+    method,
     stripe_payment_id: session.payment_intent,
     stripe_session_id: session.id,
     payment_method_brand: brand,
@@ -384,7 +451,7 @@ const processCheckoutSuccess = async (session) => {
     payment_method_wallet: wallet,
     sprint_ids: sprintIdArray,
     reference_number: invoice.invoice_number,
-    notes: `Stripe checkout · ${paymentMethodType || 'card'}`,
+    notes: `Stripe checkout · ${stripeType || 'card'}`,
     received_at: now,
     created_at: now,
   });
@@ -402,7 +469,7 @@ const processCheckoutSuccess = async (session) => {
   await sbUpdate('invoices', invoice_id, {
     total_paid: totalPaid,
     status: newStatus,
-    payment_method: paymentMethodType || 'card',
+    payment_method: method,
     stripe_payment_id: session.payment_intent,
     paid_at: isFull ? now : null,
     receipt_sent_at: now,
@@ -420,7 +487,8 @@ const processCheckoutSuccess = async (session) => {
       amount: amountReceived,
       total_paid: totalPaid,
       total: invoiceTotal,
-      method: paymentMethodType || 'card',
+      method,
+      stripe_type: stripeType,
       brand,
       last4,
       wallet,
@@ -437,7 +505,7 @@ const processCheckoutSuccess = async (session) => {
     if (clients?.[0]) client = clients[0];
   }
 
-  // Fire emails (non-blocking)
+  // Fire emails (non blocking)
   const emailContext = {
     invoice,
     client,
@@ -445,7 +513,7 @@ const processCheckoutSuccess = async (session) => {
     totalPaid,
     invoiceTotal,
     isFull,
-    paymentMethod: paymentMethodType,
+    stripeType,
     brand,
     last4,
     wallet,
@@ -510,7 +578,8 @@ const processRefund = async (charge) => {
     created_at: now,
   });
 
-  // Fire admin alert
+  // Fire admin alert. Stablecoin refunds go back on chain to the original
+  // wallet, Stripe handles that, the note here is the same either way.
   await sendEmail(
     ADMIN_FROM,
     ADMIN_TO,
@@ -555,8 +624,9 @@ export const handler = async (event) => {
     switch (stripeEvent.type) {
       case 'checkout.session.completed':
       case 'checkout.session.async_payment_succeeded': {
-        // For ACH, checkout.session.completed fires immediately but payment_status='unpaid'
-        // async_payment_succeeded fires when it clears. For card, completed has payment_status='paid'.
+        // For ACH and stablecoins, checkout.session.completed can fire with
+        // payment_status 'unpaid' and async_payment_succeeded fires when the
+        // money clears. For card, completed already carries payment_status 'paid'.
         const session = stripeEvent.data.object;
         if (session.payment_status === 'paid') {
           await processCheckoutSuccess(session);
@@ -576,7 +646,7 @@ export const handler = async (event) => {
             entity_id: invoice_id,
             metadata: {
               stripe_session_id: session.id,
-              reason: session.last_payment_error?.message || 'ACH payment failed',
+              reason: session.last_payment_error?.message || 'Async payment failed',
             },
             created_at: new Date().toISOString(),
           });
@@ -596,8 +666,9 @@ export const handler = async (event) => {
     return { statusCode: 200, body: JSON.stringify({ received: true }) };
   } catch (err) {
     console.error('Webhook handler error:', err);
-    // Return 200 so Stripe doesn't retry indefinitely on application errors
-    // (security errors already returned 400 above)
+    // Return 200 so Stripe does not retry indefinitely on application errors
+    // (signature errors already returned 400 above). This is also why a bad
+    // write here is silent, see the header, and why the method mapping exists.
     return {
       statusCode: 200,
       body: JSON.stringify({ received: true, error: err.message }),
