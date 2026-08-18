@@ -1,29 +1,24 @@
 // src/pages/Invoicing/components/InvoicePreview.jsx
-// Pixel-exact preview of the client email.
-// Uses the SAME template module as netlify/functions/send-invoice.js
-// so this preview is literally what the client receives in their inbox.
-// Light-mode email: iframe frame uses bone, not black.
+// Pixel-exact preview of the client document, the SAME buildInvoiceEmailHTML the
+// send function uses, so this is literally what lands in their inbox. The frame
+// is Paper now, a cream mat holding the warm document. No dashes, no oxford.
 
 import { useMemo } from 'react';
 import { Box, VStack, HStack, Text, Icon } from '@chakra-ui/react';
 import { TbClock, TbMailFast } from 'react-icons/tb';
 import { buildInvoiceEmailHTML } from '../../../lib/invoiceEmailTemplate';
-import { EMAIL } from '../../../lib/emailTokens';
+import colors from '../../../theme/colors';
+
+const P = colors.paper;
 
 const InvoicePreview = ({ invoice, client, sprints }) => {
   const html = useMemo(() => {
     if (!client || !sprints || sprints.length === 0) return null;
-
     const invoiceDate = new Date().toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
+      year: 'numeric', month: 'long', day: 'numeric',
     });
-
     return buildInvoiceEmailHTML({
-      invoice: {
-        invoice_number: invoice?.invoice_number || 'NB______',
-      },
+      invoice: { invoice_number: invoice?.invoice_number || 'NB______', due_date: invoice?.due_date },
       client,
       project: null,
       lineItems: sprints,
@@ -34,21 +29,13 @@ const InvoicePreview = ({ invoice, client, sprints }) => {
 
   if (!html) {
     return (
-      <Box
-        py={20}
-        textAlign="center"
-        border="1px dashed"
-        borderColor="surface.800"
-        borderRadius="2xl"
-      >
+      <Box py={20} textAlign="center" border="1px dashed" borderColor={P.hair} borderRadius="2xl" bg={P.sheet}>
         <VStack spacing={3}>
-          <Icon as={TbClock} boxSize={10} color="surface.700" />
-          <Text color="surface.500" fontSize="sm">
-            {!client
-              ? 'Select a client to see the preview'
-              : 'Add at least one billable sprint to see the preview'}
+          <Icon as={TbClock} boxSize={10} color={P.inkFaint} />
+          <Text color={P.inkMuted} fontSize="sm">
+            {!client ? 'Select a client to see the preview' : 'Add at least one billable sprint to see the preview'}
           </Text>
-          <Text color="surface.700" fontSize="2xs" fontFamily="mono">
+          <Text color={P.inkFaint} fontSize="2xs" fontFamily="mono">
             WIP sprints are hidden from the client
           </Text>
         </VStack>
@@ -58,32 +45,18 @@ const InvoicePreview = ({ invoice, client, sprints }) => {
 
   return (
     <VStack spacing={4} align="stretch">
-      <HStack spacing={2} justify="center" pb={2}>
-        <Icon as={TbMailFast} boxSize={3.5} color="brand.500" />
-        <Text
-          fontSize="2xs"
-          color="brand.500"
-          fontWeight="700"
-          letterSpacing="0.12em"
-          textTransform="uppercase"
-          fontFamily="mono"
-        >
-          Exact Email Preview
+      <HStack spacing={2} justify="center" pb={1}>
+        <Icon as={TbMailFast} boxSize={3.5} color={P.limeDeep} />
+        <Text fontSize="2xs" color={P.inkMuted} fontWeight="600" letterSpacing="0.16em" textTransform="uppercase" fontFamily="mono">
+          Exact client preview
         </Text>
       </HStack>
 
-      <Box
-        borderRadius="2xl"
-        overflow="hidden"
-        border="1px solid"
-        borderColor="surface.800"
-        boxShadow="0 8px 32px rgba(0,0,0,0.4)"
-        bg={EMAIL.page}
-      >
+      <Box borderRadius="2xl" overflow="hidden" border="1px solid" borderColor={P.hair} bg={P.mat}>
         <Box
           as="iframe"
           srcDoc={html}
-          title="Invoice email preview"
+          title="Invoice preview"
           width="100%"
           minH="900px"
           h="auto"
@@ -95,13 +68,8 @@ const InvoicePreview = ({ invoice, client, sprints }) => {
             const handleLoad = () => {
               try {
                 const doc = iframe.contentDocument || iframe.contentWindow?.document;
-                if (doc?.body) {
-                  const height = doc.body.scrollHeight;
-                  iframe.style.height = `${height + 40}px`;
-                }
-              } catch (err) {
-                // Ignore cross-origin errors
-              }
+                if (doc?.body) iframe.style.height = `${doc.body.scrollHeight + 40}px`;
+              } catch { /* cross-origin, ignore */ }
             };
             iframe.addEventListener('load', handleLoad);
             setTimeout(handleLoad, 500);
@@ -109,10 +77,6 @@ const InvoicePreview = ({ invoice, client, sprints }) => {
           }}
         />
       </Box>
-
-      <Text color="surface.700" fontSize="2xs" fontFamily="mono" textAlign="center">
-        This is exactly what {client?.name?.split(' ')[0] || 'the client'} will receive
-      </Text>
     </VStack>
   );
 };

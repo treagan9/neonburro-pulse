@@ -89,18 +89,15 @@ const ReviewSendModal = ({ isOpen, onClose, invoice, client, project, sprints, d
       >
         {/* Header */}
         <Box px={{ base: 5, md: 7 }} pt={{ base: 5, md: 6 }} pb={4} borderBottom="1px solid" borderColor={P.hairSoft}>
-          <HStack spacing={2} mb={3}>
+          <HStack spacing={2} mb={4}>
             <Icon as={TbMailFast} boxSize={3.5} color={P.limeDeep} />
             <Text fontFamily="mono" fontSize="10px" letterSpacing="0.2em" textTransform="uppercase" color={P.inkMuted}>
               Review and send
             </Text>
           </HStack>
-          <Text fontSize={{ base: 'lg', md: 'xl' }} fontWeight="600" color={P.ink} letterSpacing="-0.01em" lineHeight="1.2">
-            This is exactly what {client?.name?.split(' ')[0] || 'your client'} receives
-          </Text>
 
           {/* Recipient + amount + due */}
-          <HStack spacing={6} mt={4} align="flex-start" flexWrap="wrap" rowGap={3}>
+          <HStack spacing={6} align="flex-start" flexWrap="wrap" rowGap={3}>
             <Meta
               label="To"
               value={hasEmail ? client.email : 'No email on file'}

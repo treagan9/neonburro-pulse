@@ -1,30 +1,23 @@
 // src/pages/Invoicing/index.jsx
-// Design language v2: no big title, kicker only, teal-filled + Invoice button
-// with explicit child color props (Chakra cascade workaround).
-// Sticky rounded search, tab system from uiConstants.
+// The invoicing surface, Paper. A cream worktable: kicker, a lime new-invoice
+// button, a live stats line, a rounded search and the filter tabs over the list.
+// Local Paper styles here rather than the shared dark uiConstants, since those
+// still drive the not yet converted pages. When selectedInvoiceId is set the
+// whole surface hands off to InvoiceEditor. No oxford commas, no dashes.
 
 import { useState, useEffect } from 'react';
 import {
-  Box, VStack, HStack, Text, Icon, Input,
+  Box, VStack, HStack, Text, Icon, Input, Container,
 } from '@chakra-ui/react';
 import { useSearchParams } from 'react-router-dom';
 import { TbPlus, TbSearch } from 'react-icons/tb';
 import { supabase } from '../../lib/supabase';
 import { SENT_STATUSES, formatCurrencyCompact } from '../../lib/invoiceConstants';
-import {
-  PRIMARY_BUTTON_PROPS,
-  PRIMARY_BUTTON_ICON_PROPS,
-  PRIMARY_BUTTON_TEXT_PROPS,
-  SEARCH_INPUT_WRAP_PROPS,
-  SEARCH_INPUT_PROPS,
-  buildFilterTabProps,
-  FILTER_TAB_LABEL_PROPS,
-  FILTER_TAB_COUNT_PROPS,
-  FILTER_TAB_UNDERLINE_PROPS,
-  PAGE_AMBIENT_GLOW_PROPS,
-} from '../../lib/uiConstants';
+import colors from '../../theme/colors';
 import InvoiceList from './components/InvoiceList';
 import InvoiceEditor from './components/InvoiceEditor';
+
+const P = colors.paper;
 
 const Invoicing = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -38,6 +31,7 @@ const Invoicing = () => {
   useEffect(() => {
     const invoiceParam = searchParams.get('invoice');
     if (invoiceParam) setSelectedInvoiceId(invoiceParam);
+    else setSelectedInvoiceId(null);
   }, [searchParams]);
 
   useEffect(() => { fetchData(); }, []);
@@ -47,7 +41,7 @@ const Invoicing = () => {
     const [invoicesRes, clientsRes] = await Promise.all([
       supabase
         .from('invoices')
-        .select('*, invoice_items(*), clients(id, name, company, email, phone)')
+        .select('*, invoice_items(*), clients(id, name, company, email, phone, avatar_url)')
         .is('cancelled_at', null)
         .order('created_at', { ascending: false }),
       supabase
@@ -157,80 +151,125 @@ const Invoicing = () => {
   ];
 
   return (
-    <Box position="relative" minH="100%">
-      <Box {...PAGE_AMBIENT_GLOW_PROPS} />
+    <Box position="relative" minH="100vh" bg={P.mat}>
+      <Box
+        position="absolute"
+        top={0}
+        left={0}
+        right={0}
+        h="320px"
+        bg={`radial-gradient(ellipse at top center, ${P.lime}12, transparent 70%)`}
+        pointerEvents="none"
+      />
 
-      <VStack spacing={{ base: 8, md: 12 }} align="stretch" position="relative">
-        {/* Header */}
-        <VStack align="stretch" spacing={3}>
-          <HStack justify="space-between" align="center" flexWrap="wrap" gap={3}>
-            <Text textStyle="kicker">Invoicing</Text>
+      <Container maxW="1080px" px={{ base: 5, md: 8 }} py={{ base: 6, md: 10 }} position="relative">
+        <VStack spacing={{ base: 7, md: 9 }} align="stretch">
+          {/* Header */}
+          <VStack align="stretch" spacing={3}>
+            <HStack justify="space-between" align="center" flexWrap="wrap" gap={3}>
+              <Text fontFamily="mono" fontSize="2xs" fontWeight="600" letterSpacing="0.22em" textTransform="uppercase" color={P.inkMuted}>
+                Invoicing
+              </Text>
 
-            <Box as="button" onClick={handleNewInvoice} {...PRIMARY_BUTTON_PROPS}>
-              <Icon as={TbPlus} {...PRIMARY_BUTTON_ICON_PROPS} />
-              <Text {...PRIMARY_BUTTON_TEXT_PROPS}>Invoice</Text>
-            </Box>
+              <HStack
+                as="button"
+                onClick={handleNewInvoice}
+                spacing={1.5}
+                bg={P.lime}
+                color={P.limeInk}
+                borderRadius="full"
+                px={4}
+                h="40px"
+                fontWeight="700"
+                fontSize="sm"
+                transition="all 0.18s"
+                _hover={{ bg: '#D2E26B', transform: 'translateY(-1px)' }}
+                _active={{ transform: 'scale(0.98)' }}
+              >
+                <Icon as={TbPlus} boxSize={4} />
+                <Text>Invoice</Text>
+              </HStack>
+            </HStack>
+
+            <HStack spacing={0} fontSize="xs" fontFamily="mono" flexWrap="wrap" rowGap={1}>
+              <Text color={P.ink} fontWeight="700">{stats.totalCount}</Text>
+              <Text color={P.inkMuted} mx={1.5}>invoices</Text>
+              <Text color={P.inkFaint} mx={1}>·</Text>
+              <Text color={P.ink} fontWeight="700">{formatCurrencyCompact(stats.mtdRevenue)}</Text>
+              <Text color={P.inkMuted} mx={1.5}>MTD</Text>
+              {stats.totalOutstanding > 0 && (
+                <>
+                  <Text color={P.inkFaint} mx={1}>·</Text>
+                  <Text color={P.gold} fontWeight="700">{formatCurrencyCompact(stats.totalOutstanding)}</Text>
+                  <Text color={P.inkMuted} mx={1.5}>outstanding</Text>
+                </>
+              )}
+              {stats.drafts > 0 && (
+                <>
+                  <Text color={P.inkFaint} mx={1}>·</Text>
+                  <Text color={P.inkSec} fontWeight="700">{stats.drafts}</Text>
+                  <Text color={P.inkMuted} mx={1.5}>draft{stats.drafts !== 1 ? 's' : ''}</Text>
+                </>
+              )}
+            </HStack>
+          </VStack>
+
+          {/* Search */}
+          <HStack
+            spacing={3}
+            bg={P.sheet}
+            border="1px solid"
+            borderColor={P.hair}
+            borderRadius="full"
+            px={5}
+            h="52px"
+            position="sticky"
+            top={4}
+            zIndex={2}
+            _focusWithin={{ borderColor: P.lime, boxShadow: `0 0 0 3px ${P.lime}22` }}
+          >
+            <Icon as={TbSearch} boxSize={4} color={P.inkMuted} flexShrink={0} />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by number, client, or company"
+              variant="unstyled"
+              color={P.ink}
+              fontSize="sm"
+              _placeholder={{ color: P.inkFaint }}
+            />
           </HStack>
 
-          <HStack spacing={0} color="surface.500" fontSize="xs" fontFamily="mono" flexWrap="wrap" rowGap={1}>
-            <Text color="white" fontWeight="700">{stats.totalCount}</Text>
-            <Text color="surface.600" mx={1.5}>invoices</Text>
-            <Text color="surface.700" mx={1}>·</Text>
-            <Text color="white" fontWeight="700">{formatCurrencyCompact(stats.mtdRevenue)}</Text>
-            <Text color="surface.600" mx={1.5}>MTD</Text>
-            {stats.totalOutstanding > 0 && (
-              <>
-                <Text color="surface.700" mx={1}>·</Text>
-                <Text color="accent.banana" fontWeight="700">{formatCurrencyCompact(stats.totalOutstanding)}</Text>
-                <Text color="surface.600" mx={1.5}>outstanding</Text>
-              </>
-            )}
-            {stats.drafts > 0 && (
-              <>
-                <Text color="surface.700" mx={1}>·</Text>
-                <Text color="surface.400" fontWeight="700">{stats.drafts}</Text>
-                <Text color="surface.600" mx={1.5}>draft{stats.drafts !== 1 ? 's' : ''}</Text>
-              </>
-            )}
+          {/* Filter tabs */}
+          <HStack spacing={7} flexWrap="wrap" align="center">
+            {FILTER_OPTIONS.map((opt) => {
+              const active = filterStatus === opt.value;
+              const count = counts[opt.value] || 0;
+              return (
+                <Box key={opt.value} onClick={() => setFilterStatus(opt.value)} position="relative" pb={2} cursor="pointer">
+                  <HStack spacing={2}>
+                    <Text fontSize="sm" fontWeight={active ? '700' : '500'} color={active ? P.ink : P.inkMuted}>
+                      {opt.label}
+                    </Text>
+                    <Text fontSize="2xs" fontFamily="mono" fontWeight="700" color={active ? P.limeDeep : P.inkFaint}>
+                      {count}
+                    </Text>
+                  </HStack>
+                  {active && <Box position="absolute" bottom="-1px" left={0} right={0} h="2px" bg={P.lime} borderRadius="full" />}
+                </Box>
+              );
+            })}
           </HStack>
-        </VStack>
 
-        {/* Sticky rounded search */}
-        <Box {...SEARCH_INPUT_WRAP_PROPS}>
-          <Icon as={TbSearch} boxSize={4} color="surface.500" flexShrink={0} />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by number, client, or company"
-            {...SEARCH_INPUT_PROPS}
+          <InvoiceList
+            invoices={filtered}
+            loading={loading}
+            onSelect={handleSelectInvoice}
+            onNew={handleNewInvoice}
+            onQuickDelete={handleQuickDelete}
           />
-        </Box>
-
-        {/* Filter row */}
-        <HStack spacing={6} flexWrap="wrap" align="center">
-          {FILTER_OPTIONS.map((opt) => {
-            const active = filterStatus === opt.value;
-            const count = counts[opt.value] || 0;
-            return (
-              <Box key={opt.value} onClick={() => setFilterStatus(opt.value)} {...buildFilterTabProps(active)}>
-                <HStack spacing={2}>
-                  <Text {...FILTER_TAB_LABEL_PROPS(active)}>{opt.label}</Text>
-                  <Text {...FILTER_TAB_COUNT_PROPS(active)}>{count}</Text>
-                </HStack>
-                {active && <Box {...FILTER_TAB_UNDERLINE_PROPS} />}
-              </Box>
-            );
-          })}
-        </HStack>
-
-        <InvoiceList
-          invoices={filtered}
-          loading={loading}
-          onSelect={handleSelectInvoice}
-          onNew={handleNewInvoice}
-          onQuickDelete={handleQuickDelete}
-        />
-      </VStack>
+        </VStack>
+      </Container>
     </Box>
   );
 };

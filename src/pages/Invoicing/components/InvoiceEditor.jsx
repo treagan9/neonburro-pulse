@@ -1,8 +1,18 @@
 // src/pages/Invoicing/components/InvoiceEditor.jsx
-// Invoice compose + preview surface.
-// Phase 6.4b additions: Mark Paid (off-platform), Duplicate invoice.
-// Bonus fix: due_date now stripped to YYYY-MM-DD before setting state
-// so <input type="date"> doesn't emit the format warning.
+// Invoice compose, preview and send. Paper surface (src/theme/colors.js paper.*):
+// a warm cream worktable that matches the document it produces.
+//
+// ── THE SEND GATE ────────────────────────────────────────────────────────────
+// Review and send never emails on click. It validates, persists the draft, then
+// re-enters the invoice with ?review=1 so it reloads with real ids (no double
+// create) and ReviewSendModal opens over it showing the exact client document.
+// Only Approve and send inside that gate fires the email. persistInvoice is side
+// effect free so Save Draft and the gate both reuse it.
+//
+// Mark Paid records an off-platform payment from any source. Duplicate clones to
+// a fresh draft. Cancel soft cancels and kills the pay link, keeping the snapshot.
+//
+// No oxford commas, no em dashes.
 
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -23,11 +33,10 @@ import {
 import {
   SENT_STATUSES,
   TOOLTIP_PROPS,
-  FIELD_LABEL,
-  NAKED_INPUT,
   formatCurrency,
 } from '../../../lib/invoiceConstants';
 import { validateSprintsForSend } from '../../../lib/invoiceValidation';
+import colors from '../../../theme/colors';
 
 import SprintEditRow from './SprintEditRow';
 import CancelInvoiceModal from './CancelInvoiceModal';
@@ -37,6 +46,22 @@ import InvoiceSnapshotModal from './InvoiceSnapshotModal';
 import SendHistoryStrip from './SendHistoryStrip';
 import ReminderModal from './ReminderModal';
 import ReviewSendModal from './ReviewSendModal';
+
+const P = colors.paper;
+
+// Paper field label and control styles, local so the editor does not inherit the
+// dark tokens from invoiceConstants.
+const LABEL = {
+  fontFamily: 'mono', fontSize: '2xs', fontWeight: '600', color: P.inkMuted,
+  textTransform: 'uppercase', letterSpacing: '0.16em', mb: 2, display: 'block',
+};
+const FIELD = {
+  bg: P.sheet, border: '1px solid', borderColor: P.hair, borderRadius: 'lg',
+  color: P.ink, fontSize: 'sm', h: '48px', px: 4,
+  _hover: { borderColor: P.inkFaint },
+  _focus: { borderColor: P.lime, boxShadow: `0 0 0 3px ${P.lime}33`, outline: 'none' },
+  _placeholder: { color: P.inkFaint },
+};
 
 // Strip timestamp to YYYY-MM-DD for <input type="date"> compatibility
 const dateInputValue = (val) => {
@@ -77,7 +102,6 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
   const [sendingReminder, setSendingReminder] = useState(false);
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
 
-  // Phase 6.4b state
   const [showMarkPaidModal, setShowMarkPaidModal] = useState(false);
   const [markingPaid, setMarkingPaid] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
@@ -414,9 +438,6 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
     }
   };
 
-  // ============================================================
-  // PHASE 6.4b - MARK PAID OFF-PLATFORM
-  // ============================================================
   const handleMarkPaid = async ({ method, reference, amount, notes: payNotes, paid_date }) => {
     if (!invoiceId) return;
     setMarkingPaid(true);
@@ -435,7 +456,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
           paid_at: fullyPaid ? `${paid_date}T12:00:00Z` : null,
           payment_method: method,
           payment_reference: reference,
-          pay_token: fullyPaid ? null : invoice.pay_token, // kill pay link if fully paid
+          pay_token: fullyPaid ? null : invoice.pay_token,
           updated_at: now,
         })
         .eq('id', invoiceId);
@@ -460,12 +481,11 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
         created_at: now,
       });
 
-      // Snapshot to invoice_history for the timeline
       await supabase.from('invoice_history').insert({
         invoice_id: invoiceId,
         sent_at: now,
         sent_by: user?.id,
-        send_type: 'initial', // payment events use 'initial' bucket since no email sent
+        send_type: 'initial',
         amount,
         method,
         notes: `Off-platform payment: ${method}${reference ? ` (${reference})` : ''}${payNotes ? ` — ${payNotes}` : ''}`,
@@ -484,27 +504,18 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
       onSaved();
       loadData();
     } catch (err) {
-      toast({
-        title: 'Mark paid failed',
-        description: err.message,
-        status: 'error',
-        duration: 4000,
-      });
+      toast({ title: 'Mark paid failed', description: err.message, status: 'error', duration: 4000 });
     } finally {
       setMarkingPaid(false);
     }
   };
 
-  // ============================================================
-  // PHASE 6.4b - DUPLICATE INVOICE
-  // ============================================================
   const handleDuplicate = async () => {
     if (!invoiceId || duplicating) return;
     setDuplicating(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
-      // Create the new draft with a fresh invoice number
       const newInvoice = await withInvoiceNumberRetry(async (newNumber) => {
         const { data, error } = await supabase
           .from('invoices')
@@ -516,7 +527,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
             total: invoice.total,
             total_paid: 0,
             notes: invoice.notes || null,
-            due_date: null, // user picks fresh due date
+            due_date: null,
             created_at: new Date().toISOString(),
           })
           .select()
@@ -525,7 +536,6 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
         return data;
       });
 
-      // Copy sprints with fresh sprint_numbers
       const sprintsToClone = (invoice.invoice_items || sprints).filter((s) => !String(s.id).startsWith('new-'));
 
       for (let i = 0; i < sprintsToClone.length; i++) {
@@ -568,15 +578,9 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
       });
 
       onSaved();
-      // Navigate to the new draft
       navigate(`/invoicing/?invoice=${newInvoice.id}`);
     } catch (err) {
-      toast({
-        title: 'Duplicate failed',
-        description: err.message,
-        status: 'error',
-        duration: 4000,
-      });
+      toast({ title: 'Duplicate failed', description: err.message, status: 'error', duration: 4000 });
     } finally {
       setDuplicating(false);
     }
@@ -664,9 +668,9 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
 
   if (loading) {
     return (
-      <Box minH="100vh">
+      <Box minH="100vh" bg={P.mat}>
         <Center minH="60vh">
-          <Spinner size="lg" color="brand.500" />
+          <Spinner size="lg" color={P.limeDeep} />
         </Center>
       </Box>
     );
@@ -678,7 +682,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
   const billableCount = sprints.filter((s) => s.is_billable !== false).length;
 
   const displayNumber = isNew
-    ? (previewNumber || 'New Invoice')
+    ? (previewNumber || 'New invoice')
     : (invoice?.invoice_number || 'Invoice');
 
   const previewInvoice = {
@@ -689,46 +693,52 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
     due_date: dueDate,
   };
 
+  const statusColor =
+    invoice?.status === 'paid' ? P.green :
+    invoice?.status === 'overdue' ? P.coral :
+    invoice?.status === 'draft' ? P.inkMuted : P.limeDeep;
+
   return (
-    <Box position="relative" minH="100%">
+    <Box position="relative" minH="100vh" bg={P.mat}>
+      {/* soft warm wash from the top */}
       <Box
         position="absolute"
         top={0}
         left={0}
         right={0}
-        h="400px"
-        bg="radial-gradient(ellipse at top center, rgba(0,229,229,0.025), transparent 70%)"
+        h="360px"
+        bg={`radial-gradient(ellipse at top center, ${P.lime}14, transparent 70%)`}
         pointerEvents="none"
       />
 
-      <Container maxW="900px" px={{ base: 4, md: 6 }} py={{ base: 6, md: 10 }} position="relative">
+      <Container maxW="920px" px={{ base: 5, md: 8 }} py={{ base: 6, md: 10 }} position="relative">
         <HStack
           spacing={2}
           cursor="pointer"
-          color="surface.500"
-          _hover={{ color: 'brand.500' }}
+          color={P.inkMuted}
+          _hover={{ color: P.ink }}
           transition="color 0.15s"
-          mb={6}
+          mb={7}
           onClick={onClose}
           userSelect="none"
         >
           <Icon as={TbArrowLeft} boxSize={3.5} />
-          <Text fontSize="xs" fontWeight="700" letterSpacing="0.05em" textTransform="uppercase">
-            All Invoices
+          <Text fontSize="2xs" fontFamily="mono" fontWeight="700" letterSpacing="0.14em" textTransform="uppercase">
+            All invoices
           </Text>
         </HStack>
 
-        <VStack align="stretch" spacing={6} mb={6}>
-          <HStack justify="space-between" align="flex-end" flexWrap="wrap" gap={3}>
-            <VStack align="start" spacing={1}>
-              <HStack spacing={3}>
+        <VStack align="stretch" spacing={6} mb={7}>
+          <HStack justify="space-between" align="flex-end" flexWrap="wrap" gap={4}>
+            <VStack align="start" spacing={1.5}>
+              <HStack spacing={3} align="baseline">
                 <Text
-                  fontSize={{ base: '2xl', md: '3xl' }}
-                  fontWeight="800"
-                  color="white"
-                  letterSpacing="-0.02em"
+                  fontFamily={isNew ? 'mono' : 'display'}
+                  fontSize={isNew ? { base: 'xl', md: '2xl' } : { base: '3xl', md: '4xl' }}
+                  fontWeight={isNew ? '600' : '500'}
+                  color={P.ink}
+                  letterSpacing="-0.01em"
                   lineHeight="1"
-                  fontFamily={isNew ? 'mono' : 'heading'}
                 >
                   {displayNumber}
                 </Text>
@@ -737,12 +747,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                     <Text
                       fontSize="2xs"
                       fontWeight="700"
-                      color={
-                        invoice.status === 'paid' ? 'accent.neon' :
-                        invoice.status === 'overdue' ? 'red.400' :
-                        invoice.status === 'draft' ? 'surface.500' :
-                        'brand.500'
-                      }
+                      color={statusColor}
                       textTransform="uppercase"
                       letterSpacing="0.08em"
                       fontFamily="mono"
@@ -754,8 +759,8 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                         <Box
                           as="button"
                           onClick={() => setShowSnapshot(true)}
-                          color="surface.600"
-                          _hover={{ color: 'brand.500' }}
+                          color={P.inkFaint}
+                          _hover={{ color: P.limeDeep }}
                           transition="color 0.15s"
                           p={0.5}
                         >
@@ -766,12 +771,12 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                   </HStack>
                 )}
                 {isNew && previewNumber && (
-                  <Text fontSize="2xs" color="surface.600" fontFamily="mono" fontWeight="700" textTransform="uppercase" letterSpacing="0.08em">
+                  <Text fontSize="2xs" color={P.inkFaint} fontFamily="mono" fontWeight="600" textTransform="uppercase" letterSpacing="0.08em">
                     Draft preview
                   </Text>
                 )}
               </HStack>
-              <Text color="surface.500" fontSize="sm">
+              <Text color={P.inkMuted} fontSize="sm">
                 {billableCount} sprint{billableCount !== 1 ? 's' : ''} · {formatCurrency(billableTotal)}
               </Text>
             </VStack>
@@ -781,29 +786,29 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                 <Button
                   size="sm"
                   variant="outline"
-                  borderColor="surface.800"
-                  color="surface.400"
-                  borderRadius="lg"
+                  borderColor={P.hair}
+                  color={P.inkSec}
+                  borderRadius="full"
                   onClick={handleSave}
                   isLoading={saving && !showSendGate}
                   loadingText="Saving"
-                  _hover={{ borderColor: 'surface.700', color: 'white' }}
+                  _hover={{ borderColor: P.inkFaint, color: P.ink, bg: P.sheet }}
                 >
-                  Save Draft
+                  Save draft
                 </Button>
               )}
               {isDraft && billableCount > 0 && clientId && (
                 <Button
                   size="sm"
-                  bg="brand.500"
-                  color="surface.950"
+                  bg={P.lime}
+                  color={P.limeInk}
                   fontWeight="700"
-                  borderRadius="lg"
+                  borderRadius="full"
                   leftIcon={<TbSend size={14} />}
                   onClick={handleReviewSend}
                   isLoading={saving}
                   loadingText="Preparing"
-                  _hover={{ bg: 'brand.400', transform: 'translateY(-1px)' }}
+                  _hover={{ bg: '#D2E26B', transform: 'translateY(-1px)' }}
                 >
                   Review and send
                 </Button>
@@ -815,15 +820,15 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                     <Button
                       size="sm"
                       variant="outline"
-                      borderColor="brand.500"
-                      color="brand.500"
-                      fontWeight="700"
-                      borderRadius="lg"
+                      borderColor={P.hair}
+                      color={P.limeDeep}
+                      fontWeight="600"
+                      borderRadius="full"
                       leftIcon={<TbRotateClockwise size={14} />}
                       onClick={handleResend}
                       isLoading={resending}
                       loadingText="Resending"
-                      _hover={{ bg: 'rgba(0,229,229,0.08)' }}
+                      _hover={{ bg: P.sheet, borderColor: P.limeDeep }}
                     >
                       Resend
                     </Button>
@@ -832,13 +837,13 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                     <Button
                       size="sm"
                       variant="outline"
-                      borderColor="accent.banana"
-                      color="accent.banana"
-                      fontWeight="700"
-                      borderRadius="lg"
+                      borderColor={P.hair}
+                      color={P.gold}
+                      fontWeight="600"
+                      borderRadius="full"
                       leftIcon={<TbBellRinging size={14} />}
                       onClick={() => setShowReminderModal(true)}
-                      _hover={{ bg: 'rgba(255,229,0,0.06)' }}
+                      _hover={{ bg: P.sheet, borderColor: P.gold }}
                     >
                       Remind
                     </Button>
@@ -850,15 +855,16 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                 <Tooltip label="Record an off-platform payment" {...TOOLTIP_PROPS}>
                   <Button
                     size="sm"
-                    bg="accent.neon"
-                    color="surface.950"
-                    fontWeight="700"
-                    borderRadius="lg"
+                    variant="outline"
+                    borderColor={P.hair}
+                    color={P.green}
+                    fontWeight="600"
+                    borderRadius="full"
                     leftIcon={<TbCash size={14} />}
                     onClick={() => setShowMarkPaidModal(true)}
-                    _hover={{ bg: 'brand.400', transform: 'translateY(-1px)' }}
+                    _hover={{ bg: P.sheet, borderColor: P.green }}
                   >
-                    Mark Paid
+                    Mark paid
                   </Button>
                 </Tooltip>
               )}
@@ -868,15 +874,15 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                   <Button
                     size="sm"
                     variant="outline"
-                    borderColor="surface.800"
-                    color="surface.400"
-                    fontWeight="700"
-                    borderRadius="lg"
+                    borderColor={P.hair}
+                    color={P.inkSec}
+                    fontWeight="600"
+                    borderRadius="full"
                     leftIcon={<TbCopy size={14} />}
                     onClick={handleDuplicate}
                     isLoading={duplicating}
                     loadingText="Duplicating"
-                    _hover={{ borderColor: 'surface.700', color: 'white' }}
+                    _hover={{ borderColor: P.inkFaint, color: P.ink, bg: P.sheet }}
                   >
                     Duplicate
                   </Button>
@@ -894,7 +900,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
           )}
         </VStack>
 
-        <HStack spacing={6} borderBottom="1px solid" borderColor="surface.900" mb={8}>
+        <HStack spacing={7} borderBottom="1px solid" borderColor={P.hair} mb={8}>
           {[
             { value: 'compose', label: 'Compose', icon: TbEdit },
             { value: 'preview', label: 'Preview', icon: TbEye },
@@ -909,11 +915,11 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                 onClick={() => setActiveTab(tab.value)}
               >
                 <HStack spacing={2}>
-                  <Icon as={tab.icon} boxSize={3.5} color={active ? 'brand.500' : 'surface.600'} />
+                  <Icon as={tab.icon} boxSize={3.5} color={active ? P.limeDeep : P.inkFaint} />
                   <Text
                     fontSize="xs"
                     fontWeight="700"
-                    color={active ? 'white' : 'surface.600'}
+                    color={active ? P.ink : P.inkMuted}
                     textTransform="uppercase"
                     letterSpacing="0.05em"
                   >
@@ -921,16 +927,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                   </Text>
                 </HStack>
                 {active && (
-                  <Box
-                    position="absolute"
-                    bottom="-1px"
-                    left={0}
-                    right={0}
-                    h="2px"
-                    bg="brand.500"
-                    borderRadius="full"
-                    boxShadow="0 0 8px rgba(0,229,229,0.6)"
-                  />
+                  <Box position="absolute" bottom="-1px" left={0} right={0} h="2px" bg={P.lime} borderRadius="full" />
                 )}
               </Box>
             );
@@ -939,18 +936,18 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
 
         {activeTab === 'compose' && (
           <VStack spacing={8} align="stretch">
-            <HStack spacing={6} align="start">
-              <Box flex={1}>
-                <Text {...FIELD_LABEL}>Client</Text>
+            <HStack spacing={6} align="start" flexWrap="wrap" rowGap={6}>
+              <Box flex={1} minW="220px">
+                <Text {...LABEL}>Client</Text>
                 <Select
                   value={clientId}
                   onChange={(e) => setClientId(e.target.value)}
                   placeholder="Select client..."
-                  {...NAKED_INPUT}
-                  fontFamily="body"
+                  {...FIELD}
                   cursor="pointer"
                   isDisabled={isPaid}
-                  sx={{ '& option': { bg: 'surface.950', color: 'white' } }}
+                  iconColor={P.inkMuted}
+                  sx={{ '& option': { bg: P.sheet, color: P.ink } }}
                 >
                   {clients.map((c) => (
                     <option key={c.id} value={c.id}>
@@ -960,17 +957,17 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                 </Select>
               </Box>
               {projects.length > 0 && (
-                <Box flex={1}>
-                  <Text {...FIELD_LABEL}>Project</Text>
+                <Box flex={1} minW="220px">
+                  <Text {...LABEL}>Project</Text>
                   <Select
                     value={projectId}
                     onChange={(e) => setProjectId(e.target.value)}
                     placeholder="No project"
-                    {...NAKED_INPUT}
-                    fontFamily="body"
+                    {...FIELD}
                     cursor="pointer"
                     isDisabled={isPaid}
-                    sx={{ '& option': { bg: 'surface.950', color: 'white' } }}
+                    iconColor={P.inkMuted}
+                    sx={{ '& option': { bg: P.sheet, color: P.ink } }}
                   >
                     <option value="">No project</option>
                     {projects.map((p) => (
@@ -982,43 +979,43 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
             </HStack>
 
             <Box>
-              <HStack justify="space-between" align="center" mb={4}>
-                <Text {...FIELD_LABEL}>Sprints</Text>
+              <HStack justify="space-between" align="center" mb={2}>
+                <Text {...LABEL} mb={0}>Sprints</Text>
                 {!isPaid && (
                   <HStack
                     spacing={1.5}
                     cursor="pointer"
                     onClick={addSprint}
-                    color="brand.500"
-                    opacity={0.8}
-                    _hover={{ opacity: 1 }}
+                    color={P.limeDeep}
+                    _hover={{ color: P.ink }}
                   >
                     <Icon as={TbPlus} boxSize={3} />
-                    <Text fontSize="2xs" fontWeight="700" textTransform="uppercase" letterSpacing="0.05em">
-                      Add Sprint
+                    <Text fontSize="2xs" fontFamily="mono" fontWeight="700" textTransform="uppercase" letterSpacing="0.05em">
+                      Add sprint
                     </Text>
                   </HStack>
                 )}
               </HStack>
 
               {sprints.length === 0 ? (
-                <Box py={12} textAlign="center" border="1px dashed" borderColor="surface.800" borderRadius="xl">
-                  <Icon as={TbBolt} boxSize={8} color="surface.700" mb={2} />
-                  <Text color="surface.500" fontSize="sm" mb={3}>No sprints yet</Text>
+                <Box py={12} textAlign="center" border="1px dashed" borderColor={P.hair} borderRadius="xl" bg={P.sheet}>
+                  <Icon as={TbBolt} boxSize={8} color={P.inkFaint} mb={2} />
+                  <Text color={P.inkMuted} fontSize="sm" mb={3}>No sprints yet</Text>
                   <Button
                     size="sm"
-                    variant="outline"
-                    borderColor="brand.500"
-                    color="brand.500"
+                    bg={P.lime}
+                    color={P.limeInk}
+                    fontWeight="700"
                     borderRadius="full"
                     leftIcon={<TbPlus size={12} />}
                     onClick={addSprint}
+                    _hover={{ bg: '#D2E26B' }}
                   >
                     Add first sprint
                   </Button>
                 </Box>
               ) : (
-                <Box borderTop="1px solid" borderColor="surface.900">
+                <Box borderTop="1px solid" borderColor={P.hair}>
                   {sprints.map((sprint) => (
                     <SprintEditRow
                       key={sprint.id}
@@ -1032,11 +1029,11 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
 
               {sprints.length > 0 && (
                 <HStack justify="flex-end" pt={5} spacing={6}>
-                  <VStack align="end" spacing={1}>
-                    <Text fontSize="2xs" color="surface.600" fontFamily="mono" fontWeight="700" textTransform="uppercase">
-                      Billable Total
+                  <VStack align="end" spacing={0.5}>
+                    <Text fontSize="2xs" color={P.inkMuted} fontFamily="mono" fontWeight="700" textTransform="uppercase" letterSpacing="0.1em">
+                      Billable total
                     </Text>
-                    <Text fontSize="2xl" color="white" fontFamily="mono" fontWeight="800">
+                    <Text fontFamily="display" fontSize="3xl" color={P.ink} fontWeight="500">
                       {formatCurrency(billableTotal)}
                     </Text>
                   </VStack>
@@ -1044,55 +1041,54 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
               )}
             </Box>
 
-            <Divider borderColor="surface.900" />
+            <Divider borderColor={P.hair} />
 
-            <HStack spacing={6} align="start">
-              <Box flex={2}>
-                <Text {...FIELD_LABEL}>Internal Notes</Text>
+            <HStack spacing={6} align="start" flexWrap="wrap" rowGap={6}>
+              <Box flex={2} minW="240px">
+                <Text {...LABEL}>Internal notes</Text>
                 <Textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Notes only visible to team"
-                  bg="transparent"
+                  placeholder="Notes only your team sees"
+                  bg={P.sheet}
                   border="1px solid"
-                  borderColor="surface.800"
+                  borderColor={P.hair}
                   borderRadius="lg"
-                  color="white"
+                  color={P.ink}
                   fontSize="sm"
                   rows={3}
                   isReadOnly={isPaid}
-                  _focus={{ borderColor: 'brand.500', boxShadow: 'none' }}
-                  _placeholder={{ color: 'surface.700' }}
+                  _focus={{ borderColor: P.lime, boxShadow: `0 0 0 3px ${P.lime}33` }}
+                  _placeholder={{ color: P.inkFaint }}
                 />
               </Box>
-              <Box flex={1}>
-                <Text {...FIELD_LABEL}>Due Date</Text>
+              <Box flex={1} minW="180px">
+                <Text {...LABEL}>Due date</Text>
                 <Input
                   type="date"
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
                   isDisabled={isPaid}
-                  {...NAKED_INPUT}
+                  {...FIELD}
                 />
               </Box>
             </HStack>
 
             {!isNew && (
-              <Box pt={6}>
+              <Box pt={4}>
                 {isDraft && (
                   <HStack
                     spacing={1.5}
                     cursor="pointer"
                     onClick={handleHardDelete}
-                    color={confirmDelete ? 'red.400' : 'surface.700'}
-                    opacity={confirmDelete ? 1 : 0.4}
-                    _hover={{ opacity: 1, color: 'red.400' }}
+                    color={confirmDelete ? P.coral : P.inkFaint}
+                    _hover={{ color: P.coral }}
                     transition="all 0.15s"
                     justify="center"
                     userSelect="none"
                   >
                     <Icon as={confirmDelete ? TbAlertTriangle : TbTrash} boxSize={3} />
-                    <Text fontSize="2xs" fontWeight="700" textTransform="uppercase" letterSpacing="0.05em">
+                    <Text fontSize="2xs" fontFamily="mono" fontWeight="700" textTransform="uppercase" letterSpacing="0.05em">
                       {deleting ? 'Deleting...' : confirmDelete ? 'Click again to confirm' : 'Delete draft'}
                     </Text>
                   </HStack>
@@ -1103,15 +1099,14 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                     spacing={1.5}
                     cursor="pointer"
                     onClick={() => setShowCancelModal(true)}
-                    color="surface.700"
-                    opacity={0.4}
-                    _hover={{ opacity: 1, color: 'red.400' }}
+                    color={P.inkFaint}
+                    _hover={{ color: P.coral }}
                     transition="all 0.15s"
                     justify="center"
                     userSelect="none"
                   >
                     <Icon as={TbAlertTriangle} boxSize={3} />
-                    <Text fontSize="2xs" fontWeight="700" textTransform="uppercase" letterSpacing="0.05em">
+                    <Text fontSize="2xs" fontFamily="mono" fontWeight="700" textTransform="uppercase" letterSpacing="0.05em">
                       Cancel invoice
                     </Text>
                   </HStack>
@@ -1120,7 +1115,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                 {isPaid && (
                   <Text
                     fontSize="2xs"
-                    color="surface.700"
+                    color={P.inkFaint}
                     textAlign="center"
                     fontFamily="mono"
                     textTransform="uppercase"

@@ -1,12 +1,27 @@
 // src/pages/Invoicing/components/SprintEditRow.jsx
-// One row in the sprint list of the invoice editor.
+// One row in the sprint list of the invoice editor. Paper surface.
 // Inline editing for title, amount, payment_mode. Expand for description.
-// Locked when sprint is paid. WIP toggle hides from billable total.
+// Locked when the sprint is paid. The billable checkbox hides a WIP sprint from
+// the client and from the billable total.
+//
+// The funding chips use the SAME warm tints as the invoice document
+// (invoiceEmailTemplate.js CHIP), so what you set here reads identically to what
+// the client sees. No oxford commas, no dashes.
 
 import { useState } from 'react';
 import { Box, HStack, Input, Textarea, Text, Icon } from '@chakra-ui/react';
-import { TbCheck, TbTrash } from 'react-icons/tb';
+import { TbCheck, TbTrash, TbLock } from 'react-icons/tb';
 import { FUNDING_MODES } from '../../../lib/invoiceConstants';
+import colors from '../../../theme/colors';
+
+const P = colors.paper;
+
+// Same tints as the document chips.
+const CHIP = {
+  pay_full:     { bg: '#EAF0D2', ink: '#3A4319' },
+  deposit_50:   { bg: '#F3EAD3', ink: '#7A5A1E' },
+  approve_only: { bg: '#ECE6DA', ink: '#5A4636' },
+};
 
 const SprintEditRow = ({ sprint, onUpdate, onDelete }) => {
   const [expanded, setExpanded] = useState(false);
@@ -14,44 +29,42 @@ const SprintEditRow = ({ sprint, onUpdate, onDelete }) => {
   const isWip = sprint.is_billable === false;
 
   return (
-    <Box py={3} borderBottom="1px solid" borderColor="surface.900" role="group">
-      <HStack align="start" spacing={3}>
+    <Box py={4} borderBottom="1px solid" borderColor={P.hairSoft} role="group">
+      <HStack align="start" spacing={3.5}>
         <Box
-          w="16px"
-          h="16px"
-          borderRadius="sm"
+          w="18px"
+          h="18px"
+          borderRadius="6px"
           border="1.5px solid"
-          borderColor={isWip ? 'surface.700' : 'brand.500'}
-          bg={isWip ? 'transparent' : 'brand.500'}
+          borderColor={isWip ? P.hair : P.lime}
+          bg={isWip ? 'transparent' : P.lime}
           display="flex"
           alignItems="center"
           justifyContent="center"
           onClick={() => !isLocked && onUpdate({ ...sprint, is_billable: isWip })}
-          mt={1}
+          mt="2px"
           cursor={isLocked ? 'not-allowed' : 'pointer'}
           flexShrink={0}
           transition="all 0.15s"
         >
-          {!isWip && <Icon as={TbCheck} boxSize={2.5} color="surface.950" strokeWidth={3} />}
+          {!isWip && <Icon as={TbCheck} boxSize={2.5} color={P.limeInk} strokeWidth={3} />}
         </Box>
 
-        <Box flex={1}>
+        <Box flex={1} minW={0}>
           <HStack spacing={3} align="center" mb={1}>
             <Input
               value={sprint.title || ''}
               onChange={(e) => onUpdate({ ...sprint, title: e.target.value })}
               placeholder="Sprint title..."
-              bg="transparent"
-              border="none"
-              color="white"
-              fontSize="sm"
-              fontWeight="700"
+              variant="unstyled"
+              color={P.ink}
+              fontSize="md"
+              fontWeight="600"
+              letterSpacing="-0.01em"
               h="28px"
-              px={0}
               flex={1}
               isReadOnly={isLocked}
-              _focus={{ boxShadow: 'none' }}
-              _placeholder={{ color: 'surface.600', fontWeight: '500' }}
+              _placeholder={{ color: P.inkFaint, fontWeight: '500' }}
             />
             <Input
               value={sprint.amount || ''}
@@ -59,50 +72,51 @@ const SprintEditRow = ({ sprint, onUpdate, onDelete }) => {
               placeholder="0"
               type="number"
               step="0.01"
-              bg="transparent"
-              border="none"
-              color="white"
-              fontSize="sm"
+              variant="unstyled"
+              color={P.ink}
+              fontSize="md"
               fontFamily="mono"
-              fontWeight="700"
+              fontWeight="600"
               h="28px"
-              px={0}
               textAlign="right"
-              w="80px"
+              w="90px"
               isReadOnly={isLocked}
-              _focus={{ boxShadow: 'none' }}
-              _placeholder={{ color: 'surface.600' }}
+              _placeholder={{ color: P.inkFaint }}
             />
-            <Text color="surface.600" fontSize="xs" fontFamily="mono">USD</Text>
+            <Text color={P.inkMuted} fontSize="xs" fontFamily="mono">USD</Text>
           </HStack>
 
-          <HStack spacing={3} mt={1}>
-            <Text color="surface.600" fontSize="2xs" fontFamily="mono" fontWeight="700">
-              {sprint.sprint_number || '— not assigned yet —'}
+          <HStack spacing={3} mt={1.5} flexWrap="wrap" rowGap={2}>
+            <Text color={P.inkFaint} fontSize="2xs" fontFamily="mono" fontWeight="600" letterSpacing="0.04em">
+              {sprint.sprint_number || 'number on save'}
             </Text>
 
             <HStack spacing={1.5}>
               {FUNDING_MODES.map((mode) => {
                 const active = (sprint.payment_mode || 'approve_only') === mode.value;
+                const chip = CHIP[mode.value] || CHIP.approve_only;
                 return (
                   <Box
                     key={mode.value}
                     as="button"
                     onClick={() => !isLocked && onUpdate({ ...sprint, payment_mode: mode.value })}
-                    px={2}
-                    py={0.5}
+                    px={2.5}
+                    py={1}
                     borderRadius="full"
                     border="1px solid"
-                    borderColor={active ? mode.color : 'surface.800'}
-                    bg={active ? `${mode.color}12` : 'transparent'}
+                    borderColor={active ? 'transparent' : P.hair}
+                    bg={active ? chip.bg : 'transparent'}
                     transition="all 0.15s"
                     cursor={isLocked ? 'not-allowed' : 'pointer'}
+                    _hover={isLocked ? {} : { borderColor: active ? 'transparent' : P.inkFaint }}
                   >
                     <Text
                       fontSize="2xs"
-                      fontWeight="700"
-                      color={active ? mode.color : 'surface.600'}
+                      fontWeight="600"
+                      fontFamily="mono"
+                      letterSpacing="0.04em"
                       textTransform="uppercase"
+                      color={active ? chip.ink : P.inkMuted}
                     >
                       {mode.label}
                     </Text>
@@ -112,12 +126,13 @@ const SprintEditRow = ({ sprint, onUpdate, onDelete }) => {
             </HStack>
 
             {isLocked && (
-              <Text color="accent.neon" fontSize="2xs" fontFamily="mono" fontWeight="700">
-                🔒 PAID
-              </Text>
+              <HStack spacing={1} color={P.limeDeep}>
+                <Icon as={TbLock} boxSize={3} />
+                <Text fontSize="2xs" fontFamily="mono" fontWeight="700" letterSpacing="0.06em">PAID</Text>
+              </HStack>
             )}
-            {isWip && (
-              <Text color="surface.600" fontSize="2xs" fontFamily="mono" fontWeight="700">
+            {isWip && !isLocked && (
+              <Text color={P.inkFaint} fontSize="2xs" fontFamily="mono" fontWeight="700" letterSpacing="0.06em">
                 WIP
               </Text>
             )}
@@ -127,18 +142,19 @@ const SprintEditRow = ({ sprint, onUpdate, onDelete }) => {
             <Box
               as="button"
               onClick={() => setExpanded(!expanded)}
-              color="surface.600"
-              _hover={{ color: 'surface.400' }}
+              color={P.inkMuted}
+              _hover={{ color: P.ink }}
               fontSize="2xs"
               fontFamily="mono"
               fontWeight="700"
               textTransform="uppercase"
+              letterSpacing="0.04em"
             >
               {expanded ? 'Less' : 'Details'}
             </Box>
 
             {!isLocked && (
-              <Box as="button" onClick={onDelete} color="surface.700" _hover={{ color: 'red.400' }}>
+              <Box as="button" onClick={onDelete} color={P.inkFaint} _hover={{ color: P.coral }} transition="color 0.15s">
                 <Icon as={TbTrash} boxSize={3.5} />
               </Box>
             )}
@@ -148,18 +164,18 @@ const SprintEditRow = ({ sprint, onUpdate, onDelete }) => {
             <Textarea
               value={sprint.description || ''}
               onChange={(e) => onUpdate({ ...sprint, description: e.target.value })}
-              placeholder="What's happening in this sprint..."
+              placeholder="What is happening in this sprint..."
               mt={3}
-              bg="transparent"
+              bg={P.sheet}
               border="1px solid"
-              borderColor="surface.800"
+              borderColor={P.hair}
               borderRadius="lg"
-              color="surface.300"
-              fontSize="xs"
+              color={P.inkSec}
+              fontSize="sm"
               rows={2}
               isReadOnly={isLocked}
-              _focus={{ borderColor: 'brand.500', boxShadow: 'none' }}
-              _placeholder={{ color: 'surface.700' }}
+              _focus={{ borderColor: P.lime, boxShadow: `0 0 0 3px ${P.lime}33` }}
+              _placeholder={{ color: P.inkFaint }}
             />
           )}
         </Box>
