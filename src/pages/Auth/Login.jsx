@@ -367,7 +367,7 @@ const Login = () => {
                 pb={1}
               >
                 <Icon as={TbLock} boxSize={3} />
-                <Text fontSize="sm">Forgot your password?</Text>
+                <Text fontSize="sm" color="inherit">Forgot your password?</Text>
               </HStack>
             </VStack>
 

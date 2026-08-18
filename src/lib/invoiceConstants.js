@@ -24,12 +24,20 @@ export const STATUS_COLORS = {
   cancelled: { color: colors.surface[600],  label: 'CANCELLED' },
 };
 
+// Off-platform payment sources for Mark Paid. payments.method is free text in
+// the database (no check constraint), so this list is presentation only and can
+// grow freely. "Other" pairs with a free-text note so anything not listed still
+// records. Stripe card, wallet and USDC settlements come in through their own
+// rails, this is for money that arrived some other way.
 export const PAYMENT_METHODS = [
-  { value: 'check', label: 'Check', referenceLabel: 'Check number' },
-  { value: 'wire',  label: 'Wire transfer', referenceLabel: 'Wire confirmation #' },
-  { value: 'ach',   label: 'ACH', referenceLabel: 'ACH reference' },
-  { value: 'cash',  label: 'Cash', referenceLabel: 'Receipt #' },
-  { value: 'other', label: 'Other', referenceLabel: 'Reference' },
+  { value: 'bank_transfer', label: 'Bank transfer', referenceLabel: 'Confirmation #' },
+  { value: 'venmo',         label: 'Venmo',         referenceLabel: 'Venmo handle or note' },
+  { value: 'zelle',         label: 'Zelle',         referenceLabel: 'Zelle reference' },
+  { value: 'check',         label: 'Check',         referenceLabel: 'Check number' },
+  { value: 'ach',           label: 'ACH',           referenceLabel: 'ACH reference' },
+  { value: 'wire',          label: 'Wire',          referenceLabel: 'Wire confirmation #' },
+  { value: 'cash',          label: 'Cash',          referenceLabel: 'Receipt #' },
+  { value: 'other',         label: 'Other',         referenceLabel: 'Reference or note' },
 ];
 
 export const TOOLTIP_PROPS = {

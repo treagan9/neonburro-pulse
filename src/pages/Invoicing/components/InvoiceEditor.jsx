@@ -5,7 +5,7 @@
 // so <input type="date"> doesn't emit the format warning.
 
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Box, VStack, HStack, Text, Icon, Spinner, Center, Button,
   Input, Textarea, Select, Container, Divider, Tooltip, useToast,
@@ -36,6 +36,7 @@ import InvoicePreview from './InvoicePreview';
 import InvoiceSnapshotModal from './InvoiceSnapshotModal';
 import SendHistoryStrip from './SendHistoryStrip';
 import ReminderModal from './ReminderModal';
+import ReviewSendModal from './ReviewSendModal';
 
 // Strip timestamp to YYYY-MM-DD for <input type="date"> compatibility
 const dateInputValue = (val) => {
@@ -51,6 +52,7 @@ const dateInputValue = (val) => {
 const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose, onSaved }) => {
   const toast = useToast();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [activeTab, setActiveTab] = useState('compose');
   const [loading, setLoading] = useState(true);
@@ -80,6 +82,10 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
   const [markingPaid, setMarkingPaid] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
 
+  // Send gate. Nothing reaches a client without passing through ReviewSendModal.
+  const [showSendGate, setShowSendGate] = useState(false);
+  const [reviewInvoiceId, setReviewInvoiceId] = useState(null);
+
   const isNew = !invoiceId;
   const client = clients.find((c) => c.id === clientId);
   const isPaid = invoice?.status === 'paid';
@@ -94,6 +100,17 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
   useEffect(() => {
     if (clientId) loadProjectsForClient(clientId);
   }, [clientId]);
+
+  // After a send button round trip (persist then navigate with ?review=1) the
+  // invoice reloads with real ids, then the gate opens over it.
+  useEffect(() => {
+    if (!loading && !isNew && invoiceId && searchParams.get('review') === '1') {
+      setReviewInvoiceId(invoiceId);
+      setShowSendGate(true);
+      setSearchParams({ invoice: invoiceId });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, isNew, invoiceId, searchParams]);
 
   const loadData = async () => {
     setLoading(true);
@@ -175,7 +192,83 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
     toast({ title: 'Sprint removed', status: 'success', duration: 1500 });
   };
 
-  const handleSave = async (sendAfterSave = false) => {
+  // Persist the invoice and its sprints, no side effects beyond the write, so
+  // both Save Draft and the send gate can reuse it and decide what happens next.
+  // Returns the saved id and number.
+  const persistInvoice = async () => {
+    const total = sprints
+      .filter((s) => s.is_billable !== false)
+      .reduce((sum, s) => sum + parseFloat(s.amount || 0), 0);
+
+    let savedInvoiceId = invoiceId;
+    let savedInvoiceNumber = invoice?.invoice_number;
+
+    if (isNew) {
+      const inserted = await withInvoiceNumberRetry(async (newNumber) => {
+        const { data, error } = await supabase
+          .from('invoices')
+          .insert({
+            client_id: clientId,
+            project_id: projectId || null,
+            status: 'draft',
+            invoice_number: newNumber,
+            total,
+            total_paid: 0,
+            notes: notes || null,
+            due_date: dueDate || null,
+            created_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+        if (error) throw error;
+        return data;
+      });
+      savedInvoiceId = inserted.id;
+      savedInvoiceNumber = inserted.invoice_number;
+    } else {
+      const { error } = await supabase
+        .from('invoices')
+        .update({
+          client_id: clientId,
+          project_id: projectId || null,
+          total,
+          notes: notes || null,
+          due_date: dueDate || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', invoiceId);
+      if (error) throw error;
+    }
+
+    for (const sprint of sprints) {
+      const sprintPayload = {
+        title: sprint.title || 'Untitled Sprint',
+        description: sprint.description || null,
+        amount: parseFloat(sprint.amount || 0),
+        payment_mode: sprint.payment_mode || 'approve_only',
+        is_billable: sprint.is_billable !== false,
+        sort_order: sprint.sort_order || 0,
+        invoice_id: savedInvoiceId,
+      };
+
+      if (sprint._isNew) {
+        const childNumber = await fetchNextSprintNumber(savedInvoiceId);
+        if (childNumber) sprintPayload.sprint_number = childNumber;
+        sprintPayload.created_at = new Date().toISOString();
+        await supabase.from('invoice_items').insert(sprintPayload);
+      } else if (sprint._dirty) {
+        await supabase
+          .from('invoice_items')
+          .update({ ...sprintPayload, updated_at: new Date().toISOString() })
+          .eq('id', sprint.id);
+      }
+    }
+
+    return { id: savedInvoiceId, number: savedInvoiceNumber };
+  };
+
+  // Save Draft. Persist and stay in the editor.
+  const handleSave = async () => {
     if (!clientId) {
       toast({ title: 'Select a client first', status: 'warning', duration: 2000 });
       return;
@@ -184,102 +277,46 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
       toast({ title: 'Add at least one sprint', status: 'warning', duration: 2000 });
       return;
     }
-
-    if (sendAfterSave) {
-      const check = validateSprintsForSend(sprints);
-      if (!check.valid) {
-        toast({
-          title: 'Cannot send yet',
-          description: check.reason,
-          status: 'warning',
-          duration: 3500,
-        });
-        return;
-      }
-    }
-
     setSaving(true);
     try {
-      const total = sprints
-        .filter((s) => s.is_billable !== false)
-        .reduce((sum, s) => sum + parseFloat(s.amount || 0), 0);
-
-      let savedInvoiceId = invoiceId;
-      let savedInvoiceNumber = invoice?.invoice_number;
-
-      if (isNew) {
-        const inserted = await withInvoiceNumberRetry(async (newNumber) => {
-          const { data, error } = await supabase
-            .from('invoices')
-            .insert({
-              client_id: clientId,
-              project_id: projectId || null,
-              status: 'draft',
-              invoice_number: newNumber,
-              total,
-              total_paid: 0,
-              notes: notes || null,
-              due_date: dueDate || null,
-              created_at: new Date().toISOString(),
-            })
-            .select()
-            .single();
-          if (error) throw error;
-          return data;
-        });
-        savedInvoiceId = inserted.id;
-        savedInvoiceNumber = inserted.invoice_number;
-      } else {
-        const { error } = await supabase
-          .from('invoices')
-          .update({
-            client_id: clientId,
-            project_id: projectId || null,
-            total,
-            notes: notes || null,
-            due_date: dueDate || null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', invoiceId);
-        if (error) throw error;
-      }
-
-      for (const sprint of sprints) {
-        const sprintPayload = {
-          title: sprint.title || 'Untitled Sprint',
-          description: sprint.description || null,
-          amount: parseFloat(sprint.amount || 0),
-          payment_mode: sprint.payment_mode || 'approve_only',
-          is_billable: sprint.is_billable !== false,
-          sort_order: sprint.sort_order || 0,
-          invoice_id: savedInvoiceId,
-        };
-
-        if (sprint._isNew) {
-          const childNumber = await fetchNextSprintNumber(savedInvoiceId);
-          if (childNumber) sprintPayload.sprint_number = childNumber;
-          sprintPayload.created_at = new Date().toISOString();
-          await supabase.from('invoice_items').insert(sprintPayload);
-        } else if (sprint._dirty) {
-          await supabase
-            .from('invoice_items')
-            .update({ ...sprintPayload, updated_at: new Date().toISOString() })
-            .eq('id', sprint.id);
-        }
-      }
-
+      const { id, number } = await persistInvoice();
       toast({
-        title: isNew ? `Invoice ${savedInvoiceNumber} created` : 'Invoice saved',
+        title: isNew ? `Invoice ${number} created` : 'Invoice saved',
         status: 'success',
         duration: 2000,
       });
+      onSaved();
+      if (isNew) navigate(`/invoicing/?invoice=${id}`);
+      else loadData();
+    } catch (err) {
+      toast({ title: 'Save failed', description: err.message, status: 'error', duration: 3000 });
+    } finally {
+      setSaving(false);
+    }
+  };
 
-      if (sendAfterSave) {
-        await handleSend(savedInvoiceId);
-      } else {
-        onSaved();
-        loadData();
-      }
+  // The send button. Validate, persist, then re-enter this invoice with a review
+  // flag so it reloads with real ids (no double create) and the gate opens over
+  // it. The email only goes out when Approve and send is pressed in the gate.
+  const handleReviewSend = async () => {
+    if (!clientId) {
+      toast({ title: 'Select a client first', status: 'warning', duration: 2000 });
+      return;
+    }
+    if (sprints.length === 0) {
+      toast({ title: 'Add at least one sprint', status: 'warning', duration: 2000 });
+      return;
+    }
+    const check = validateSprintsForSend(sprints);
+    if (!check.valid) {
+      toast({ title: 'Cannot send yet', description: check.reason, status: 'warning', duration: 3500 });
+      return;
+    }
+    setSaving(true);
+    try {
+      const { id } = await persistInvoice();
+      onSaved();
+      navigate(`/invoicing/?invoice=${id}&review=1`);
     } catch (err) {
       toast({ title: 'Save failed', description: err.message, status: 'error', duration: 3000 });
     } finally {
@@ -747,8 +784,8 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                   borderColor="surface.800"
                   color="surface.400"
                   borderRadius="lg"
-                  onClick={() => handleSave(false)}
-                  isLoading={saving && !sending}
+                  onClick={handleSave}
+                  isLoading={saving && !showSendGate}
                   loadingText="Saving"
                   _hover={{ borderColor: 'surface.700', color: 'white' }}
                 >
@@ -763,12 +800,12 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                   fontWeight="700"
                   borderRadius="lg"
                   leftIcon={<TbSend size={14} />}
-                  onClick={() => handleSave(true)}
-                  isLoading={sending}
-                  loadingText="Sending"
+                  onClick={handleReviewSend}
+                  isLoading={saving}
+                  loadingText="Preparing"
                   _hover={{ bg: 'brand.400', transform: 'translateY(-1px)' }}
                 >
-                  Save & Send
+                  Review and send
                 </Button>
               )}
 
@@ -1135,6 +1172,18 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
         isOpen={showSnapshot}
         onClose={() => setShowSnapshot(false)}
         invoiceId={invoiceId}
+      />
+
+      <ReviewSendModal
+        isOpen={showSendGate}
+        onClose={() => setShowSendGate(false)}
+        invoice={previewInvoice}
+        client={client}
+        project={projects.find((p) => p.id === projectId) || null}
+        sprints={sprints}
+        dueDate={dueDate}
+        sending={sending}
+        onConfirm={() => handleSend(reviewInvoiceId)}
       />
     </Box>
   );
