@@ -68,7 +68,7 @@ const MobileNav = () => {
           spacing={1}
           p={1.5}
           borderRadius="full"
-          bg="rgba(23, 18, 16, 0.86)"
+          bg="rgba(36, 26, 22, 0.90)"
           border="1px solid"
           borderColor={C.line}
           pointerEvents="auto"

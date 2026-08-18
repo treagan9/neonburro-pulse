@@ -45,7 +45,7 @@ const theme = extendTheme({
   styles: {
     global: {
       'html, body': {
-        bg: 'chrome.ground',
+        bg: 'paper.mat',
         color: 'text.primary',
         fontFamily: 'body',
         fontSize: 'md',
@@ -54,14 +54,14 @@ const theme = extendTheme({
         MozOsxFontSmoothing: 'grayscale',
         textRendering: 'optimizeLegibility',
       },
-      'body': { minHeight: '100vh' },
+      'body': { minHeight: '100dvh' },
       '*::selection': {
-        bg: 'rgba(197, 217, 87, 0.3)',   // lime, was cyan
-        color: 'brand.300',
+        bg: 'rgba(197, 217, 87, 0.35)',   // lime
+        color: 'paper.ink',
       },
-      '::-webkit-scrollbar': { width: '6px', height: '6px', bg: 'surface.950' },
+      '::-webkit-scrollbar': { width: '8px', height: '8px', bg: 'transparent' },
       '::-webkit-scrollbar-thumb': {
-        bg: 'surface.800', borderRadius: '3px', _hover: { bg: 'surface.700' },
+        bg: 'rgba(36,26,22,0.24)', borderRadius: '4px', _hover: { bg: 'rgba(36,26,22,0.42)' },
       },
       'code, kbd, pre, samp': { fontFamily: 'mono' },
       a: { textDecoration: 'none', _hover: { textDecoration: 'none' } },

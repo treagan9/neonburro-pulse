@@ -1,14 +1,24 @@
 // src/theme/typography.js
-// NeonBurro Pulse — type scale, aligned to brand canon.
-// Three voices: heading + body (Geist Sans, was Inter), mono (JetBrains Mono).
-// Fraunces retained for marquee numbers and editorial moments (money, big stats).
+// NeonBurro Pulse — type scale, ONE font.
+//
+// Pulse used to run three faces: Geist Sans to read, JetBrains Mono for labels,
+// Fraunces for marquee numbers. Tyler wanted one clean rounded family for the
+// whole tool, numbers included, and no second font anywhere. That family is Rubik
+// (rounded corners, geometric, crisp at 13px, clean numerals). Every token below
+// points at it: body and heading read, `mono` still exists as a name so the
+// uppercase tracked kickers keep working (they are Rubik now, not a monospace),
+// and `display` is Rubik too so big numbers are the same clean face as everything
+// else instead of a serif. Swapping the whole system to another font is a one line
+// change here. Loaded in src/main.jsx. No oxford commas, no em dashes.
+
+const RUBIK = "'Rubik', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif";
 
 export const typography = {
   fonts: {
-    heading: "'Geist Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-    body:    "'Geist Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-    mono:    "'JetBrains Mono', 'Geist Mono', 'SF Mono', 'Fira Code', ui-monospace, monospace",
-    display: "'Fraunces', Georgia, 'Times New Roman', serif",
+    heading: RUBIK,
+    body:    RUBIK,
+    mono:    RUBIK,
+    display: RUBIK,
   },
 
   fontSizes: {

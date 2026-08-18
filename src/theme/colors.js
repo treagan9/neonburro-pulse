@@ -140,10 +140,10 @@ const colors = {
   // above, both are valid while the migration is underway.
   paper: {
     mat:      '#E7DFD1',  // page ground, cream as dark as cream goes
-    sheet:    '#FBF9F4',  // cards and surfaces, warm near white, never pure white
-    sunken:   '#F5F0E6',  // inset panels and wells
-    hair:     '#E4DBCB',  // borders and real rules
-    hairSoft: '#EFE9DC',  // faintest inner rules
+    sheet:    '#F4EEE2',  // cards and surfaces, a lighter warm cream, NEVER white
+    sunken:   '#EDE6D7',  // inset panels and wells, a hair below sheet
+    hair:     '#E1D7C6',  // borders and real rules
+    hairSoft: '#EBE3D4',  // faintest inner rules
 
     ink:      '#241A16',  // Night Tack, primary text
     inkSec:   '#4A382F',  // Canyon Stitch, supporting text
@@ -159,21 +159,20 @@ const colors = {
     green:    '#5E7A1E',  // paid, positive
   },
 
-  // ── CHROME, THE DARK FRAME ─────────────────────────────────────────────────
-  // The shell chrome is WARM dark, not the cool near-black the surface tokens
-  // used to be, so the dark rail and the warm cream sheet read as one family
-  // rather than two colliding temperatures. The cream workspace (paper.mat) sits
-  // on chrome.ground as a rounded panel: the sidebar and the bottom pill ARE the
-  // dark frame, the content is the paper lifted off it. Text on chrome is a warm
-  // off white, never pure white. Lime stays the one accent, on the active nav
+  // ── CHROME, THE DARK ROUNDED RECTANGLES ────────────────────────────────────
+  // The whole tool is two colors now: cream and ONE dark, the same near-black warm
+  // ink that sets bold text (paper.ink #241A16). Everything is cream except the
+  // sidebar on desktop and the bottom pill on a phone, and those two are dark
+  // rounded rectangles floating on the cream. So chrome.ground IS the ink. Text on
+  // it is a warm cream, never white. Lime stays the one accent, on the active nav
   // item only. Read by AppShell, Sidebar and MobileNav.
   chrome: {
-    ground:    '#171210',  // the dark frame, the sidebar and the bottom pill
-    raised:    '#231C17',  // hover and active nav surface on the rail
-    line:      '#2E251E',  // hairline on chrome
-    text:      '#ECE4D7',  // warm off white, primary text on the dark rail
-    textMuted: '#8B7E6E',  // muted nav label
-    textFaint: '#5F5445',  // faint meta on chrome
+    ground:    '#241A16',  // the ink, the floating dark rectangles (sidebar, pill)
+    raised:    '#3A2C22',  // hover and active nav surface on the dark rectangle
+    line:      '#3E2F25',  // hairline on the dark rectangle
+    text:      '#EFE7DA',  // warm cream text on the dark rectangle, never white
+    textMuted: '#A2937F',  // muted nav label
+    textFaint: '#7A6B58',  // faint meta on the dark rectangle
   },
 };
 
