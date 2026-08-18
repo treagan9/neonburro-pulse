@@ -1,26 +1,21 @@
 // src/components/Layout/MobileNav.jsx
-// SENTINEL: NB_PULSE_MOBILENAV_V2
+// SENTINEL: NB_PULSE_MOBILENAV_V3
 //
-// Four tabs and a More sheet, all of it read from lib/nav.js.
+// The phone nav, rebuilt as a floating dark pill. V2 was a full width bar pinned
+// to the bottom edge, one more rectangle. This is a single rounded pill in the
+// warm chrome, floated off the bottom with a shadow, so it reads as an object on
+// the cream rather than a border of it. Tyler asked for exactly this: a big pill
+// with icons, dark background.
 //
-// ── THE TWO THINGS THAT WERE ACTUALLY BROKEN ────────────────────────────────
+// THE ACTIVE TAB EXPANDS. Inactive tabs are icon only, a clean row of thumb sized
+// targets. The active one grows into a lime pill and shows its label, so where
+// you are is unmistakable and the accent is spent once, same lime as the sidebar
+// bar. Four pages plus a More button, all read from lib/nav.js so the sidebar and
+// the pill can never disagree about what exists.
 //
-//   MESSAGES DID NOT EXIST ON A PHONE. It was in the sidebar and in neither the
-//   primary tabs nor the More sheet, so on mobile the feature was simply gone.
-//
-//   THE PROJECTS TAB WENT NOWHERE. /projects/ redirects to /clients/, so it
-//   navigated somewhere with a different name and then never highlighted.
-//
-// Both came from the same cause: two hand typed lists that had to agree and had
-// no mechanism forcing them to. There is one list now.
-//
-// ── LABELS ARE BACK UNDER THE ICONS ─────────────────────────────────────────
-// V1 was icon only. An icon only tab bar is fine for five verbs everybody
-// already knows and wrong for an admin tool, where Forms and Invoicing and
-// Clients are three rectangles with people in them. The labels cost nine pixels
-// of height and remove the guessing.
-//
-// No oxford commas, no em dashes.
+// The wrapper is pointer-events none so the cream around the pill still takes
+// taps. Only the pill itself is live. More opens a full sheet, repainted to
+// chrome. No oxford commas, no em dashes.
 
 import { useState } from 'react';
 import {
@@ -32,9 +27,11 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { MOBILE_PRIMARY, MOBILE_MORE, isActivePath } from '../../lib/nav';
 import colors from '../../theme/colors';
-import { TABBAR_H, EASE, FAST } from '../../theme/layout';
+import { EASE, FAST } from '../../theme/layout';
 
-const GLOW = `0 0 10px ${colors.accent.signal}66`;
+const C = colors.chrome;
+const LIME = colors.paper.lime;
+const LIME_INK = colors.paper.limeInk;
 
 const MobileNav = () => {
   const location = useLocation();
@@ -55,49 +52,54 @@ const MobileNav = () => {
   return (
     <>
       <Box
-        as="nav"
-        aria-label="Primary"
-        display={{ base: 'block', lg: 'none' }}
+        display={{ base: 'flex', lg: 'none' }}
+        justifyContent="center"
         position="fixed"
-        bottom={0}
         left={0}
         right={0}
-        bg="rgba(11, 11, 10, 0.88)"
-        borderTop="1px solid"
-        borderColor="divider.soft"
+        bottom="calc(env(safe-area-inset-bottom) + 14px)"
         zIndex={20}
-        pb="env(safe-area-inset-bottom)"
-        sx={{
-          backdropFilter: 'saturate(180%) blur(20px)',
-          WebkitBackdropFilter: 'saturate(180%) blur(20px)',
-        }}
+        pointerEvents="none"
+        px={4}
       >
-        <HStack spacing={0} align="stretch" h={TABBAR_H}>
+        <HStack
+          as="nav"
+          aria-label="Primary"
+          spacing={1}
+          p={1.5}
+          borderRadius="full"
+          bg="rgba(23, 18, 16, 0.86)"
+          border="1px solid"
+          borderColor={C.line}
+          pointerEvents="auto"
+          boxShadow="0 10px 34px rgba(0,0,0,0.42), 0 2px 8px rgba(0,0,0,0.3)"
+          sx={{
+            backdropFilter: 'saturate(160%) blur(18px)',
+            WebkitBackdropFilter: 'saturate(160%) blur(18px)',
+          }}
+        >
           {MOBILE_PRIMARY.map((item) => (
-            <Tab key={item.path} item={item} active={active(item.path)} onClick={() => go(item.path)} />
+            <PillTab key={item.path} item={item} active={active(item.path)} onClick={() => go(item.path)} />
           ))}
-          <Tab item={{ icon: TbDots, label: 'More' }} active={moreActive || open}
-            onClick={() => setOpen(true)} />
+          <PillTab item={{ icon: TbDots, label: 'More' }} active={moreActive || open} onClick={() => setOpen(true)} />
         </HStack>
       </Box>
 
       <Modal isOpen={open} onClose={() => setOpen(false)} size="full" motionPreset="slideInBottom">
         <ModalOverlay bg="blackAlpha.700" backdropFilter="blur(8px)" />
-        <ModalContent bg="surface.950" m={0} borderRadius={0} color="text.primary">
+        <ModalContent bg={C.ground} m={0} borderRadius={0} color={C.text}>
           <ModalCloseButton top={4} right={4} size="lg" borderRadius="full"
-            color="surface.400" _hover={{ color: 'text.primary', bg: 'surface.900' }} />
+            color={C.textMuted} _hover={{ color: C.text, bg: C.raised }} />
 
-          <ModalBody px={5} pt="max(env(safe-area-inset-top), 56px)"
-            pb="max(env(safe-area-inset-bottom), 32px)">
+          <ModalBody px={5} pt="max(env(safe-area-inset-top), 56px)" pb="max(env(safe-area-inset-bottom), 32px)">
             <VStack align="stretch" spacing={8}>
-
               <HStack spacing={3} align="center">
                 <Image src="/logo-main.png" alt="" w="26px" h="26px" />
                 <Box>
-                  <Text color="text.primary" fontSize="15px" fontWeight="600" letterSpacing="-0.02em" lineHeight="1.1">
+                  <Text color={C.text} fontSize="15px" fontWeight="600" letterSpacing="-0.02em" lineHeight="1.1">
                     Pulse
                   </Text>
-                  <Text color="surface.500" fontFamily="mono" fontSize="9px" letterSpacing="0.14em">
+                  <Text color={C.textFaint} fontFamily="mono" fontSize="9px" letterSpacing="0.14em">
                     neonburro
                   </Text>
                 </Box>
@@ -109,7 +111,7 @@ const MobileNav = () => {
                 ))}
               </VStack>
 
-              <Divider borderColor="divider.soft" />
+              <Divider borderColor={C.line} />
 
               <Row item={{ icon: TbLogout, label: 'Sign out', desc: 'See you next time' }}
                 destructive onClick={signOut} />
@@ -121,50 +123,53 @@ const MobileNav = () => {
   );
 };
 
-const Tab = ({ item, active, onClick }) => (
-  <VStack
+// Inactive: a thumb sized icon. Active: a lime pill that shows its label.
+const PillTab = ({ item, active, onClick }) => (
+  <Box
     as="button"
     onClick={onClick}
     aria-label={item.label}
     aria-current={active ? 'page' : undefined}
-    flex={1}
-    spacing={1}
-    justify="center"
-    position="relative"
-    transition={`transform ${FAST} ${EASE}`}
-    _active={{ transform: 'scale(0.94)' }}
+    h="46px"
+    minW="46px"
+    px={active ? 4 : 0}
+    borderRadius="full"
+    bg={active ? LIME : 'transparent'}
+    display="flex"
+    alignItems="center"
+    justifyContent="center"
+    gap={active ? 2 : 0}
+    transition={`background ${FAST} ${EASE}, padding ${FAST} ${EASE}`}
+    _active={{ transform: 'scale(0.93)' }}
   >
-    {active && (
-      <Box position="absolute" top={0} left="50%" transform="translateX(-50%)"
-        w="22px" h="2px" borderRadius="full" bg="brand.500" boxShadow={GLOW} />
-    )}
-    <Icon as={item.icon} boxSize="21px" color={active ? 'brand.500' : 'surface.500'}
+    <Icon as={item.icon} boxSize="21px" color={active ? LIME_INK : C.textMuted}
       transition={`color ${FAST} ${EASE}`} />
-    <Text fontSize="9px" fontWeight={active ? '600' : '500'} letterSpacing="0.02em"
-      color={active ? 'text.primary' : 'surface.600'} transition={`color ${FAST} ${EASE}`}>
-      {item.label}
-    </Text>
-  </VStack>
+    {active && (
+      <Text fontSize="sm" fontWeight="700" letterSpacing="-0.01em" color={LIME_INK} whiteSpace="nowrap">
+        {item.label}
+      </Text>
+    )}
+  </Box>
 );
 
 const Row = ({ item, active, destructive, onClick }) => (
   <Box as="button" onClick={onClick} textAlign="left" w="100%" px={4} py={4} borderRadius="14px"
-    bg={active ? 'surface.900' : 'transparent'} transition={`all ${FAST} ${EASE}`}
-    _hover={{ bg: 'surface.900' }} _active={{ bg: 'surface.800', transform: 'scale(0.99)' }}>
+    bg={active ? C.raised : 'transparent'} transition={`all ${FAST} ${EASE}`}
+    _hover={{ bg: C.raised }} _active={{ bg: C.raised, transform: 'scale(0.99)' }}>
     <HStack spacing={4}>
       <Box w="38px" h="38px" borderRadius="11px" flexShrink={0}
-        bg={destructive ? 'status.redMuted' : 'surface.900'}
+        bg={destructive ? 'rgba(194,64,47,0.16)' : C.raised}
         display="flex" alignItems="center" justifyContent="center">
         <Icon as={item.icon} boxSize="18px"
-          color={destructive ? 'accent.coral' : active ? 'brand.500' : 'surface.300'} />
+          color={destructive ? colors.paper.coral : active ? LIME : C.textMuted} />
       </Box>
       <VStack align="start" spacing={0} flex={1} minW={0}>
         <Text fontSize="15px" fontWeight="600" letterSpacing="-0.01em" lineHeight="1.2"
-          color={destructive ? 'accent.coral' : 'text.primary'}>
+          color={destructive ? colors.paper.coral : C.text}>
           {item.label}
         </Text>
         {item.desc && (
-          <Text fontSize="xs" color="surface.500" lineHeight="1.4" noOfLines={1}>
+          <Text fontSize="xs" color={C.textFaint} lineHeight="1.4" noOfLines={1}>
             {item.desc}
           </Text>
         )}

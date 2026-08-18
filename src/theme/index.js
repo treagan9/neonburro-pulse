@@ -45,7 +45,7 @@ const theme = extendTheme({
   styles: {
     global: {
       'html, body': {
-        bg: 'surface.950',
+        bg: 'chrome.ground',
         color: 'text.primary',
         fontFamily: 'body',
         fontSize: 'md',

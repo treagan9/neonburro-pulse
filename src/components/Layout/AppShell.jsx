@@ -1,26 +1,30 @@
 // src/components/Layout/AppShell.jsx
-// SENTINEL: NB_PULSE_SHELL_V2
+// SENTINEL: NB_PULSE_SHELL_V3
 //
-// The frame every protected page renders inside.
+// The frame every protected page renders inside, rebuilt as warm dark chrome
+// holding a rounded cream sheet.
 //
-// ── THE ONE REAL CHANGE ─────────────────────────────────────────────────────
-// V1 wrapped content in maxW 1400px with mx auto, so on any monitor wider than
-// about 1650px the app drifted into the middle of the screen while the sidebar
-// stayed pinned to the left edge. The gap between the nav and the first column
-// of a table grew as the window did, which is the opposite of what a dense tool
-// should do with more room.
+// ── WHAT V3 CHANGES AND WHY ─────────────────────────────────────────────────
+// V2 was a cool near-black sidebar butting a cream page along a hard 1px seam,
+// two different temperatures meeting at a line, and the page's own padding sat
+// INSIDE this file's px rail so the content was pushed twice off the left edge,
+// which read as dead space. Tyler's note, verbatim in spirit: make it look like
+// a good portal, blend the colors, kill the dead space, the sidebar can stay
+// dark.
 //
-// Content is left aligned now. SHEET still caps the width so a table cannot run
-// three thousand pixels wide, it just does not centre what it caps. That is the
-// same call the marketing site documents in its own layout file, and it is the
-// only call that lets a fixed sidebar and a page heading share a left edge.
+// So: the whole shell now sits on chrome.ground, a WARM near-black in the same
+// family as the cream (see colors.chrome). The sidebar is that same dark, no
+// border, so it reads as the frame not a panel. The content is a cream sheet
+// (paper.mat) with its LEFT corners rounded, lifting off the dark rail like a
+// sheet of paper on a desk. That single rounded reveal is the whole blend.
 //
-// The gutter also went from five steps to one. base 20px, md and up 28px.
+// PADDING moved out. Every converted page owns its own px, minH and maxW, so this
+// file adds none. That removes the double inset that was the dead space.
 //
-// ── MOBILE ──────────────────────────────────────────────────────────────────
-// Bottom padding is TABBAR_PAD, which is the bar height plus the iOS safe area
-// plus breathing room, so the last row of any list clears the tabs on a notched
-// phone instead of sitting one pixel under them.
+// SCROLL is split by breakpoint. On desktop the sheet is a fixed-height panel
+// that scrolls its own content, so the rounded corners stay put and the dark
+// frame never scrolls. On a phone there is no rail and no rounding, so the window
+// scrolls normally and the bottom pill floats over it. pb clears the pill.
 //
 // No oxford commas, no em dashes.
 
@@ -32,17 +36,17 @@ import Header from './Header';
 import MobileNav from './MobileNav';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
-import {
-  RAIL, SHEET, SIDEBAR_W, SIDEBAR_W_COLLAPSED, TABBAR_PAD, BAND_Y, EASE, SLOW,
-} from '../../theme/layout';
+import colors from '../../theme/colors';
+import { SIDEBAR_W, SIDEBAR_W_COLLAPSED, TABBAR_PAD, EASE, SLOW } from '../../theme/layout';
+
+const C = colors.chrome;
 
 const AppShell = ({ children }) => {
   const { user } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
 
   // Loaded in the background. The sidebar renders expanded immediately rather
-  // than waiting on a round trip, because a nav that appears half a second late
-  // is worse than one that occasionally starts a pixel wide.
+  // than waiting on a round trip.
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
@@ -65,14 +69,19 @@ const AppShell = ({ children }) => {
   };
 
   return (
-    <Flex minH="100vh" bg="surface.950">
+    // 100dvh, not 100vh: the cream sheet must fill the REAL viewport. On a phone
+    // 100vh is the tall pre-scroll value and leaves a dark band under the content
+    // once the URL bar collapses, and the fixed pill drops into that band and
+    // vanishes against the dark. dvh tracks the live viewport and closes the gap.
+    <Flex minH="100dvh" bg={C.ground} align="stretch">
       <Sidebar collapsed={collapsed} onToggle={toggle} />
 
       <Box
         flex={1}
         minW={0}
         ml={{ base: 0, lg: collapsed ? SIDEBAR_W_COLLAPSED : SIDEBAR_W }}
-        minH="100vh"
+        minH="100dvh"
+        h={{ lg: '100dvh' }}
         transition={`margin-left ${SLOW} ${EASE}`}
         display="flex"
         flexDirection="column"
@@ -82,11 +91,13 @@ const AppShell = ({ children }) => {
         <Box
           as="main"
           w="100%"
-          maxW={SHEET}
           flex={1}
-          px={RAIL}
-          pt={BAND_Y}
-          pb={{ base: TABBAR_PAD, lg: 10 }}
+          bg={colors.paper.mat}
+          borderRadius={{ base: 0, lg: '22px 0 0 22px' }}
+          overflowY={{ lg: 'auto' }}
+          overflowX={{ lg: 'hidden' }}
+          pb={{ base: TABBAR_PAD, lg: 0 }}
+          sx={{ WebkitOverflowScrolling: 'touch' }}
         >
           {children || <Outlet />}
         </Box>

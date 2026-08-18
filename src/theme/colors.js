@@ -158,6 +158,23 @@ const colors = {
     coral:    '#C2402F',  // overdue, destructive
     green:    '#5E7A1E',  // paid, positive
   },
+
+  // ── CHROME, THE DARK FRAME ─────────────────────────────────────────────────
+  // The shell chrome is WARM dark, not the cool near-black the surface tokens
+  // used to be, so the dark rail and the warm cream sheet read as one family
+  // rather than two colliding temperatures. The cream workspace (paper.mat) sits
+  // on chrome.ground as a rounded panel: the sidebar and the bottom pill ARE the
+  // dark frame, the content is the paper lifted off it. Text on chrome is a warm
+  // off white, never pure white. Lime stays the one accent, on the active nav
+  // item only. Read by AppShell, Sidebar and MobileNav.
+  chrome: {
+    ground:    '#171210',  // the dark frame, the sidebar and the bottom pill
+    raised:    '#231C17',  // hover and active nav surface on the rail
+    line:      '#2E251E',  // hairline on chrome
+    text:      '#ECE4D7',  // warm off white, primary text on the dark rail
+    textMuted: '#8B7E6E',  // muted nav label
+    textFaint: '#5F5445',  // faint meta on chrome
+  },
 };
 
 export default colors;
