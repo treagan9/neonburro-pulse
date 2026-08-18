@@ -61,9 +61,10 @@ const sbUpdate = (table, id, data) =>
 const sbInsert = (table, data) =>
   sbFetch(table, { method: 'POST', body: JSON.stringify(data), prefer: 'return=minimal' });
 
-const sendEmail = async (from, to, subject, html, replyTo) => {
+const sendEmail = async (from, to, subject, html, replyTo, cc) => {
   const payload = { from, to: Array.isArray(to) ? to : [to], subject, html };
   if (replyTo) payload.reply_to = replyTo;
+  if (cc && cc.length) payload.cc = cc;
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
@@ -250,6 +251,17 @@ export const handler = async (event) => {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'Client has no email address' }) };
     }
 
+    // Billing CC. Contacts flagged is_billing, plus any invoice cc_emails, minus
+    // the primary recipient, get copied on the invoice.
+    let ccEmails = [];
+    if (invoice.client_id) {
+      const contacts = await sbGet('client_contacts', `client_id=eq.${invoice.client_id}&is_billing=eq.true&select=email`);
+      ccEmails = (contacts || []).map((c) => c.email).filter(Boolean);
+    }
+    if (Array.isArray(invoice.cc_emails)) ccEmails.push(...invoice.cc_emails);
+    const ccFinal = [...new Set(ccEmails.map((e) => String(e).toLowerCase()))]
+      .filter((e) => e && e !== String(client.email).toLowerCase());
+
     const totalAmount = lineItems.reduce((sum, i) => sum + parseFloat(i.amount || 0), 0);
     const totalDueNow = lineItems.reduce((sum, i) => sum + getDueNow(i), 0);
     const invoiceDate = new Date().toLocaleDateString('en-US', {
@@ -272,7 +284,9 @@ export const handler = async (event) => {
       FROM_EMAIL,
       [client.email],
       `Invoice ${invoice.invoice_number}${project?.name ? ` - ${project.name}` : ''}`,
-      clientHtml
+      clientHtml,
+      null,
+      ccFinal
     );
 
     const snapshot = {

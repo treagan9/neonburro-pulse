@@ -214,11 +214,25 @@ export const buildInvoiceEmailHTML = ({
       <td align="right" style="padding:2px 0 9px 0;font-family:${SANS};font-size:14px;font-weight:500;color:${accent || EMAIL.ink};border-bottom:1px solid ${EMAIL.hairSoft};">${v}</td>
     </tr>`;
 
+  // Bill To. A business leads with the company and lists the contact as Attn, an
+  // individual leads with the name. Then the billing address, then the email.
+  const addrLines = [];
+  if (client?.address_line1) addrLines.push(escapeHtml(client.address_line1));
+  if (client?.address_line2) addrLines.push(escapeHtml(client.address_line2));
+  const cityRegion = [client?.city, client?.region].filter(Boolean).join(', ');
+  const cityLine = [cityRegion, client?.postal_code].filter(Boolean).join(' ').trim();
+  if (cityLine) addrLines.push(escapeHtml(cityLine));
+  if (client?.country && client.country.toUpperCase() !== 'US') addrLines.push(escapeHtml(client.country));
+
+  const billPrimary = client?.company || client?.name || 'Client';
+  const billAttn = client?.company ? client?.name : null;
+  const billLn = (t) => `<div style="font-family:${SANS};font-size:13px;line-height:1.7;color:${EMAIL.inkSec};">${t}</div>`;
   const billed = `
     <div style="font-family:${MONO};font-size:10px;font-weight:500;letter-spacing:0.22em;text-transform:uppercase;color:${EMAIL.inkMuted};margin-bottom:7px;">Billed to</div>
-    <div style="font-family:${SANS};font-size:16px;font-weight:600;color:${EMAIL.ink};">${escapeHtml(client?.name || 'Client')}</div>
-    ${client?.company ? `<div style="font-family:${SANS};font-size:13px;line-height:1.65;color:${EMAIL.inkSec};margin-top:2px;">${escapeHtml(client.company)}</div>` : ''}
-    ${client?.email ? `<div style="font-family:${SANS};font-size:13px;line-height:1.65;color:${EMAIL.inkSec};margin-top:2px;">${escapeHtml(client.email)}</div>` : ''}`;
+    <div style="font-family:${SANS};font-size:16px;font-weight:600;color:${EMAIL.ink};margin-bottom:2px;">${escapeHtml(billPrimary)}</div>
+    ${billAttn ? billLn(`Attn ${escapeHtml(billAttn)}`) : ''}
+    ${addrLines.map(billLn).join('')}
+    ${client?.email ? billLn(escapeHtml(client.email)) : ''}`;
 
   const dates = `
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">

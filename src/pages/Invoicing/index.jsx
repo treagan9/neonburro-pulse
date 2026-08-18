@@ -46,7 +46,7 @@ const Invoicing = () => {
         .order('created_at', { ascending: false }),
       supabase
         .from('clients')
-        .select('id, name, company, email, phone, status')
+        .select('id, name, company, email, phone, status, client_type, address_line1, address_line2, city, region, postal_code, country')
         .order('name'),
     ]);
     setInvoices(invoicesRes.data || []);
