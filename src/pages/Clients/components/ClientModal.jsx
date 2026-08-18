@@ -30,6 +30,7 @@ import {
 } from 'react-icons/tb';
 import { supabase } from '../../../lib/supabase';
 import colors from '../../../theme/colors';
+import DotSelect from '../../../components/common/DotSelect';
 import {
   formatPhoneDisplay, formatPhoneStorage, isValidEmail, isValidPhone,
   generatePortalPin, getInitials, getAvatarColor,
@@ -557,9 +558,7 @@ const ClientModal = ({ isOpen, onClose, client, onSave }) => {
                   <Field label="EIN or tax id"><Input value={taxId} onChange={(e) => setTaxId(e.target.value)} placeholder="00-0000000" {...FIELD} /></Field>
                 )}
                 <Field label="Timezone">
-                  <Select value={timezone} onChange={(e) => setTimezone(e.target.value)} placeholder="Select timezone" {...FIELD} iconColor={P.inkMuted} sx={{ '& option': { bg: P.sheet, color: P.ink } }}>
-                    {TIMEZONES.map((tz) => <option key={tz} value={tz}>{tz.replace('_', ' ')}</option>)}
-                  </Select>
+                  <DotSelect value={timezone} onChange={setTimezone} placeholder="Select timezone" options={TIMEZONES.map((tz) => ({ value: tz, label: tz.replace('_', ' ') }))} />
                 </Field>
               </SimpleGrid>
 

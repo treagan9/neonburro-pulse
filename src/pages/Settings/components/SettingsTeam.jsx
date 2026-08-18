@@ -6,10 +6,11 @@
 
 import { useState, useEffect } from 'react';
 import {
-  VStack, HStack, Text, Box, Icon, Button, Input, useToast, Spinner, Center, Select,
+  VStack, HStack, Text, Box, Icon, Button, Input, useToast, Spinner, Center,
   Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalFooter, ModalCloseButton,
   FormControl, FormLabel, useDisclosure,
 } from '@chakra-ui/react';
+import DotSelect from '../../../components/common/DotSelect';
 import { TbUserPlus, TbCrown, TbShield, TbBriefcase, TbUser, TbBuilding, TbMail } from 'react-icons/tb';
 import { supabase } from '../../../lib/supabase';
 import Avatar from '../../../components/common/Avatar';
@@ -67,11 +68,14 @@ const TeamMemberRow = ({ member, currentUserId, onRoleChange }) => {
       </HStack>
 
       {!isMe && !isSuperAdmin && (
-        <Select size="xs" value={EDITABLE_ROLES.includes(member.role) ? member.role : 'team'} onChange={(e) => onRoleChange(member.id, e.target.value)}
-          bg={P.sheet} border="1px solid" borderColor={P.hair} color={P.inkSec} fontSize="2xs" fontWeight="700" h="32px" borderRadius="md" w="110px"
-          _hover={{ borderColor: P.inkFaint }} _focus={{ borderColor: P.lime, boxShadow: 'none' }} cursor="pointer" sx={{ '& option': { background: P.sheet } }}>
-          {EDITABLE_ROLES.map((r) => <option key={r} value={r}>{ROLE_CONFIG[r].label}</option>)}
-        </Select>
+        <Box w="132px" flexShrink={0}>
+          <DotSelect
+            value={EDITABLE_ROLES.includes(member.role) ? member.role : 'team'}
+            onChange={(v) => onRoleChange(member.id, v)}
+            options={EDITABLE_ROLES.map((r) => ({ value: r, label: ROLE_CONFIG[r].label }))}
+            h="34px"
+          />
+        </Box>
       )}
     </HStack>
   );

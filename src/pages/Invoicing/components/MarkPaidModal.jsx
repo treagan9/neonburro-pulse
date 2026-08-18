@@ -7,11 +7,12 @@
 import { useState, useEffect } from 'react';
 import {
   Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalFooter,
-  ModalCloseButton, Box, VStack, HStack, Text, Icon, Input, Select, Textarea,
+  ModalCloseButton, Box, VStack, HStack, Text, Icon, Input, Textarea,
   Button,
 } from '@chakra-ui/react';
 import { TbCash, TbCheck } from 'react-icons/tb';
 import colors from '../../../theme/colors';
+import DotSelect from '../../../components/common/DotSelect';
 import {
   PAYMENT_METHODS, FIELD_LABEL, NAKED_INPUT, formatCurrency,
 } from '../../../lib/invoiceConstants';
@@ -82,9 +83,7 @@ const MarkPaidModal = ({ isOpen, onClose, invoice, onConfirm, processing }) => {
             <HStack spacing={4} align="start">
               <Box flex={1}>
                 <Text {...FIELD_LABEL}>Method</Text>
-                <Select value={method} onChange={(e) => setMethod(e.target.value)} {...NAKED_INPUT} fontFamily="body" cursor="pointer" sx={{ '& option': { bg: P.sheet, color: P.ink } }}>
-                  {PAYMENT_METHODS.map((m) => (<option key={m.value} value={m.value}>{m.label}</option>))}
-                </Select>
+                <DotSelect value={method} onChange={setMethod} options={PAYMENT_METHODS.map((m) => ({ value: m.value, label: m.label }))} />
               </Box>
               <Box flex={1}>
                 <Text {...FIELD_LABEL}>Paid date</Text>

@@ -18,8 +18,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Box, VStack, HStack, Text, Icon, Spinner, Center, Button,
-  Input, Textarea, Select, Container, Divider, Tooltip, useToast,
+  Input, Textarea, Container, Divider, Tooltip, useToast,
 } from '@chakra-ui/react';
+import DotSelect from '../../../components/common/DotSelect';
 import {
   TbArrowLeft, TbPlus, TbTrash, TbEdit, TbEye, TbSend, TbBolt,
   TbAlertTriangle, TbRotateClockwise, TbBellRinging, TbCash, TbCopy,
@@ -939,41 +940,24 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
             <HStack spacing={6} align="start" flexWrap="wrap" rowGap={6}>
               <Box flex={1} minW="220px">
                 <Text {...LABEL}>Client</Text>
-                <Select
+                <DotSelect
                   value={clientId}
-                  onChange={(e) => setClientId(e.target.value)}
-                  placeholder="Select client..."
-                  {...FIELD}
-                  cursor="pointer"
+                  onChange={setClientId}
+                  placeholder="Select a client"
                   isDisabled={isPaid}
-                  iconColor={P.inkMuted}
-                  sx={{ '& option': { bg: P.sheet, color: P.ink } }}
-                >
-                  {clients.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} {c.company ? `· ${c.company}` : ''}
-                    </option>
-                  ))}
-                </Select>
+                  options={clients.map((c) => ({ value: c.id, label: `${c.name}${c.company ? ` · ${c.company}` : ''}` }))}
+                />
               </Box>
               {projects.length > 0 && (
                 <Box flex={1} minW="220px">
                   <Text {...LABEL}>Project</Text>
-                  <Select
+                  <DotSelect
                     value={projectId}
-                    onChange={(e) => setProjectId(e.target.value)}
+                    onChange={setProjectId}
                     placeholder="No project"
-                    {...FIELD}
-                    cursor="pointer"
                     isDisabled={isPaid}
-                    iconColor={P.inkMuted}
-                    sx={{ '& option': { bg: P.sheet, color: P.ink } }}
-                  >
-                    <option value="">No project</option>
-                    {projects.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </Select>
+                    options={[{ value: '', label: 'No project' }, ...projects.map((p) => ({ value: p.id, label: p.name }))]}
+                  />
                 </Box>
               )}
             </HStack>

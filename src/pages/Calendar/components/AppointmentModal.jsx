@@ -22,9 +22,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
   Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalFooter,
-  ModalCloseButton, VStack, HStack, Text, Input, Select, Button, Textarea,
+  ModalCloseButton, VStack, HStack, Text, Input, Button, Textarea,
   Box, SimpleGrid, Icon, useToast,
 } from '@chakra-ui/react';
+import DotSelect from '../../../components/common/DotSelect';
 import {
   TbPhone, TbVideo, TbMapPin, TbRefresh, TbBell, TbTrash, TbCalendarPlus, TbCopy, TbCheck,
 } from 'react-icons/tb';
@@ -295,12 +296,15 @@ const AppointmentModal = ({ isOpen, onClose, clients = [], appointment = null, i
             </Field>
 
             <Field label="Client">
-              <Select {...FIELD} value={clientId} onChange={(e) => setClientId(e.target.value)} sx={{ '> option': { background: P.sheet, color: P.ink } }}>
-                <option value="">Internal, no client</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}{c.company ? ` — ${c.company}` : ''}</option>
-                ))}
-              </Select>
+              <DotSelect
+                value={clientId}
+                onChange={setClientId}
+                placeholder="Internal, no client"
+                options={[
+                  { value: '', label: 'Internal, no client' },
+                  ...clients.map((c) => ({ value: c.id, label: `${c.name}${c.company ? ` · ${c.company}` : ''}` })),
+                ]}
+              />
             </Field>
 
             <SimpleGrid columns={{ base: 1, md: 3 }} spacing={3}>
@@ -311,9 +315,11 @@ const AppointmentModal = ({ isOpen, onClose, clients = [], appointment = null, i
                 <Input {...FIELD} type="time" value={time} onChange={(e) => setTime(e.target.value)} sx={{ '&::-webkit-calendar-picker-indicator': { filter: 'invert(0.3)' } }} />
               </Field>
               <Field label="Length">
-                <Select {...FIELD} value={duration} onChange={(e) => setDuration(Number(e.target.value))} sx={{ '> option': { background: P.sheet, color: P.ink } }}>
-                  {DURATIONS.map((d) => <option key={d.min} value={d.min}>{d.label}</option>)}
-                </Select>
+                <DotSelect
+                  value={duration}
+                  onChange={(v) => setDuration(Number(v))}
+                  options={DURATIONS.map((d) => ({ value: d.min, label: d.label }))}
+                />
               </Field>
             </SimpleGrid>
 
