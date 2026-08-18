@@ -1,14 +1,15 @@
 // src/pages/Dashboard/components/TeamOnlineStrip.jsx
-// Naked avatars of online team members. Click navigates to /clients/.
-// Queries all four staff roles. Tokens only.
+// Avatars of online team members, click goes to /clients/. Paper tooltip.
 
 import { useState, useEffect } from 'react';
 import { HStack, Tooltip, Box } from '@chakra-ui/react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../../lib/supabase';
 import { usePresence } from '../../../hooks/usePresence';
+import colors from '../../../theme/colors';
 import Avatar from '../../../components/common/Avatar';
 
+const P = colors.paper;
 const STAFF_ROLES = ['super_admin', 'admin', 'manager', 'team'];
 
 const TeamOnlineStrip = () => {
@@ -18,11 +19,7 @@ const TeamOnlineStrip = () => {
 
   useEffect(() => {
     const fetchProfiles = async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, display_name, username, avatar_url, role')
-        .in('role', STAFF_ROLES)
-        .order('display_name');
+      const { data } = await supabase.from('profiles').select('id, display_name, username, avatar_url, role').in('role', STAFF_ROLES).order('display_name');
       if (data) setProfiles(data);
     };
     fetchProfiles();
@@ -34,28 +31,9 @@ const TeamOnlineStrip = () => {
   return (
     <HStack spacing={2}>
       {onlineMembers.map((member) => (
-        <Tooltip
-          key={member.id}
-          label={member.display_name || member.username || 'Team member'}
-          placement="bottom"
-          hasArrow
-          bg="surface.800"
-          color="text.primary"
-          fontSize="xs"
-          openDelay={300}
-        >
-          <Box
-            cursor="pointer"
-            onClick={() => navigate('/clients/')}
-            transition="all 0.15s"
-            _hover={{ transform: 'translateY(-1px)' }}
-          >
-            <Avatar
-              name={member.display_name || member.username || 'Team'}
-              url={member.avatar_url}
-              size="xs"
-              presence="online"
-            />
+        <Tooltip key={member.id} label={member.display_name || member.username || 'Team member'} placement="bottom" hasArrow bg={P.ink} color={P.sheet} fontSize="xs" openDelay={300}>
+          <Box cursor="pointer" onClick={() => navigate('/clients/')} transition="all 0.15s" _hover={{ transform: 'translateY(-1px)' }}>
+            <Avatar name={member.display_name || member.username || 'Team'} url={member.avatar_url} size="xs" presence="online" />
           </Box>
         </Tooltip>
       ))}
