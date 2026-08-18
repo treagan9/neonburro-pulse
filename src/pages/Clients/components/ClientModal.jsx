@@ -1,18 +1,32 @@
 // src/pages/Clients/components/ClientModal.jsx
-// Tabbed, naked-input, login-DNA client modal.
-// Details / Portal / Projects. Tag + status colors resolve from tokens
-// to match ClientGrid. No hardcoded cyan glow.
+// New and edit client, on Paper. A wide cream sheet on desktop, full screen on a
+// phone, organized into short tabs so nothing is crammed: Profile, Billing,
+// Portal, and Projects when editing.
+//
+// ── WHAT IT GATHERS, AND WHY ─────────────────────────────────────────────────
+// Individual or business (business reveals company and an EIN). A real billing
+// address so the invoice Bill To is complete. A timezone so the shared calendar
+// can line people up later. And contacts, any number of them, each flaggable as
+// primary or as a billing CC, which is who gets copied on an invoice. Contacts
+// live in the client_contacts table and are replaced as a set on save.
+//
+// ── MOBILE ───────────────────────────────────────────────────────────────────
+// Every field grid is one column on a phone and at most two on desktop
+// (SimpleGrid base 1 md 2). Toggles are plain pills, no floating badges, nothing
+// overlaps. The cream is the frame.
+//
+// Preserves the PIN, the portal invite and the projects logic. No oxford commas,
+// no dashes.
 
 import { useState, useEffect } from 'react';
 import {
-  Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody,
-  ModalFooter, ModalCloseButton, VStack, HStack, Text,
-  Input, Button, Textarea, Box, Wrap, WrapItem, Icon, useToast,
-  InputGroup, InputRightElement,
+  Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalFooter,
+  ModalCloseButton, VStack, HStack, Text, Input, Select, Button, Textarea,
+  Box, Wrap, WrapItem, Icon, useToast, InputGroup, InputRightElement, SimpleGrid,
 } from '@chakra-ui/react';
 import {
-  TbAlertTriangle, TbCheck, TbMail, TbRefresh, TbPlus,
-  TbFolder, TbTrash, TbX,
+  TbAlertTriangle, TbCheck, TbMail, TbRefresh, TbPlus, TbFolder, TbTrash, TbX,
+  TbUser, TbBuilding,
 } from 'react-icons/tb';
 import { supabase } from '../../../lib/supabase';
 import colors from '../../../theme/colors';
@@ -21,54 +35,73 @@ import {
   generatePortalPin, getInitials, getAvatarColor,
 } from '../../../utils/phone';
 
-const SIGNAL_GLOW = `0 0 8px ${colors.accent.signal}`;
+const P = colors.paper;
 
-// Naked input - bottom border only (login DNA)
-const nakedInput = {
-  bg: 'transparent',
-  border: 'none',
-  borderBottom: '1px solid',
-  borderColor: 'surface.800',
-  borderRadius: 0,
-  color: 'text.primary',
-  fontSize: 'sm',
-  h: '44px',
-  px: 0,
-  _hover: { borderColor: 'surface.700' },
-  _focus: { borderColor: 'brand.500', boxShadow: 'none' },
-  _placeholder: { color: 'surface.700' },
+const FIELD = {
+  bg: P.sheet, border: '1px solid', borderColor: P.hair, borderRadius: 'lg',
+  color: P.ink, fontSize: 'sm', h: '46px', px: 3.5,
+  _hover: { borderColor: P.inkFaint },
+  _focus: { borderColor: P.lime, boxShadow: `0 0 0 3px ${P.lime}33`, outline: 'none' },
+  _placeholder: { color: P.inkFaint },
 };
 
-const FIELD_LABEL_PROPS = {
-  fontSize: '2xs',
-  fontWeight: '700',
-  color: 'surface.600',
-  textTransform: 'uppercase',
-  letterSpacing: '0.08em',
-  fontFamily: 'mono',
-  mb: 1,
+const LABEL = {
+  fontSize: '2xs', fontWeight: '600', color: P.inkMuted,
+  textTransform: 'uppercase', letterSpacing: '0.12em', fontFamily: 'mono', mb: 1.5,
 };
 
 const PRESET_TAGS = [
-  { value: 'local',        label: 'Local',        color: colors.accent.signal },
-  { value: 'recurring',    label: 'Recurring',    color: colors.status.green },
-  { value: 'vip',          label: 'VIP',          color: colors.accent.banana },
-  { value: 'lab',          label: 'Lab',          color: colors.accent.purple },
-  { value: 'hosting',      label: 'Hosting',      color: colors.accent.cool },
-  { value: 'web3',         label: 'Web3',         color: '#EC4899' },
-  { value: 'subscription', label: 'Subscription', color: '#FF6B35' },
+  { value: 'local',        label: 'Local' },
+  { value: 'recurring',    label: 'Recurring' },
+  { value: 'vip',          label: 'VIP' },
+  { value: 'lab',          label: 'Lab' },
+  { value: 'hosting',      label: 'Hosting' },
+  { value: 'web3',         label: 'Web3' },
+  { value: 'subscription', label: 'Subscription' },
 ];
 
 const STATUS_OPTIONS = [
-  { value: 'active',   label: 'Active',   color: colors.status.green },
-  { value: 'lead',     label: 'Lead',     color: colors.accent.banana },
-  { value: 'inactive', label: 'Inactive', color: colors.surface[500] },
+  { value: 'active',   label: 'Active',   color: P.green },
+  { value: 'lead',     label: 'Lead',     color: P.gold },
+  { value: 'inactive', label: 'Inactive', color: P.inkFaint },
 ];
 
-const PURPLE = colors.accent.purple;
+const TIMEZONES = [
+  'America/New_York', 'America/Chicago', 'America/Denver', 'America/Phoenix',
+  'America/Los_Angeles', 'America/Anchorage', 'Pacific/Honolulu', 'UTC',
+];
+
+// A field wrapper with a label above it.
+const Field = ({ label, children }) => (
+  <Box>
+    <Text {...LABEL}>{label}</Text>
+    {children}
+  </Box>
+);
+
+// A small pill toggle, filled lime when on.
+const PillToggle = ({ on, onClick, children }) => (
+  <Box
+    as="button"
+    type="button"
+    onClick={onClick}
+    px={3}
+    py={1.5}
+    borderRadius="full"
+    border="1px solid"
+    borderColor={on ? 'transparent' : P.hair}
+    bg={on ? P.lime : 'transparent'}
+    transition="all 0.15s"
+    _hover={{ borderColor: on ? 'transparent' : P.inkFaint }}
+  >
+    <Text fontSize="2xs" fontWeight="700" fontFamily="mono" letterSpacing="0.04em" textTransform="uppercase" color={on ? P.limeInk : P.inkMuted}>
+      {children}
+    </Text>
+  </Box>
+);
 
 // ============================================
-// PROJECTS SUBSECTION - inline list + quick add
+// PROJECTS SUBSECTION
 // ============================================
 const ProjectsSection = ({ clientId, toast }) => {
   const [projects, setProjects] = useState([]);
@@ -77,9 +110,7 @@ const ProjectsSection = ({ clientId, toast }) => {
   const [newName, setNewName] = useState('');
   const [adding, setAdding] = useState(false);
 
-  useEffect(() => {
-    if (clientId) fetchProjects();
-  }, [clientId]);
+  useEffect(() => { if (clientId) fetchProjects(); }, [clientId]);
 
   const fetchProjects = async () => {
     setLoading(true);
@@ -98,16 +129,9 @@ const ProjectsSection = ({ clientId, toast }) => {
     try {
       const { data, error } = await supabase
         .from('projects')
-        .insert({
-          client_id: clientId,
-          name: newName.trim(),
-          status: 'active',
-        })
-        .select()
-        .single();
-
+        .insert({ client_id: clientId, name: newName.trim(), status: 'active' })
+        .select().single();
       if (error) throw error;
-
       setProjects([data, ...projects]);
       setNewName('');
       setShowAdd(false);
@@ -131,123 +155,49 @@ const ProjectsSection = ({ clientId, toast }) => {
   };
 
   if (!clientId) {
-    return (
-      <Text fontSize="2xs" color="surface.600">
-        Save this client first to add projects
-      </Text>
-    );
+    return <Text fontSize="xs" color={P.inkMuted}>Save this client first to add projects</Text>;
   }
 
   return (
     <VStack align="stretch" spacing={2}>
       {loading ? (
-        <Text fontSize="2xs" color="surface.600" fontFamily="mono">Loading projects</Text>
+        <Text fontSize="xs" color={P.inkMuted} fontFamily="mono">Loading projects</Text>
       ) : (
         <>
           {projects.length === 0 && !showAdd && (
-            <Text fontSize="xs" color="surface.600">
-              No projects yet
-            </Text>
+            <Text fontSize="xs" color={P.inkMuted}>No projects yet</Text>
           )}
-
           {projects.map((project) => (
-            <HStack
-              key={project.id}
-              py={2}
-              spacing={3}
-              borderBottom="1px solid"
-              borderColor="surface.900"
-              role="group"
-              _hover={{ bg: 'rgba(255,255,255,0.01)' }}
-            >
-              <Icon as={TbFolder} boxSize={3.5} color="surface.600" />
-              <Box flex={1}>
-                <Text color="text.primary" fontSize="sm" fontWeight="600">
-                  {project.name}
-                </Text>
+            <HStack key={project.id} py={2.5} px={3} spacing={3} bg={P.sheet} border="1px solid" borderColor={P.hairSoft} borderRadius="lg" role="group">
+              <Icon as={TbFolder} boxSize={3.5} color={P.inkFaint} />
+              <Box flex={1} minW={0}>
+                <Text color={P.ink} fontSize="sm" fontWeight="600" noOfLines={1}>{project.name}</Text>
                 {project.project_number && (
-                  <Text color="surface.600" fontSize="2xs" fontFamily="mono">
-                    {project.project_number}
-                  </Text>
+                  <Text color={P.inkFaint} fontSize="2xs" fontFamily="mono">{project.project_number}</Text>
                 )}
               </Box>
-              <Text
-                fontSize="2xs"
-                color={project.status === 'active' ? 'accent.neon' : 'surface.600'}
-                fontFamily="mono"
-                fontWeight="700"
-                textTransform="uppercase"
-              >
+              <Text fontSize="2xs" color={project.status === 'active' ? P.limeDeep : P.inkFaint} fontFamily="mono" fontWeight="700" textTransform="uppercase">
                 {project.status}
               </Text>
-              <Box
-                as="button"
-                onClick={() => handleDelete(project.id)}
-                opacity={0}
-                transition="opacity 0.15s"
-                _groupHover={{ opacity: 0.5 }}
-                _hover={{ opacity: '1 !important', color: 'red.400' }}
-                color="surface.600"
-              >
+              <Box as="button" onClick={() => handleDelete(project.id)} opacity={0} transition="opacity 0.15s" _groupHover={{ opacity: 0.6 }} _hover={{ opacity: '1 !important', color: P.coral }} color={P.inkFaint}>
                 <Icon as={TbTrash} boxSize={3.5} />
               </Box>
             </HStack>
           ))}
-
           {showAdd ? (
-            <HStack spacing={2} pt={2}>
-              <Input
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder="Project name"
-                {...nakedInput}
-                autoFocus
+            <HStack spacing={2} pt={1}>
+              <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Project name" {...FIELD} autoFocus
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAdd();
-                  } else if (e.key === 'Escape') {
-                    setShowAdd(false);
-                    setNewName('');
-                  }
-                }}
-              />
-              <Button
-                size="xs"
-                bg="brand.500"
-                color="surface.950"
-                fontWeight="700"
-                onClick={handleAdd}
-                isLoading={adding}
-                isDisabled={!newName.trim()}
-              >
-                Add
-              </Button>
-              <Box
-                as="button"
-                onClick={() => { setShowAdd(false); setNewName(''); }}
-                color="surface.500"
-                _hover={{ color: 'text.primary' }}
-              >
-                <Icon as={TbX} boxSize={4} />
-              </Box>
+                  if (e.key === 'Enter') { e.preventDefault(); handleAdd(); }
+                  else if (e.key === 'Escape') { setShowAdd(false); setNewName(''); }
+                }} />
+              <Button size="sm" bg={P.lime} color={P.limeInk} fontWeight="700" borderRadius="full" onClick={handleAdd} isLoading={adding} isDisabled={!newName.trim()} _hover={{ bg: '#D2E26B' }}>Add</Button>
+              <Box as="button" onClick={() => { setShowAdd(false); setNewName(''); }} color={P.inkMuted} _hover={{ color: P.ink }}><Icon as={TbX} boxSize={4} /></Box>
             </HStack>
           ) : (
-            <HStack
-              spacing={1.5}
-              cursor="pointer"
-              onClick={() => setShowAdd(true)}
-              color="brand.500"
-              opacity={0.6}
-              transition="opacity 0.15s"
-              _hover={{ opacity: 1 }}
-              pt={2}
-              userSelect="none"
-            >
+            <HStack spacing={1.5} cursor="pointer" onClick={() => setShowAdd(true)} color={P.limeDeep} _hover={{ color: P.ink }} pt={1} userSelect="none">
               <Icon as={TbPlus} boxSize={3} />
-              <Text fontSize="2xs" fontWeight="700" textTransform="uppercase" letterSpacing="0.05em">
-                Add project
-              </Text>
+              <Text fontSize="2xs" fontFamily="mono" fontWeight="700" textTransform="uppercase" letterSpacing="0.05em">Add project</Text>
             </HStack>
           )}
         </>
@@ -260,7 +210,8 @@ const ProjectsSection = ({ clientId, toast }) => {
 // MAIN MODAL
 // ============================================
 const ClientModal = ({ isOpen, onClose, client, onSave }) => {
-  const [activeTab, setActiveTab] = useState('details');
+  const [activeTab, setActiveTab] = useState('profile');
+  const [clientType, setClientType] = useState('individual');
   const [name, setName] = useState('');
   const [company, setCompany] = useState('');
   const [website, setWebsite] = useState('');
@@ -270,6 +221,17 @@ const ClientModal = ({ isOpen, onClose, client, onSave }) => {
   const [tags, setTags] = useState([]);
   const [portalPin, setPortalPin] = useState('');
   const [notes, setNotes] = useState('');
+
+  const [taxId, setTaxId] = useState('');
+  const [timezone, setTimezone] = useState('');
+  const [addr1, setAddr1] = useState('');
+  const [addr2, setAddr2] = useState('');
+  const [city, setCity] = useState('');
+  const [region, setRegion] = useState('');
+  const [postal, setPostal] = useState('');
+  const [country, setCountry] = useState('US');
+  const [contacts, setContacts] = useState([]);
+
   const [saving, setSaving] = useState(false);
   const [sendingInvite, setSendingInvite] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -277,11 +239,13 @@ const ClientModal = ({ isOpen, onClose, client, onSave }) => {
   const toast = useToast();
 
   const isEditing = !!client?.id;
+  const isBusiness = clientType === 'business';
   const emailValid = email ? isValidEmail(email) : null;
   const phoneValid = phone ? isValidPhone(phone) : null;
 
   useEffect(() => {
     if (client) {
+      setClientType(client.client_type || (client.company ? 'business' : 'individual'));
       setName(client.name || '');
       setCompany(client.company || '');
       setWebsite(client.website || '');
@@ -291,59 +255,78 @@ const ClientModal = ({ isOpen, onClose, client, onSave }) => {
       setTags(client.tags || []);
       setPortalPin(client.portal_pin || client.lookup_pin || '');
       setNotes(client.notes || '');
+      setTaxId(client.tax_id || '');
+      setTimezone(client.timezone || '');
+      setAddr1(client.address_line1 || '');
+      setAddr2(client.address_line2 || '');
+      setCity(client.city || '');
+      setRegion(client.region || '');
+      setPostal(client.postal_code || '');
+      setCountry(client.country || 'US');
+      loadContacts(client.id);
     } else {
-      setName('');
-      setCompany('');
-      setWebsite('');
-      setEmail('');
-      setPhone('');
-      setStatus('active');
-      setTags([]);
-      setPortalPin(generatePortalPin());
-      setNotes('');
+      setClientType('individual');
+      setName(''); setCompany(''); setWebsite(''); setEmail(''); setPhone('');
+      setStatus('active'); setTags([]); setPortalPin(generatePortalPin()); setNotes('');
+      setTaxId(''); setTimezone(''); setAddr1(''); setAddr2(''); setCity('');
+      setRegion(''); setPostal(''); setCountry('US'); setContacts([]);
     }
     setConfirmDelete(false);
-    setActiveTab('details');
+    setActiveTab('profile');
   }, [client, isOpen]);
 
-  const toggleTag = (tagValue) => {
-    if (tags.includes(tagValue)) {
-      setTags(tags.filter((t) => t !== tagValue));
-    } else {
-      setTags([...tags, tagValue]);
-    }
+  const loadContacts = async (clientId) => {
+    if (!clientId) { setContacts([]); return; }
+    const { data } = await supabase
+      .from('client_contacts')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('sort_order');
+    setContacts(data || []);
   };
 
-  const regeneratePin = () => {
-    setPortalPin(generatePortalPin());
-    toast({ title: 'New PIN generated', status: 'info', duration: 1500 });
-  };
+  const toggleTag = (v) => setTags(tags.includes(v) ? tags.filter((t) => t !== v) : [...tags, v]);
+  const regeneratePin = () => { setPortalPin(generatePortalPin()); toast({ title: 'New PIN generated', status: 'info', duration: 1500 }); };
+
+  const addContact = () => setContacts([...contacts, { _key: `new-${Date.now()}`, name: '', email: '', phone: '', role: '', is_primary: contacts.length === 0, is_billing: contacts.length === 0 }]);
+  const updateContact = (idx, patch) => setContacts(contacts.map((c, i) => (i === idx ? { ...c, ...patch } : c)));
+  const removeContact = (idx) => setContacts(contacts.filter((_, i) => i !== idx));
 
   const logActivity = async (action, entityId, metadata) => {
     const { data: { user } } = await supabase.auth.getUser();
     await supabase.from('activity_log').insert({
-      user_id: user?.id,
-      action,
-      entity_type: 'client',
-      entity_id: entityId,
-      metadata,
+      user_id: user?.id, action, entity_type: 'client', entity_id: entityId, metadata,
       created_at: new Date().toISOString(),
     });
   };
 
+  // Replace the whole contact set for a client. Small N, so a clean delete then
+  // insert keeps the table exactly in sync with the form.
+  const syncContacts = async (clientId) => {
+    await supabase.from('client_contacts').delete().eq('client_id', clientId);
+    const rows = contacts
+      .filter((c) => (c.name || c.email || c.phone))
+      .map((c, i) => ({
+        client_id: clientId,
+        name: c.name?.trim() || null,
+        email: c.email?.trim().toLowerCase() || null,
+        phone: c.phone ? formatPhoneStorage(c.phone) : null,
+        role: c.role?.trim() || null,
+        is_primary: !!c.is_primary,
+        is_billing: !!c.is_billing,
+        sort_order: i,
+      }));
+    if (rows.length) await supabase.from('client_contacts').insert(rows);
+  };
+
   const handleSave = async () => {
-    if (!name.trim()) {
-      toast({ title: 'Name is required', status: 'warning', duration: 2000 });
-      return;
-    }
-    if (email && !isValidEmail(email)) {
-      toast({ title: 'Email looks invalid', status: 'warning', duration: 2000 });
-      return;
-    }
+    if (!name.trim()) { toast({ title: 'Name is required', status: 'warning', duration: 2000 }); return; }
+    if (email && !isValidEmail(email)) { toast({ title: 'Email looks invalid', status: 'warning', duration: 2000 }); return; }
 
     setSaving(true);
     try {
       const payload = {
+        client_type: clientType,
         name: name.trim(),
         company: company.trim() || null,
         website: website.trim() || null,
@@ -354,21 +337,33 @@ const ClientModal = ({ isOpen, onClose, client, onSave }) => {
         portal_pin: portalPin || null,
         lookup_pin: portalPin || null,
         notes: notes.trim() || null,
+        tax_id: isBusiness ? (taxId.trim() || null) : null,
+        timezone: timezone || null,
+        address_line1: addr1.trim() || null,
+        address_line2: addr2.trim() || null,
+        city: city.trim() || null,
+        region: region.trim() || null,
+        postal_code: postal.trim() || null,
+        country: country.trim() || null,
         last_activity_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
 
+      let clientId = client?.id;
       if (isEditing) {
         const { error } = await supabase.from('clients').update(payload).eq('id', client.id);
         if (error) throw error;
         await logActivity('client_updated', client.id, { client_name: name.trim() });
-        toast({ title: 'Client updated', status: 'success', duration: 2000 });
       } else {
         const { data, error } = await supabase.from('clients').insert(payload).select().single();
         if (error) throw error;
+        clientId = data.id;
         await logActivity('client_created', data.id, { client_name: name.trim() });
-        toast({ title: 'Client added', status: 'success', duration: 2000 });
       }
+
+      await syncContacts(clientId);
+
+      toast({ title: isEditing ? 'Client updated' : 'Client added', status: 'success', duration: 2000 });
       onSave();
       onClose();
     } catch (err) {
@@ -405,24 +400,11 @@ const ClientModal = ({ isOpen, onClose, client, onSave }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ clientId: client.id }),
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Invite failed');
-      }
-      toast({
-        title: 'Portal invite sent',
-        description: `${client.email} will receive an email`,
-        status: 'success',
-        duration: 3000,
-      });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Invite failed'); }
+      toast({ title: 'Portal invite sent', description: `${client.email} will receive an email`, status: 'success', duration: 3000 });
       onSave();
     } catch (err) {
-      toast({
-        title: 'Invite failed',
-        description: err.message,
-        status: 'error',
-        duration: 4000,
-      });
+      toast({ title: 'Invite failed', description: err.message, status: 'error', duration: 4000 });
     } finally {
       setSendingInvite(false);
     }
@@ -431,405 +413,250 @@ const ClientModal = ({ isOpen, onClose, client, onSave }) => {
   const initials = getInitials(name);
   const avatarColor = getAvatarColor(name);
 
+  const TABS = [
+    { value: 'profile', label: 'Profile' },
+    { value: 'billing', label: 'Billing' },
+    { value: 'portal', label: 'Portal' },
+    ...(isEditing ? [{ value: 'projects', label: 'Projects' }] : []),
+  ];
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size={{ base: 'full', md: 'md' }} scrollBehavior="inside">
-      <ModalOverlay bg="blackAlpha.900" backdropFilter="blur(8px)" />
+    <Modal isOpen={isOpen} onClose={onClose} size={{ base: 'full', md: 'xl' }} scrollBehavior="inside" isCentered>
+      <ModalOverlay bg="rgba(23,17,12,0.6)" backdropFilter="blur(4px)" />
       <ModalContent
-        bg="surface.950"
+        bg={P.sheet}
         border={{ base: 'none', md: '1px solid' }}
-        borderColor="surface.800"
+        borderColor={P.hair}
         mx={{ base: 0, md: 4 }}
-        borderRadius={{ base: 0, md: '2xl' }}
-        maxW={{ md: '480px' }}
+        borderRadius={{ base: 0, md: '20px' }}
+        maxW={{ md: '660px' }}
+        overflow="hidden"
       >
-        <ModalHeader pb={3} pt={6} px={6}>
+        <ModalHeader pb={3} pt={6} px={{ base: 5, md: 7 }}>
           <HStack spacing={3}>
-            <Box
-              w="40px"
-              h="40px"
-              borderRadius="full"
-              bg={name ? avatarColor : 'surface.850'}
-              display="flex"
-              alignItems="center"
-              justifyContent="center"
-              transition="all 0.2s"
-              boxShadow={name ? `0 0 20px ${avatarColor}30` : 'none'}
-            >
-              <Text
-                color={name ? 'surface.950' : 'surface.500'}
-                fontSize="xs"
-                fontWeight="800"
-                letterSpacing="-0.02em"
-              >
-                {initials || '··'}
-              </Text>
+            <Box w="42px" h="42px" borderRadius="12px" bg={name ? avatarColor : P.sunken} display="flex" alignItems="center" justifyContent="center" flexShrink={0}>
+              <Text color={name ? '#fff' : P.inkFaint} fontSize="sm" fontWeight="800" letterSpacing="-0.02em">{initials || '··'}</Text>
             </Box>
             <VStack align="start" spacing={0}>
-              <Text color="text.primary" fontSize="md" fontWeight="800" lineHeight="1.2">
-                {isEditing ? 'Edit Client' : 'New Client'}
-              </Text>
-              {name && (
-                <Text fontSize="2xs" color="surface.500" fontFamily="mono">
-                  {company || 'No company'}
-                </Text>
-              )}
+              <Text color={P.ink} fontSize="lg" fontWeight="600" lineHeight="1.2">{isEditing ? 'Edit client' : 'New client'}</Text>
+              {name && <Text fontSize="2xs" color={P.inkMuted} fontFamily="mono">{company || (isBusiness ? 'Business' : 'Individual')}</Text>}
             </VStack>
           </HStack>
         </ModalHeader>
-        <ModalCloseButton color="surface.500" top={5} right={5} />
+        <ModalCloseButton color={P.inkMuted} top={5} right={5} />
 
-        <HStack spacing={6} px={6} mb={2} borderBottom="1px solid" borderColor="surface.900">
-          {[
-            { value: 'details', label: 'Details' },
-            { value: 'portal', label: 'Portal' },
-            ...(isEditing ? [{ value: 'projects', label: 'Projects' }] : []),
-          ].map((tab) => {
+        <HStack spacing={{ base: 4, md: 6 }} px={{ base: 5, md: 7 }} borderBottom="1px solid" borderColor={P.hair} flexWrap="wrap">
+          {TABS.map((tab) => {
             const active = activeTab === tab.value;
             return (
-              <Box
-                key={tab.value}
-                pb={2.5}
-                cursor="pointer"
-                position="relative"
-                onClick={() => setActiveTab(tab.value)}
-              >
-                <Text
-                  fontSize="xs"
-                  fontWeight="700"
-                  color={active ? 'text.primary' : 'surface.600'}
-                  letterSpacing="0.05em"
-                  textTransform="uppercase"
-                  _hover={!active ? { color: 'surface.400' } : {}}
-                  transition="color 0.15s"
-                >
+              <Box key={tab.value} pb={2.5} cursor="pointer" position="relative" onClick={() => setActiveTab(tab.value)}>
+                <Text fontSize="xs" fontWeight="700" color={active ? P.ink : P.inkMuted} letterSpacing="0.05em" textTransform="uppercase" _hover={!active ? { color: P.inkSec } : {}}>
                   {tab.label}
                 </Text>
-                {active && (
-                  <Box
-                    position="absolute"
-                    bottom="-1px"
-                    left={0}
-                    right={0}
-                    h="2px"
-                    bg="brand.500"
-                    borderRadius="full"
-                    boxShadow={SIGNAL_GLOW}
-                  />
-                )}
+                {active && <Box position="absolute" bottom="-1px" left={0} right={0} h="2px" bg={P.lime} borderRadius="full" />}
               </Box>
             );
           })}
         </HStack>
 
-        <ModalBody px={6} py={5}>
-          {/* ================= DETAILS TAB ================= */}
-          {activeTab === 'details' && (
+        <ModalBody px={{ base: 5, md: 7 }} py={6} bg={P.mat}>
+          {/* ===================== PROFILE ===================== */}
+          {activeTab === 'profile' && (
             <VStack spacing={5} align="stretch">
+              <Field label="Type">
+                <HStack spacing={2}>
+                  <PillToggle on={!isBusiness} onClick={() => setClientType('individual')}>
+                    <HStack spacing={1.5}><Icon as={TbUser} boxSize={3} /><Text as="span">Individual</Text></HStack>
+                  </PillToggle>
+                  <PillToggle on={isBusiness} onClick={() => setClientType('business')}>
+                    <HStack spacing={1.5}><Icon as={TbBuilding} boxSize={3} /><Text as="span">Business</Text></HStack>
+                  </PillToggle>
+                </HStack>
+              </Field>
+
+              <Field label={isBusiness ? 'Contact name' : 'Name'}>
+                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={isBusiness ? 'Primary contact' : 'Full name'} {...FIELD} autoFocus={!isEditing} />
+              </Field>
+
+              <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+                {isBusiness && (
+                  <Field label="Company"><Input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Company name" {...FIELD} /></Field>
+                )}
+                <Field label="Website"><Input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="example.com" {...FIELD} /></Field>
+              </SimpleGrid>
+
+              <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+                <Field label="Email">
+                  <InputGroup>
+                    <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@company.com" {...FIELD} />
+                    {emailValid !== null && (
+                      <InputRightElement h="46px"><Icon as={emailValid ? TbCheck : TbAlertTriangle} color={emailValid ? P.green : P.gold} boxSize={3.5} /></InputRightElement>
+                    )}
+                  </InputGroup>
+                </Field>
+                <Field label="Phone">
+                  <InputGroup>
+                    <Input type="tel" value={phone} onChange={(e) => setPhone(formatPhoneDisplay(e.target.value))} placeholder="(970) 555-1234" {...FIELD} />
+                    {phoneValid !== null && (
+                      <InputRightElement h="46px"><Icon as={phoneValid ? TbCheck : TbAlertTriangle} color={phoneValid ? P.green : P.gold} boxSize={3.5} /></InputRightElement>
+                    )}
+                  </InputGroup>
+                </Field>
+              </SimpleGrid>
+
+              <Field label="Status">
+                <HStack spacing={2} flexWrap="wrap" rowGap={2}>
+                  {STATUS_OPTIONS.map((s) => (
+                    <Box key={s.value} as="button" type="button" onClick={() => setStatus(s.value)} px={3} py={1.5} borderRadius="full" border="1px solid" borderColor={status === s.value ? s.color : P.hair} bg={status === s.value ? `${s.color}1A` : 'transparent'} transition="all 0.15s">
+                      <HStack spacing={1.5}>
+                        <Box w="6px" h="6px" borderRadius="full" bg={s.color} opacity={status === s.value ? 1 : 0.5} />
+                        <Text fontSize="2xs" fontWeight="700" fontFamily="mono" textTransform="uppercase" color={status === s.value ? P.ink : P.inkMuted}>{s.label}</Text>
+                      </HStack>
+                    </Box>
+                  ))}
+                </HStack>
+              </Field>
+
+              <Field label="Tags">
+                <Wrap spacing={2}>
+                  {PRESET_TAGS.map((t) => (
+                    <WrapItem key={t.value}><PillToggle on={tags.includes(t.value)} onClick={() => toggleTag(t.value)}>{t.label}</PillToggle></WrapItem>
+                  ))}
+                </Wrap>
+              </Field>
+
+              <Field label="Notes">
+                <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Internal notes" bg={P.sheet} border="1px solid" borderColor={P.hair} borderRadius="lg" color={P.ink} fontSize="sm" rows={3} _focus={{ borderColor: P.lime, boxShadow: `0 0 0 3px ${P.lime}33` }} _placeholder={{ color: P.inkFaint }} />
+              </Field>
+            </VStack>
+          )}
+
+          {/* ===================== BILLING ===================== */}
+          {activeTab === 'billing' && (
+            <VStack spacing={6} align="stretch">
               <Box>
-                <Text {...FIELD_LABEL_PROPS}>Name</Text>
-                <Input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Full name or business"
-                  {...nakedInput}
-                  autoFocus={!isEditing}
-                />
+                <Text fontFamily="mono" fontSize="2xs" fontWeight="600" letterSpacing="0.16em" textTransform="uppercase" color={P.inkMuted} mb={4}>
+                  Bill to address
+                </Text>
+                <VStack spacing={4} align="stretch">
+                  <Field label="Street"><Input value={addr1} onChange={(e) => setAddr1(e.target.value)} placeholder="210 Sherman St" {...FIELD} /></Field>
+                  <Field label="Suite or unit"><Input value={addr2} onChange={(e) => setAddr2(e.target.value)} placeholder="Optional" {...FIELD} /></Field>
+                  <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+                    <Field label="City"><Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ridgway" {...FIELD} /></Field>
+                    <Field label="State or region"><Input value={region} onChange={(e) => setRegion(e.target.value)} placeholder="CO" {...FIELD} /></Field>
+                  </SimpleGrid>
+                  <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+                    <Field label="Postal code"><Input value={postal} onChange={(e) => setPostal(e.target.value)} placeholder="81432" {...FIELD} /></Field>
+                    <Field label="Country"><Input value={country} onChange={(e) => setCountry(e.target.value)} placeholder="US" {...FIELD} /></Field>
+                  </SimpleGrid>
+                </VStack>
               </Box>
 
-              <HStack spacing={4} align="start">
-                <Box flex={1}>
-                  <Text {...FIELD_LABEL_PROPS}>Company</Text>
-                  <Input
-                    value={company}
-                    onChange={(e) => setCompany(e.target.value)}
-                    placeholder="Company"
-                    {...nakedInput}
-                  />
-                </Box>
-                <Box flex={1}>
-                  <Text {...FIELD_LABEL_PROPS}>Website</Text>
-                  <Input
-                    value={website}
-                    onChange={(e) => setWebsite(e.target.value)}
-                    placeholder="example.com"
-                    {...nakedInput}
-                  />
-                </Box>
-              </HStack>
+              <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+                {isBusiness && (
+                  <Field label="EIN or tax id"><Input value={taxId} onChange={(e) => setTaxId(e.target.value)} placeholder="00-0000000" {...FIELD} /></Field>
+                )}
+                <Field label="Timezone">
+                  <Select value={timezone} onChange={(e) => setTimezone(e.target.value)} placeholder="Select timezone" {...FIELD} iconColor={P.inkMuted} sx={{ '& option': { bg: P.sheet, color: P.ink } }}>
+                    {TIMEZONES.map((tz) => <option key={tz} value={tz}>{tz.replace('_', ' ')}</option>)}
+                  </Select>
+                </Field>
+              </SimpleGrid>
 
               <Box>
-                <Text {...FIELD_LABEL_PROPS}>Email</Text>
-                <InputGroup>
-                  <Input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="email@company.com"
-                    {...nakedInput}
-                  />
-                  {emailValid !== null && (
-                    <InputRightElement h="44px">
-                      <Icon
-                        as={emailValid ? TbCheck : TbAlertTriangle}
-                        color={emailValid ? 'accent.neon' : 'accent.banana'}
-                        boxSize={3.5}
-                      />
-                    </InputRightElement>
-                  )}
-                </InputGroup>
-              </Box>
+                <HStack justify="space-between" align="center" mb={3}>
+                  <Text fontFamily="mono" fontSize="2xs" fontWeight="600" letterSpacing="0.16em" textTransform="uppercase" color={P.inkMuted}>Contacts</Text>
+                  <HStack spacing={1.5} cursor="pointer" onClick={addContact} color={P.limeDeep} _hover={{ color: P.ink }} userSelect="none">
+                    <Icon as={TbPlus} boxSize={3} />
+                    <Text fontSize="2xs" fontFamily="mono" fontWeight="700" textTransform="uppercase" letterSpacing="0.05em">Add contact</Text>
+                  </HStack>
+                </HStack>
 
-              <Box>
-                <Text {...FIELD_LABEL_PROPS}>Phone</Text>
-                <InputGroup>
-                  <Input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(formatPhoneDisplay(e.target.value))}
-                    placeholder="(970) 555-1234"
-                    {...nakedInput}
-                  />
-                  {phoneValid !== null && (
-                    <InputRightElement h="44px">
-                      <Icon
-                        as={phoneValid ? TbCheck : TbAlertTriangle}
-                        color={phoneValid ? 'accent.neon' : 'accent.banana'}
-                        boxSize={3.5}
-                      />
-                    </InputRightElement>
-                  )}
-                </InputGroup>
-              </Box>
-
-              <Box>
-                <Text {...FIELD_LABEL_PROPS}>Status</Text>
-                <HStack spacing={5} pt={1}>
-                  {STATUS_OPTIONS.map((s) => {
-                    const active = status === s.value;
-                    return (
-                      <Box
-                        key={s.value}
-                        cursor="pointer"
-                        onClick={() => setStatus(s.value)}
-                        position="relative"
-                        pb={1}
-                      >
-                        <HStack spacing={1.5}>
-                          <Box
-                            w="6px"
-                            h="6px"
-                            borderRadius="full"
-                            bg={s.color}
-                            boxShadow={active ? `0 0 8px ${s.color}` : 'none'}
-                            opacity={active ? 1 : 0.4}
-                          />
-                          <Text
-                            fontSize="xs"
-                            fontWeight="700"
-                            color={active ? 'text.primary' : 'surface.600'}
-                            transition="color 0.15s"
-                            _hover={!active ? { color: 'surface.400' } : {}}
-                          >
-                            {s.label}
-                          </Text>
+                {contacts.length === 0 ? (
+                  <Text fontSize="xs" color={P.inkMuted}>No extra contacts. Add anyone who should be copied on invoices.</Text>
+                ) : (
+                  <VStack spacing={3} align="stretch">
+                    {contacts.map((c, idx) => (
+                      <Box key={c.id || c._key || idx} bg={P.sheet} border="1px solid" borderColor={P.hair} borderRadius="xl" p={4}>
+                        <HStack justify="space-between" mb={3}>
+                          <Text fontSize="2xs" fontFamily="mono" color={P.inkFaint} letterSpacing="0.06em">CONTACT {idx + 1}</Text>
+                          <Box as="button" onClick={() => removeContact(idx)} color={P.inkFaint} _hover={{ color: P.coral }}><Icon as={TbTrash} boxSize={3.5} /></Box>
+                        </HStack>
+                        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3}>
+                          <Input value={c.name || ''} onChange={(e) => updateContact(idx, { name: e.target.value })} placeholder="Name" {...FIELD} h="42px" />
+                          <Input value={c.role || ''} onChange={(e) => updateContact(idx, { role: e.target.value })} placeholder="Role, eg Accounts payable" {...FIELD} h="42px" />
+                          <Input value={c.email || ''} onChange={(e) => updateContact(idx, { email: e.target.value })} placeholder="Email" {...FIELD} h="42px" />
+                          <Input value={c.phone || ''} onChange={(e) => updateContact(idx, { phone: formatPhoneDisplay(e.target.value) })} placeholder="Phone" {...FIELD} h="42px" />
+                        </SimpleGrid>
+                        <HStack spacing={2} mt={3}>
+                          <PillToggle on={!!c.is_primary} onClick={() => updateContact(idx, { is_primary: !c.is_primary })}>Primary</PillToggle>
+                          <PillToggle on={!!c.is_billing} onClick={() => updateContact(idx, { is_billing: !c.is_billing })}>Bill to CC</PillToggle>
                         </HStack>
                       </Box>
-                    );
-                  })}
-                </HStack>
-              </Box>
-
-              <Box>
-                <Text {...FIELD_LABEL_PROPS}>Tags</Text>
-                <Wrap spacing={1.5} pt={1}>
-                  {PRESET_TAGS.map((t) => {
-                    const active = tags.includes(t.value);
-                    return (
-                      <WrapItem key={t.value}>
-                        <Box
-                          px={2.5}
-                          py={1}
-                          borderRadius="full"
-                          border="1px solid"
-                          borderColor={active ? t.color : 'surface.800'}
-                          bg={active ? `${t.color}12` : 'transparent'}
-                          cursor="pointer"
-                          onClick={() => toggleTag(t.value)}
-                          transition="all 0.15s"
-                          _hover={!active ? { borderColor: 'surface.600' } : {}}
-                        >
-                          <Text
-                            fontSize="2xs"
-                            fontWeight="700"
-                            color={active ? t.color : 'surface.600'}
-                            textTransform="uppercase"
-                            letterSpacing="0.03em"
-                          >
-                            {t.label}
-                          </Text>
-                        </Box>
-                      </WrapItem>
-                    );
-                  })}
-                </Wrap>
-              </Box>
-
-              <Box>
-                <Text {...FIELD_LABEL_PROPS}>Notes</Text>
-                <Textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Internal notes"
-                  bg="transparent"
-                  border="none"
-                  borderBottom="1px solid"
-                  borderColor="surface.800"
-                  borderRadius={0}
-                  color="text.primary"
-                  fontSize="sm"
-                  rows={2}
-                  px={0}
-                  resize="none"
-                  _hover={{ borderColor: 'surface.700' }}
-                  _focus={{ borderColor: 'brand.500', boxShadow: 'none' }}
-                  _placeholder={{ color: 'surface.700' }}
-                />
+                    ))}
+                  </VStack>
+                )}
               </Box>
             </VStack>
           )}
 
-          {/* ================= PORTAL TAB ================= */}
+          {/* ===================== PORTAL ===================== */}
           {activeTab === 'portal' && (
             <VStack spacing={6} align="stretch">
-              <Box>
-                <Text {...FIELD_LABEL_PROPS}>Lookup PIN</Text>
+              <Field label="Lookup PIN">
                 <HStack spacing={3} pt={1}>
-                  <Text
-                    flex={1}
-                    fontFamily="mono"
-                    fontSize="2xl"
-                    fontWeight="800"
-                    color="text.primary"
-                    letterSpacing="0.15em"
-                  >
-                    {portalPin || '——————'}
-                  </Text>
-                  <Box
-                    as="button"
-                    onClick={regeneratePin}
-                    color="surface.500"
-                    _hover={{ color: 'brand.500', transform: 'rotate(180deg)' }}
-                    transition="all 0.3s"
-                    p={2}
-                  >
-                    <Icon as={TbRefresh} boxSize={4} />
-                  </Box>
+                  <Text flex={1} fontFamily="mono" fontSize="2xl" fontWeight="700" color={P.ink} letterSpacing="0.15em">{portalPin || '——————'}</Text>
+                  <Box as="button" onClick={regeneratePin} color={P.inkMuted} _hover={{ color: P.limeDeep, transform: 'rotate(180deg)' }} transition="all 0.3s" p={2}><Icon as={TbRefresh} boxSize={4} /></Box>
                 </HStack>
-                <Text fontSize="2xs" color="surface.600" mt={2}>
-                  Client uses this PIN + their email to look up invoices
-                </Text>
-              </Box>
+                <Text fontSize="2xs" color={P.inkMuted} mt={2}>Client uses this PIN plus their email to look up invoices</Text>
+              </Field>
 
               {isEditing && client?.email && (
-                <Box pt={4} borderTop="1px solid" borderColor="surface.900">
-                  <HStack justify="space-between" align="start" mb={3}>
+                <Box pt={4} borderTop="1px solid" borderColor={P.hair}>
+                  <HStack justify="space-between" align="start">
                     <Box flex={1}>
-                      <Text {...FIELD_LABEL_PROPS}>Portal Account</Text>
-                      <Text color="text.primary" fontSize="sm" fontWeight="600" mt={1}>
-                        {client.portal_account_created_at
-                          ? 'Active'
-                          : client.portal_invite_sent_at
-                          ? 'Invite sent'
-                          : 'Not activated'}
+                      <Text {...LABEL}>Portal account</Text>
+                      <Text color={P.ink} fontSize="sm" fontWeight="600" mt={1}>
+                        {client.portal_account_created_at ? 'Active' : client.portal_invite_sent_at ? 'Invite sent' : 'Not activated'}
                       </Text>
-                      <Text color="surface.600" fontSize="2xs" fontFamily="mono" mt={0.5}>
-                        {client.portal_account_created_at
-                          ? `Joined ${new Date(client.portal_account_created_at).toLocaleDateString()}`
-                          : client.portal_invite_sent_at
-                          ? `Sent ${new Date(client.portal_invite_sent_at).toLocaleDateString()}`
-                          : 'No invite sent'}
+                      <Text color={P.inkMuted} fontSize="2xs" fontFamily="mono" mt={0.5}>
+                        {client.portal_account_created_at ? `Joined ${new Date(client.portal_account_created_at).toLocaleDateString()}` : client.portal_invite_sent_at ? `Sent ${new Date(client.portal_invite_sent_at).toLocaleDateString()}` : 'No invite sent'}
                       </Text>
                     </Box>
                     {!client.portal_account_created_at && (
-                      <Button
-                        size="xs"
-                        variant="outline"
-                        borderColor={PURPLE}
-                        color={PURPLE}
-                        fontWeight="700"
-                        leftIcon={<TbMail size={12} />}
-                        onClick={handleSendPortalInvite}
-                        isLoading={sendingInvite}
-                        loadingText="Sending"
-                        _hover={{ bg: `${PURPLE}14` }}
-                      >
-                        {client.portal_invite_sent_at ? 'Resend' : 'Send Invite'}
+                      <Button size="sm" variant="outline" borderColor={P.hair} color={P.ink} fontWeight="600" borderRadius="full" leftIcon={<TbMail size={13} />} onClick={handleSendPortalInvite} isLoading={sendingInvite} loadingText="Sending" _hover={{ bg: P.sheet, borderColor: P.inkFaint }}>
+                        {client.portal_invite_sent_at ? 'Resend' : 'Send invite'}
                       </Button>
                     )}
                   </HStack>
                 </Box>
               )}
 
-              {!isEditing && (
-                <Text fontSize="xs" color="surface.600" textAlign="center" py={4}>
-                  Save this client first to send a portal invite
-                </Text>
-              )}
+              {!isEditing && <Text fontSize="xs" color={P.inkMuted} textAlign="center" py={4}>Save this client first to send a portal invite</Text>}
             </VStack>
           )}
 
-          {/* ================= PROJECTS TAB ================= */}
+          {/* ===================== PROJECTS ===================== */}
           {activeTab === 'projects' && (
             <VStack spacing={4} align="stretch">
               <Box>
-                <Text {...FIELD_LABEL_PROPS}>Projects</Text>
-                <Text color="surface.500" fontSize="2xs" mt={0.5}>
-                  Websites, apps, and other work for this client
-                </Text>
+                <Text {...LABEL}>Projects</Text>
+                <Text color={P.inkMuted} fontSize="2xs" mt={0.5}>Websites, apps and other work for this client</Text>
               </Box>
               <ProjectsSection clientId={client?.id} toast={toast} />
             </VStack>
           )}
         </ModalBody>
 
-        <ModalFooter
-          borderTop="1px solid"
-          borderColor="surface.900"
-          pt={4}
-          pb={6}
-          px={6}
-        >
+        <ModalFooter borderTop="1px solid" borderColor={P.hair} pt={4} pb={{ base: 8, md: 6 }} px={{ base: 5, md: 7 }} bg={P.sheet}>
           <VStack w="100%" spacing={3}>
-            <Button
-              w="100%"
-              h="48px"
-              borderRadius="xl"
-              bg="brand.500"
-              color="surface.950"
-              fontWeight="700"
-              fontSize="sm"
-              onClick={handleSave}
-              isLoading={saving}
-              loadingText="Saving..."
-              _hover={{ bg: 'brand.400', transform: 'translateY(-1px)' }}
-              _active={{ transform: 'translateY(0)' }}
-            >
-              {isEditing ? 'Save Changes' : 'Add Client'}
+            <Button w="100%" h="50px" borderRadius="full" bg={P.lime} color={P.limeInk} fontWeight="700" fontSize="sm" onClick={handleSave} isLoading={saving} loadingText="Saving..." _hover={{ bg: '#D2E26B', transform: 'translateY(-1px)' }} _active={{ transform: 'translateY(0)' }}>
+              {isEditing ? 'Save changes' : 'Add client'}
             </Button>
-
             {isEditing && (
-              <HStack
-                spacing={1.5}
-                cursor="pointer"
-                onClick={handleDelete}
-                color={confirmDelete ? 'red.400' : 'surface.700'}
-                opacity={confirmDelete ? 1 : 0.4}
-                transition="all 0.15s"
-                _hover={{ opacity: 1, color: 'red.400' }}
-                userSelect="none"
-              >
+              <HStack spacing={1.5} cursor="pointer" onClick={handleDelete} color={confirmDelete ? P.coral : P.inkFaint} _hover={{ color: P.coral }} transition="all 0.15s" userSelect="none">
                 <Icon as={confirmDelete ? TbAlertTriangle : TbTrash} boxSize={3} />
-                <Text fontSize="2xs" fontWeight="700" textTransform="uppercase" letterSpacing="0.05em">
+                <Text fontSize="2xs" fontFamily="mono" fontWeight="700" textTransform="uppercase" letterSpacing="0.05em">
                   {deleting ? 'Removing...' : confirmDelete ? 'Click again to confirm' : 'Remove client'}
                 </Text>
               </HStack>
