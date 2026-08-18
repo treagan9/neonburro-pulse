@@ -393,7 +393,7 @@ const MessagesTab = ({ clientId }) => {
                 <VStack align={isTeam ? 'end' : 'start'} spacing={1} maxW="75%">
                   <Box bg={isTeam ? P.lime : P.sheet} color={isTeam ? P.limeInk : P.ink} border={isTeam ? 'none' : '1px solid'} borderColor={P.hair}
                     borderRadius="2xl" borderTopRightRadius={isTeam ? 'sm' : '2xl'} borderTopLeftRadius={isTeam ? '2xl' : 'sm'} px={4} py={2.5}>
-                    <Text fontSize="sm" lineHeight="1.5" whiteSpace="pre-wrap">{m.message}</Text>
+                    <Text fontSize="sm" lineHeight="1.5" whiteSpace="pre-wrap" color={isTeam ? P.limeInk : P.ink}>{m.message}</Text>
                   </Box>
                   <Text color={P.inkFaint} fontSize="2xs" fontFamily="mono">{m.sender_name} · {timeAgo(m.created_at)}</Text>
                 </VStack>
