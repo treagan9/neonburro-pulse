@@ -40,24 +40,27 @@ export const PAYMENT_METHODS = [
   { value: 'other',         label: 'Other',         referenceLabel: 'Reference or note' },
 ];
 
+// Repainted to Paper. A dark ink tooltip pill reads clean on cream, and the field
+// label and naked input are ink on cream now, so the invoice modals that share
+// these come out on Paper with no per modal work.
 export const TOOLTIP_PROPS = {
   placement: 'top',
   hasArrow: true,
-  bg: 'surface.900',
-  color: 'text.primary',
+  bg: 'chrome.ground',
+  color: 'chrome.text',
   fontSize: 'xs',
   fontWeight: '600',
   px: 3,
   py: 2,
   borderRadius: 'md',
   border: '1px solid',
-  borderColor: 'surface.700',
+  borderColor: 'chrome.line',
 };
 
 export const FIELD_LABEL = {
   fontSize: '2xs',
   fontWeight: '700',
-  color: 'surface.600',
+  color: 'paper.inkMuted',
   textTransform: 'uppercase',
   letterSpacing: '0.1em',
   fontFamily: 'mono',
@@ -69,14 +72,14 @@ export const NAKED_INPUT = {
   bg: 'transparent',
   border: 'none',
   borderBottom: '1px solid',
-  borderColor: 'surface.800',
+  borderColor: 'paper.hair',
   borderRadius: 0,
-  color: 'text.primary',
+  color: 'paper.ink',
   fontSize: 'sm',
   h: '40px',
   px: 0,
-  _focus: { borderColor: 'brand.500', boxShadow: 'none' },
-  _placeholder: { color: 'surface.700' },
+  _focus: { borderColor: 'paper.lime', boxShadow: 'none' },
+  _placeholder: { color: 'paper.inkFaint' },
 };
 
 export const formatCurrency = (val) => {

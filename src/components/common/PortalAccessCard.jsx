@@ -116,7 +116,7 @@ const PortalAccessCard = ({ client, onUpdate }) => {
           </HStack>
           <Text color={P.inkSec} fontSize="xs" mb={3} lineHeight="1.5">Old PIN stops working immediately. The client needs the new PIN to log in.</Text>
           <HStack spacing={2}>
-            <Button size="xs" bg={P.coral} color="#fff" fontWeight="700" borderRadius="md" onClick={handleRegenerate} isLoading={loading} loadingText="Generating" _hover={{ bg: '#A83220' }}>Yes, regenerate</Button>
+            <Button size="xs" bg={P.coral} color={P.sheet} fontWeight="700" borderRadius="md" onClick={handleRegenerate} isLoading={loading} loadingText="Generating" _hover={{ bg: '#A83220' }}>Yes, regenerate</Button>
             <GhostBtn onClick={() => setConfirmingRegen(false)} hoverColor={P.ink}>Cancel</GhostBtn>
           </HStack>
         </Box>

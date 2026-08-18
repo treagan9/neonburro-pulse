@@ -56,22 +56,22 @@ const Header = () => {
           <Avatar name={displayName} url={profile?.avatar_url} size="sm" />
         </MenuButton>
         <MenuList
-          bg="surface.900"
-          borderColor="surface.700"
+          bg="paper.sheet"
+          borderColor="paper.hair"
           py={1}
           minW="220px"
-          boxShadow="modal"
+          boxShadow="0 12px 32px rgba(36,26,22,0.20)"
         >
           <Box px={3} py={2.5}>
-            <Text color="text.primary" fontSize="sm" fontWeight="700" noOfLines={1}>
+            <Text color="paper.ink" fontSize="sm" fontWeight="700" noOfLines={1}>
               {displayName}
             </Text>
-            <Text color="surface.500" fontSize="xs" noOfLines={1}>
+            <Text color="paper.inkMuted" fontSize="xs" noOfLines={1}>
               {user?.email}
             </Text>
             {profile?.role && (
               <Text
-                color="accent.purple"
+                color="paper.limeDeep"
                 fontSize="2xs"
                 fontWeight="700"
                 textTransform="uppercase"
@@ -83,23 +83,23 @@ const Header = () => {
               </Text>
             )}
           </Box>
-          <MenuDivider borderColor="surface.800" />
+          <MenuDivider borderColor="paper.hair" />
           <MenuItem
             bg="transparent"
-            _hover={{ bg: 'surface.800' }}
+            _hover={{ bg: 'paper.sunken' }}
             icon={<TbSettings />}
             fontSize="sm"
-            color="surface.300"
+            color="paper.inkSec"
             onClick={() => navigate('/settings/')}
           >
             Settings
           </MenuItem>
           <MenuItem
             bg="transparent"
-            _hover={{ bg: 'surface.800' }}
+            _hover={{ bg: 'paper.sunken' }}
             icon={<TbLogout />}
             fontSize="sm"
-            color="accent.coral"
+            color="paper.coral"
             onClick={handleSignOut}
           >
             Sign Out

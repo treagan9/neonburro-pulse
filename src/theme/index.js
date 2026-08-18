@@ -142,7 +142,15 @@ const theme = extendTheme({
       defaultProps: { variant: 'naked' },
     },
 
-    Text: { baseStyle: { color: 'text.primary' } },
+    // Text INHERITS its color now. It used to force text.primary (a near-white),
+    // which overrode any color set on a parent, so a <Text> inside an HStack that
+    // set color would still render near-white, the "white on cream" bug on little
+    // labels like View all. Inheriting means a Text takes the nearest ancestor
+    // color: the AppShell main sets paper.ink for the whole authed app, colored
+    // rows pass their own color down, and dark surfaces still set a light color at
+    // their root. Set an explicit color on a Text only when it differs from its
+    // surroundings.
+    Text: { baseStyle: { color: 'inherit' } },
   },
 });
 

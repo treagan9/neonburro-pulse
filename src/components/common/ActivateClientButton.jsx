@@ -81,7 +81,7 @@ const ActivateClientButton = ({ client, onActivated }) => {
             </AlertDialogBody>
             <AlertDialogFooter gap={2}>
               <Button ref={cancelRef} onClick={() => setIsOpen(false)} variant="ghost" color={P.inkMuted} size="sm" isDisabled={loading} _hover={{ color: P.ink, bg: P.sunken }}>Cancel</Button>
-              <Button onClick={handleActivate} bg={P.green} color="#fff" size="sm" borderRadius="full" fontWeight="700" leftIcon={<Icon as={TbMailForward} boxSize={3.5} />} isLoading={loading} loadingText="Activating" _hover={{ bg: '#4C6618' }}>Send welcome email</Button>
+              <Button onClick={handleActivate} bg={P.green} color={P.sheet} size="sm" borderRadius="full" fontWeight="700" leftIcon={<Icon as={TbMailForward} boxSize={3.5} />} isLoading={loading} loadingText="Activating" _hover={{ bg: '#4C6618' }}>Send welcome email</Button>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialogOverlay>

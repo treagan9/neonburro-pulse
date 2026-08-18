@@ -75,7 +75,7 @@ const SettingsPassword = ({ user }) => {
       <PasswordField label="New password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} autoComplete="new-password" show={showNew} onToggle={() => setShowNew(!showNew)} />
       <PasswordField label="Confirm new password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} autoComplete="new-password" show={showConfirm} onToggle={() => setShowConfirm(!showConfirm)} />
 
-      <Button w="100%" h="48px" borderRadius="xl" fontSize="sm" fontWeight="700" isLoading={changing} loadingText="Updating..." onClick={handleChange} isDisabled={!currentPassword || !newPassword || !confirmPassword} leftIcon={changed ? <TbCheck /> : undefined} bg={changed ? P.green : P.gold} color="#fff" transition="all 0.2s" _hover={{ bg: changed ? P.green : '#856A00', transform: 'translateY(-1px)' }} _active={{ transform: 'translateY(0)' }} _disabled={{ opacity: 0.35, cursor: 'not-allowed', _hover: { transform: 'none' } }}>
+      <Button w="100%" h="48px" borderRadius="xl" fontSize="sm" fontWeight="700" isLoading={changing} loadingText="Updating..." onClick={handleChange} isDisabled={!currentPassword || !newPassword || !confirmPassword} leftIcon={changed ? <TbCheck /> : undefined} bg={changed ? P.green : P.gold} color={P.sheet} transition="all 0.2s" _hover={{ bg: changed ? P.green : '#856A00', transform: 'translateY(-1px)' }} _active={{ transform: 'translateY(0)' }} _disabled={{ opacity: 0.35, cursor: 'not-allowed', _hover: { transform: 'none' } }}>
         {changed ? 'Password updated' : 'Change password'}
       </Button>
     </VStack>

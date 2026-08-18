@@ -74,6 +74,7 @@ const AppShell = ({ children }) => {
           w="100%"
           flex={1}
           bg={P.mat}
+          color={P.ink}
           pb={{ base: TABBAR_PAD, lg: 0 }}
         >
           {children || <Outlet />}

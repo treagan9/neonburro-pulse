@@ -10,11 +10,12 @@ import '@fontsource/rubik/500.css';
 import '@fontsource/rubik/600.css';
 import '@fontsource/rubik/700.css';
 import theme from './theme';
+import { toastOptions } from './theme/toast';
 import App from './App';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <ChakraProvider theme={theme}>
+    <ChakraProvider theme={theme} toastOptions={toastOptions}>
       <BrowserRouter>
         <App />
       </BrowserRouter>
