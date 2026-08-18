@@ -10,12 +10,13 @@ import {
   Box, VStack, HStack, Text, Icon, Input, Container,
 } from '@chakra-ui/react';
 import { useSearchParams } from 'react-router-dom';
-import { TbPlus, TbSearch } from 'react-icons/tb';
+import { TbPlus, TbSearch, TbSparkles } from 'react-icons/tb';
 import { supabase } from '../../lib/supabase';
 import { SENT_STATUSES, formatCurrencyCompact } from '../../lib/invoiceConstants';
 import colors from '../../theme/colors';
 import InvoiceList from './components/InvoiceList';
 import InvoiceEditor from './components/InvoiceEditor';
+import VoltComposer from './components/VoltComposer';
 
 const P = colors.paper;
 
@@ -27,6 +28,8 @@ const Invoicing = () => {
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedInvoiceId, setSelectedInvoiceId] = useState(null);
+  const [showVolt, setShowVolt] = useState(false);
+  const [voltDraft, setVoltDraft] = useState(null);
 
   useEffect(() => {
     const invoiceParam = searchParams.get('invoice');
@@ -56,8 +59,15 @@ const Invoicing = () => {
 
   const handleNewInvoice = () => {
     const clientId = searchParams.get('client');
+    setVoltDraft(null);
     setSelectedInvoiceId('new');
     setSearchParams({ invoice: 'new', ...(clientId ? { client: clientId } : {}) });
+  };
+
+  const handleVoltDraft = (draft) => {
+    setVoltDraft({ clientId: draft.client_id || '', notes: draft.notes || '', lines: draft.lines || [] });
+    setSelectedInvoiceId('new');
+    setSearchParams({ invoice: 'new' });
   };
 
   const handleSelectInvoice = (id) => {
@@ -66,6 +76,7 @@ const Invoicing = () => {
   };
 
   const handleCloseEditor = () => {
+    setVoltDraft(null);
     setSelectedInvoiceId(null);
     setSearchParams({});
   };
@@ -139,6 +150,7 @@ const Invoicing = () => {
         clients={clients}
         onClose={handleCloseEditor}
         onSaved={fetchData}
+        voltDraft={selectedInvoiceId === 'new' ? voltDraft : null}
       />
     );
   }
@@ -171,23 +183,44 @@ const Invoicing = () => {
                 Invoicing
               </Text>
 
-              <HStack
-                as="button"
-                onClick={handleNewInvoice}
-                spacing={1.5}
-                bg={P.lime}
-                color={P.limeInk}
-                borderRadius="full"
-                px={4}
-                h="40px"
-                fontWeight="700"
-                fontSize="sm"
-                transition="all 0.18s"
-                _hover={{ bg: '#D2E26B', transform: 'translateY(-1px)' }}
-                _active={{ transform: 'scale(0.98)' }}
-              >
-                <Icon as={TbPlus} boxSize={4} />
-                <Text>Invoice</Text>
+              <HStack spacing={2}>
+                <HStack
+                  as="button"
+                  onClick={() => setShowVolt(true)}
+                  spacing={1.5}
+                  bg="transparent"
+                  border="1px solid"
+                  borderColor={P.hair}
+                  color={P.inkSec}
+                  borderRadius="full"
+                  px={4}
+                  h="40px"
+                  fontWeight="700"
+                  fontSize="sm"
+                  transition="all 0.18s"
+                  _hover={{ borderColor: P.lime, color: P.ink, bg: `${P.lime}14` }}
+                >
+                  <Icon as={TbSparkles} boxSize={4} color={P.limeDeep} />
+                  <Text>Draft with Volt</Text>
+                </HStack>
+                <HStack
+                  as="button"
+                  onClick={handleNewInvoice}
+                  spacing={1.5}
+                  bg={P.lime}
+                  color={P.limeInk}
+                  borderRadius="full"
+                  px={4}
+                  h="40px"
+                  fontWeight="700"
+                  fontSize="sm"
+                  transition="all 0.18s"
+                  _hover={{ bg: '#D2E26B', transform: 'translateY(-1px)' }}
+                  _active={{ transform: 'scale(0.98)' }}
+                >
+                  <Icon as={TbPlus} boxSize={4} />
+                  <Text>Invoice</Text>
+                </HStack>
               </HStack>
             </HStack>
 
@@ -270,6 +303,8 @@ const Invoicing = () => {
           />
         </VStack>
       </Container>
+
+      <VoltComposer isOpen={showVolt} onClose={() => setShowVolt(false)} clients={clients} onDraft={handleVoltDraft} />
     </Box>
   );
 };

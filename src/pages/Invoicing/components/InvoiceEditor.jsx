@@ -75,7 +75,7 @@ const dateInputValue = (val) => {
   }
 };
 
-const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose, onSaved }) => {
+const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose, onSaved, voltDraft = null }) => {
   const toast = useToast();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -141,7 +141,26 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
     setLoading(true);
     if (isNew) {
       setInvoice({ status: 'draft' });
-      setSprints([]);
+      // Volt can hand a new invoice a set of drafted lines and a matched client.
+      // They land as fresh sprints the operator reviews, edits and sends, so the
+      // whole create and send path stays the editor's own tested logic.
+      if (voltDraft?.lines?.length) {
+        setSprints(voltDraft.lines.map((l, i) => ({
+          id: `new-${Date.now()}-${i}`,
+          title: l.title || 'Item',
+          description: l.description || '',
+          amount: parseFloat(l.amount || 0),
+          payment_mode: l.payment_mode || 'approve_only',
+          payment_status: null,
+          is_billable: true,
+          sort_order: i,
+          _isNew: true,
+        })));
+        if (voltDraft.clientId) setClientId(voltDraft.clientId);
+        if (voltDraft.notes) setNotes(voltDraft.notes);
+      } else {
+        setSprints([]);
+      }
       try {
         const nextNum = await fetchNextInvoiceNumber();
         setPreviewNumber(nextNum);
