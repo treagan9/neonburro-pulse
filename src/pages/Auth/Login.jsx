@@ -1,16 +1,30 @@
 // src/pages/Auth/Login.jsx
-// Pulse admin sign-in.
-// Design: editorial dark mode, matches client portal login (siblings).
-// Logo clickable to neonburro.com. No scroll. Centered. Fixed.
-// Forgot-password inline with banana easter egg preserved.
-// Username lookup goes through lookup_email_by_username RPC (security definer)
-// so the anon role never reads profiles directly.
+// Pulse sign-in, the first page in the warm Paper system (src/theme/colors.js).
+//
+// ── WHY THIS PAGE IS LIGHT WHILE THE APP IS STILL DARK ───────────────────────
+// Pulse is migrating to the Paper light look one page at a time. Login is first
+// because it is public and it paints its OWN full-screen world (position fixed,
+// its own cream ground), so it owes nothing to the global dark theme and cannot
+// break an authed screen. It reads colors.paper.* directly, the documented light
+// environment. When the rest of the app converts, this page already fits.
+//
+// ── WHAT IS PRESERVED ────────────────────────────────────────────────────────
+// Every bit of auth behavior is unchanged: username or email in, resolveEmail
+// turns a username into an email through the lookup_email_by_username RPC (the
+// anon role never reads profiles), signIn, redirect to `from`. The reset flow
+// and the burro easter egg stay, recolored for cream.
+//
+// ── THE GRAPHIC ──────────────────────────────────────────────────────────────
+// One little heartbeat line sweeps across, the Pulse motif, drawn in lime. It is
+// the only motion and the only lime spent up top so the accent stays singular.
+//
+// No containers wrap the content, on a phone the cream is the frame. No cold
+// white, the brightest surface is the input fill. No oxford commas, no dashes.
 
 import { useState, useRef, useEffect } from 'react';
 import {
   Box, VStack, Text, Input, Button, FormControl,
-  Image, Icon, HStack, Collapse,
-  InputGroup, InputRightElement,
+  Icon, HStack, Collapse, InputGroup, InputRightElement,
 } from '@chakra-ui/react';
 import { GiBananaPeeled } from 'react-icons/gi';
 import { TbLock, TbAlertTriangle, TbEye, TbEyeOff, TbArrowRight } from 'react-icons/tb';
@@ -19,50 +33,22 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import colors from '../../theme/colors';
 
-// ---------- helpers ----------
-
-const tokens = {
-  canvas: colors.surface[950],
-  brand: colors.accent.signal,        // was cyan #00E5E5
-  brandHover: colors.brand[400],
-  banana: colors.accent.banana,
-  text: {
-    primary: colors.text.primary,     // off-white, not pure #FFF
-    secondary: colors.text.secondary,
-    tertiary: colors.text.tertiary,
-    muted: colors.text.muted,
-  },
-  divider: {
-    soft: colors.divider.medium,
-  },
-};
+const P = colors.paper;
 
 const inputStyle = {
-  bg: 'transparent',
+  bg: P.sheet,
   border: '1px solid',
-  borderColor: tokens.divider.soft,
-  color: tokens.text.primary,
+  borderColor: P.hair,
+  color: P.ink,
   fontSize: 'md',
-  h: '52px',
+  h: '54px',
   borderRadius: 'xl',
   px: 4,
-  transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)',
-  _hover: { borderColor: tokens.text.tertiary },
-  _focus: {
-    borderColor: tokens.brand,
-    boxShadow: `0 0 0 1px ${tokens.brand}`,
-    outline: 'none',
-  },
-  _focusVisible: {
-    borderColor: tokens.brand,
-    boxShadow: `0 0 0 1px ${tokens.brand}`,
-    outline: 'none',
-  },
-  _placeholder: {
-    color: tokens.text.muted,
-    fontSize: 'md',
-    fontWeight: '400',
-  },
+  transition: 'all 180ms cubic-bezier(0.4, 0, 0.2, 1)',
+  _hover: { borderColor: P.inkFaint },
+  _focus: { borderColor: P.lime, boxShadow: `0 0 0 3px ${P.lime}44`, outline: 'none' },
+  _focusVisible: { borderColor: P.lime, boxShadow: `0 0 0 3px ${P.lime}44`, outline: 'none' },
+  _placeholder: { color: P.inkFaint, fontSize: 'md', fontWeight: '400' },
 };
 
 const isEmail = (value) => value.includes('@');
@@ -71,10 +57,7 @@ const resolveEmail = async (input) => {
   const trimmed = input.trim().toLowerCase();
   if (!trimmed) throw new Error('Username not recognized');
   if (isEmail(trimmed)) return trimmed;
-
-  const { data, error } = await supabase.rpc('lookup_email_by_username', {
-    p_username: trimmed,
-  });
+  const { data, error } = await supabase.rpc('lookup_email_by_username', { p_username: trimmed });
   if (error) {
     console.error('lookup_email_by_username failed', error);
     throw new Error('Could not check username, try again');
@@ -83,7 +66,39 @@ const resolveEmail = async (input) => {
   return data;
 };
 
-// ---------- component ----------
+// The heartbeat line, the Pulse motif. Draws in then sweeps off, on a loop.
+const PulseLine = () => (
+  <Box
+    as="svg"
+    viewBox="0 0 200 40"
+    w="132px"
+    h="26px"
+    fill="none"
+    aria-hidden="true"
+    sx={{
+      '& .beat': {
+        strokeDasharray: 260,
+        strokeDashoffset: 260,
+        animation: 'sweep 3.6s cubic-bezier(0.4, 0, 0.2, 1) infinite',
+      },
+      '@keyframes sweep': {
+        '0%': { strokeDashoffset: 260 },
+        '38%': { strokeDashoffset: 0 },
+        '68%': { strokeDashoffset: 0 },
+        '100%': { strokeDashoffset: -260 },
+      },
+    }}
+  >
+    <path
+      className="beat"
+      d="M2 20 H70 L82 20 L90 6 L100 34 L110 13 L118 20 H198"
+      stroke={P.lime}
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Box>
+);
 
 const Login = () => {
   const [identifier, setIdentifier] = useState('');
@@ -159,7 +174,7 @@ const Login = () => {
     <Box
       position="fixed"
       inset={0}
-      bg={tokens.canvas}
+      bg={P.mat}
       overflow="hidden"
       sx={{
         '@keyframes shake': {
@@ -173,20 +188,19 @@ const Login = () => {
         },
       }}
     >
-      {/* Ambient radial glow — subtle cyan wash from top */}
+      {/* Warm lime wash from the top, the only glow, very soft */}
       <Box
         position="absolute"
-        top="-25%"
+        top="-30%"
         left="50%"
         transform="translateX(-50%)"
-        w={{ base: '140%', md: '800px' }}
-        h={{ base: '600px', md: '800px' }}
-        bg="radial-gradient(ellipse at center top, rgba(0,229,229,0.08), transparent 60%)"
+        w={{ base: '160%', md: '900px' }}
+        h={{ base: '620px', md: '820px' }}
+        bg={`radial-gradient(ellipse at center top, ${P.lime}22, transparent 62%)`}
         pointerEvents="none"
         zIndex={0}
       />
 
-      {/* Centered content — uses flexbox to perfectly center, no overflow */}
       <Box
         position="relative"
         zIndex={1}
@@ -195,59 +209,65 @@ const Login = () => {
         display="flex"
         alignItems="center"
         justifyContent="center"
-        px={4}
+        px={5}
         pt="env(safe-area-inset-top)"
         pb="env(safe-area-inset-bottom)"
       >
-        <Box
-          w="100%"
-          maxW="360px"
-          animation="fadeUp 400ms cubic-bezier(0.4, 0, 0.2, 1)"
-        >
-          <VStack spacing={{ base: 10, md: 12 }} align="stretch">
+        <Box w="100%" maxW="372px" animation="fadeUp 420ms cubic-bezier(0.4, 0, 0.2, 1)">
+          <VStack spacing={{ base: 9, md: 11 }} align="stretch">
 
-            {/* Logo — clickable to neonburro.com, centered */}
-            <Box
-              as="a"
-              href="https://neonburro.com/"
-              target="_blank"
-              rel="noopener noreferrer"
-              display="flex"
-              justifyContent="center"
-              transition="transform 200ms cubic-bezier(0.4, 0, 0.2, 1)"
-              _hover={{ transform: 'translateY(-2px)' }}
-              _active={{ transform: 'scale(0.98)' }}
-              cursor="pointer"
-            >
-              <Image
-                src="/logo-main.svg"
-                alt="NeonBurro"
-                w={{ base: '104px', md: '120px' }}
-                h="auto"
-                display="block"
-              />
-            </Box>
+            {/* Brand: heartbeat, wordmark, kicker */}
+            <VStack spacing={3} align="center">
+              <PulseLine />
+              <Box
+                as="a"
+                href="https://neonburro.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                cursor="pointer"
+                transition="opacity 200ms"
+                _hover={{ opacity: 0.75 }}
+              >
+                <Text
+                  as="span"
+                  fontSize="26px"
+                  fontWeight="600"
+                  letterSpacing="-0.035em"
+                  color={P.ink}
+                >
+                  neonburro<Text as="span" color={P.lime}>.</Text>
+                </Text>
+              </Box>
+              <Text
+                fontFamily="mono"
+                fontSize="10px"
+                fontWeight="500"
+                letterSpacing="0.28em"
+                textTransform="uppercase"
+                color={P.inkMuted}
+              >
+                Pulse
+              </Text>
+            </VStack>
 
-            {/* Error banner — shakes on trigger */}
+            {/* Error banner */}
             <Collapse in={!!error} animateOpacity unmountOnExit>
               <HStack
                 spacing={2.5}
-                bg="rgba(255, 229, 0, 0.08)"
+                bg={`${P.coral}14`}
                 border="1px solid"
-                borderColor="rgba(255, 229, 0, 0.25)"
+                borderColor={`${P.coral}40`}
                 borderRadius="xl"
                 px={4}
                 py={3}
                 animation={errorShake ? 'shake 500ms cubic-bezier(0.4, 0, 0.2, 1)' : 'none'}
               >
-                <Icon as={TbAlertTriangle} boxSize={4} color={tokens.banana} flexShrink={0} />
-                <Text fontSize="xs" color={tokens.banana} lineHeight="1.4">
-                  {error}
-                </Text>
+                <Icon as={TbAlertTriangle} boxSize={4} color={P.coral} flexShrink={0} />
+                <Text fontSize="xs" color={P.coral} lineHeight="1.4">{error}</Text>
               </HStack>
             </Collapse>
 
-            {/* Main sign-in form */}
+            {/* Sign-in form */}
             <VStack as="form" onSubmit={handleSubmit} spacing={4}>
               <FormControl>
                 <Input
@@ -285,7 +305,7 @@ const Login = () => {
                     {...inputStyle}
                     pr="52px"
                   />
-                  <InputRightElement h="52px" w="52px">
+                  <InputRightElement h="54px" w="52px">
                     <Box
                       as="button"
                       type="button"
@@ -296,9 +316,9 @@ const Login = () => {
                       w="36px"
                       h="36px"
                       borderRadius="md"
-                      color={tokens.text.tertiary}
-                      transition="all 200ms cubic-bezier(0.4, 0, 0.2, 1)"
-                      _hover={{ color: tokens.brand }}
+                      color={P.inkFaint}
+                      transition="color 200ms"
+                      _hover={{ color: P.limeDeep }}
                       tabIndex={-1}
                       aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
@@ -313,8 +333,8 @@ const Login = () => {
                 w="100%"
                 h="56px"
                 mt={2}
-                bg={tokens.brand}
-                color={tokens.canvas}
+                bg={P.lime}
+                color={P.limeInk}
                 fontSize="md"
                 fontWeight="700"
                 borderRadius="full"
@@ -322,18 +342,14 @@ const Login = () => {
                 isLoading={loading}
                 loadingText="Signing in"
                 transition="all 200ms cubic-bezier(0.4, 0, 0.2, 1)"
-                _hover={{
-                  bg: tokens.brandHover,
-                  transform: 'translateY(-2px)',
-                  boxShadow: '0 0 24px rgba(0, 229, 229, 0.3)',
-                }}
+                _hover={{ bg: '#D2E26B', transform: 'translateY(-2px)' }}
                 _active={{ transform: 'scale(0.98)' }}
-                _focus={{ boxShadow: '0 0 0 2px rgba(0, 229, 229, 0.4)' }}
+                _focus={{ boxShadow: `0 0 0 3px ${P.lime}55` }}
               >
                 Sign in
               </Button>
 
-              {/* Forgot-password trigger — subtle, appears after form */}
+              {/* Forgot-password trigger */}
               <HStack
                 spacing={1.5}
                 justify="center"
@@ -343,44 +359,38 @@ const Login = () => {
                   setResetSent(false);
                   setError('');
                 }}
-                color={tokens.text.tertiary}
+                color={P.inkMuted}
                 transition="color 200ms"
-                _hover={{ color: tokens.brand }}
+                _hover={{ color: P.limeDeep }}
                 userSelect="none"
                 pt={3}
                 pb={1}
               >
                 <Icon as={TbLock} boxSize={3} />
-                <Text fontSize="sm">Forgot password?</Text>
+                <Text fontSize="sm">Forgot your password?</Text>
               </HStack>
             </VStack>
 
-            {/* Forgot-password inline — banana easter egg preserved */}
+            {/* Forgot-password inline, Pulse is smart, burro easter egg kept */}
             <Collapse in={showForgot} animateOpacity unmountOnExit>
               {resetSent ? (
-                <VStack
-                  spacing={3}
-                  py={2}
-                  animation="fadeUp 400ms cubic-bezier(0.4, 0, 0.2, 1)"
-                >
-                  <Icon as={GiBananaPeeled} boxSize={8} color={tokens.banana} />
+                <VStack spacing={3} py={2} animation="fadeUp 400ms cubic-bezier(0.4, 0, 0.2, 1)">
+                  <Icon as={GiBananaPeeled} boxSize={8} color={P.gold} />
                   <VStack spacing={1}>
-                    <Text fontSize="sm" color={tokens.banana} fontWeight="600" textAlign="center">
+                    <Text fontSize="sm" color={P.ink} fontWeight="600" textAlign="center">
                       Check your inbox.
                     </Text>
-                    <Text fontSize="xs" color={tokens.text.tertiary} textAlign="center">
-                      We sent a reset link. Feed the burro.
+                    <Text fontSize="xs" color={P.inkMuted} textAlign="center">
+                      The reset link is on its way. Feed the burro.
                     </Text>
                   </VStack>
                 </VStack>
               ) : (
                 <VStack spacing={3}>
-                  <HStack spacing={2} justify="center">
-                    <Icon as={GiBananaPeeled} boxSize={4} color={tokens.banana} />
-                    <Text fontSize="xs" color={tokens.text.tertiary}>
-                      Even burros forget sometimes.
-                    </Text>
-                  </HStack>
+                  <Text fontSize="xs" color={P.inkMuted} textAlign="center" lineHeight="1.6" px={2}>
+                    Pulse remembers everything. You do not have to.
+                    <br />Drop your email and we will send a reset.
+                  </Text>
                   <Input
                     type="email"
                     value={resetEmail}
@@ -395,29 +405,22 @@ const Login = () => {
                       }
                     }}
                     {...inputStyle}
-                    _focus={{
-                      borderColor: tokens.banana,
-                      boxShadow: `0 0 0 1px ${tokens.banana}`,
-                      outline: 'none',
-                    }}
                   />
                   <Button
                     w="100%"
-                    h="48px"
-                    bg={tokens.banana}
-                    color={tokens.canvas}
+                    h="50px"
+                    bg="transparent"
+                    color={P.ink}
+                    border="1px solid"
+                    borderColor={P.hair}
                     fontSize="sm"
-                    fontWeight="700"
+                    fontWeight="600"
                     borderRadius="full"
                     isLoading={resetLoading}
                     loadingText="Sending"
                     onClick={handleResetPassword}
                     transition="all 200ms cubic-bezier(0.4, 0, 0.2, 1)"
-                    _hover={{
-                      bg: '#FFEF33',
-                      transform: 'translateY(-2px)',
-                      boxShadow: '0 0 20px rgba(255, 229, 0, 0.3)',
-                    }}
+                    _hover={{ bg: P.sheet, borderColor: P.inkFaint, transform: 'translateY(-1px)' }}
                     _active={{ transform: 'scale(0.98)' }}
                   >
                     Send reset link

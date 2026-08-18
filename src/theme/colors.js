@@ -100,8 +100,9 @@ const colors = {
     400: '#C39D7F',
   },
 
-  // Alpenglow warm-light surfaces, identical to marketing. For any future
-  // editorial / print / light-mode moment inside Pulse. Opt-in only.
+  // Alpenglow warm-light surfaces, identical to marketing. The earlier draft of
+  // a light system, kept for reference. The Paper system below supersedes it as
+  // the go-forward look for Pulse, tuned to the invoice document.
   alpenglow: {
     base:   '#F3EDE3',
     raised: '#DDD2C2',
@@ -109,6 +110,53 @@ const colors = {
     ink:    '#241A16',
     inkSecondary: '#4A382F',
     inkMuted: '#6B5245',
+  },
+
+  // ── THE PAPER SYSTEM, THE LIGHT ENVIRONMENT PULSE IS BECOMING ──────────────
+  //
+  // What this place looks like, in one paragraph: warm cream paper, dark warm
+  // ink, one lime accent, no cold white anywhere. The darkest surface you ever
+  // paint is `mat`, a cream, and light rises from there to `sheet`. Content is
+  // dark ink on cream so contrast is always high and the room feels calm and lit
+  // rather than glowing in the dark. This is the same paper the invoice document
+  // uses (src/lib/emailTokens.js, the sheet and hair and lime keys), so the tool
+  // and the thing it sends a client are one material.
+  //
+  // How to reach for it:
+  //   grounds   mat is the page, sheet is a card, sunken is a well inside a card
+  //   rules     hair for a real divider, hairSoft for a whisper
+  //   ink       ink primary, inkSec supporting, inkMuted labels, inkFaint meta
+  //   accent    lime once per view, limeDeep when lime has to be small text on
+  //             cream, limeInk when text sits ON a lime fill
+  //   status    gold pending, coral overdue and destructive, green paid
+  //
+  // Rules of the room, same spirit as the marketing site:
+  //   never pure #FFFFFF, the brightest is sheet #FBF9F4, a warm near white
+  //   lime is spent ONCE per screen, everything else is ink on paper
+  //   on a phone there are no containers around content, the cream is the frame
+  //
+  // Pages convert to this one at a time. The login page is the first. Until a
+  // given authed page is converted it still reads the dark surface/text tokens
+  // above, both are valid while the migration is underway.
+  paper: {
+    mat:      '#E7DFD1',  // page ground, cream as dark as cream goes
+    sheet:    '#FBF9F4',  // cards and surfaces, warm near white, never pure white
+    sunken:   '#F5F0E6',  // inset panels and wells
+    hair:     '#E4DBCB',  // borders and real rules
+    hairSoft: '#EFE9DC',  // faintest inner rules
+
+    ink:      '#241A16',  // Night Tack, primary text
+    inkSec:   '#4A382F',  // Canyon Stitch, supporting text
+    inkMuted: '#6B5245',  // Burro Hide, labels
+    inkFaint: '#9A8574',  // faintest meta
+
+    lime:     '#C5D957',  // the one accent, Topo Lime
+    limeDeep: '#6E7A30',  // lime dark enough to read as small text on cream
+    limeInk:  '#3A4319',  // ink that sits on a lime fill
+
+    gold:     '#9A7B00',  // pending, waiting
+    coral:    '#C2402F',  // overdue, destructive
+    green:    '#5E7A1E',  // paid, positive
   },
 };
 
