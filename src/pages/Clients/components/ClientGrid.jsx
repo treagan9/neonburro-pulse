@@ -1,31 +1,12 @@
 // src/pages/Clients/components/ClientGrid.jsx
-// SENTINEL: NB_PULSE_CLIENT_GRID_V2
+// SENTINEL: NB_PULSE_CLIENT_GRID_V3
 //
-// One row per client. Press it to open them.
-//
-// ── MOBILE FIRST, WHICH V1 WAS NOT ──────────────────────────────────────────
-// V1 hid the sprint count, the funded total and the last activity behind
-// display base:none. So on a phone a client row was a dot, a face, a name and a
-// company, and every number the page existed to show was gone. The row is built
-// for the phone now and the desktop gets extra columns rather than the phone
-// getting a truncated desktop.
-//
-// The second line carries the money on every width. If you only ever learn one
-// thing about a client from this list it should be what they are worth, not
-// what their company is called.
-//
-// ── THE SUBSCRIPTION PIP ────────────────────────────────────────────────────
-// A client on a live subscription is a different kind of client from one who
-// buys a sprint when they feel like it, and nothing in this app said which was
-// which. The pip is a small lime dot with a tooltip, coloured by health, so a
-// past due subscription is visible from the list rather than three clicks deep.
-//
-// ── HOVER IS NOT AN AFFORDANCE ──────────────────────────────────────────────
-// V1 revealed the edit button on hover at opacity 0, which means it does not
-// exist on a touch screen. It is always visible now at low contrast, which is
-// how a control that only some people need should behave.
-//
-// No oxford commas, no em dashes.
+// One row per client, on Paper. Press it to open them. Built mobile first: the
+// money line and the sprint count ride along at every width, not hidden behind a
+// desktop breakpoint. The subscription pip is a small repeat glyph coloured by
+// health so a past due plan is visible from the list. The edit control is always
+// visible at low contrast, because a control at opacity 0 does not exist on a
+// phone. No oxford commas, no dashes.
 
 import {
   Box, VStack, HStack, Text, Icon, Center, Spinner, Button, Tooltip,
@@ -33,26 +14,21 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { TbUsers, TbBolt, TbEdit, TbRepeat, TbChevronRight } from 'react-icons/tb';
 import { timeAgo } from '../../../utils/phone';
-import { subscriptionHealth, HEALTH_TONE, cadenceLabel, renewalLabel } from '../../../lib/billing';
+import { subscriptionHealth, cadenceLabel, renewalLabel } from '../../../lib/billing';
 import colors from '../../../theme/colors';
 import { TYPE, EASE, FAST } from '../../../theme/layout';
 import Avatar from '../../../components/common/Avatar';
 
-const STATUS_DOT = {
-  active: colors.status.green,
-  lead: colors.accent.banana,
-  inactive: colors.surface[500],
-};
+const P = colors.paper;
+
+const STATUS_DOT = { active: P.green, lead: P.gold, inactive: P.inkFaint };
 
 const TAG_COLORS = {
-  local: colors.accent.signal,
-  recurring: colors.status.green,
-  vip: colors.accent.banana,
-  lab: colors.accent.purple,
-  hosting: colors.accent.cool,
-  web3: '#EC4899',
-  subscription: '#FF6B35',
+  local: '#6E7A30', recurring: '#5E7A1E', vip: '#9A7B00', lab: '#7A5Fc9',
+  hosting: '#6C6F97', web3: '#B23A80', subscription: '#C2402F',
 };
+
+const HEALTH_PAPER = { active: P.limeDeep, past_due: P.coral, paused: P.gold, pending: P.gold, none: P.inkFaint };
 
 const money = (v) => {
   const n = parseFloat(v || 0);
@@ -79,33 +55,28 @@ const ClientRow = ({ client, onEdit }) => {
       py={{ base: 3.5, md: 4 }}
       px={{ base: 2, md: 3 }}
       borderBottom="1px solid"
-      borderColor="surface.900"
+      borderColor={P.hairSoft}
+      borderLeft="2px solid"
+      borderLeftColor="transparent"
       role="group"
-      transition={`background ${FAST} ${EASE}`}
-      _hover={{ bg: 'surface.900' }}
-      _active={{ bg: 'surface.850' }}
+      transition={`all ${FAST} ${EASE}`}
+      _hover={{ bg: P.sheet, borderLeftColor: status, transform: 'translateX(2px)' }}
+      _active={{ bg: P.sunken }}
     >
-      <Box w="6px" h="6px" borderRadius="full" bg={status} flexShrink={0}
-        boxShadow={client.status === 'active' ? `0 0 8px ${status}80` : 'none'} />
+      <Box w="6px" h="6px" borderRadius="full" bg={status} flexShrink={0} />
 
       <Avatar name={client.name} url={client.avatar_url} size="sm" border={false} />
 
-      {/* Identity. Two lines on every width. */}
       <VStack align="start" spacing={0.5} flex={1} minW={0}>
         <HStack spacing={2} minW={0} w="100%">
-          <Text fontSize={TYPE.body} fontWeight="600" color="text.primary"
-            letterSpacing="-0.01em" noOfLines={1}>
+          <Text fontSize={TYPE.body} fontWeight="600" color={P.ink} letterSpacing="-0.01em" noOfLines={1}>
             {client.name}
           </Text>
 
           {health !== 'none' && (
-            <Tooltip
-              label={`${cadenceLabel(sub)} · ${renewalLabel(sub)}`}
-              placement="top" hasArrow bg="surface.800" color="text.primary"
-              fontSize="xs" openDelay={300}
-            >
+            <Tooltip label={`${cadenceLabel(sub)} · ${renewalLabel(sub)}`} placement="top" hasArrow bg={P.ink} color={P.sheet} fontSize="xs" openDelay={300}>
               <HStack spacing={1} flexShrink={0}>
-                <Icon as={TbRepeat} boxSize="11px" color={HEALTH_TONE[health]} />
+                <Icon as={TbRepeat} boxSize="11px" color={HEALTH_PAPER[health] || P.inkFaint} />
               </HStack>
             </Tooltip>
           )}
@@ -113,51 +84,45 @@ const ClientRow = ({ client, onEdit }) => {
           {tags.length > 0 && (
             <HStack spacing={1} flexShrink={0} display={{ base: 'none', sm: 'flex' }}>
               {tags.slice(0, 3).map((t) => (
-                <Box key={t} w="5px" h="5px" borderRadius="full"
-                  bg={TAG_COLORS[t] || colors.surface[500]} />
+                <Box key={t} w="5px" h="5px" borderRadius="full" bg={TAG_COLORS[t] || P.inkFaint} />
               ))}
             </HStack>
           )}
         </HStack>
 
-        {/* The money line. Present at every width, which is the whole change. */}
-        <HStack spacing={2} fontFamily="mono" fontSize={TYPE.micro} color="surface.600" minW={0}>
-          <Text color={client.total_funded > 0 ? 'surface.400' : 'surface.700'} fontWeight="500"
-            sx={{ fontVariantNumeric: 'tabular-nums' }}>
+        <HStack spacing={2} fontFamily="mono" fontSize={TYPE.micro} color={P.inkMuted} minW={0}>
+          <Text color={client.total_funded > 0 ? P.inkSec : P.inkFaint} fontWeight="500" sx={{ fontVariantNumeric: 'tabular-nums' }}>
             {money(client.total_funded)}
           </Text>
-          <Text color="surface.800">·</Text>
+          <Text color={P.inkFaint}>·</Text>
           <HStack spacing={1}>
             <Icon as={TbBolt} boxSize="10px" />
             <Text sx={{ fontVariantNumeric: 'tabular-nums' }}>{client.sprint_count || 0}</Text>
           </HStack>
           {client.company && (
             <>
-              <Text color="surface.800" display={{ base: 'none', sm: 'block' }}>·</Text>
+              <Text color={P.inkFaint} display={{ base: 'none', sm: 'block' }}>·</Text>
               <Text noOfLines={1} display={{ base: 'none', sm: 'block' }}>{client.company}</Text>
             </>
           )}
         </HStack>
       </VStack>
 
-      <Text display={{ base: 'none', lg: 'block' }} fontFamily="mono" fontSize={TYPE.micro}
-        color="surface.700" minW="58px" textAlign="right" flexShrink={0}>
+      <Text display={{ base: 'none', lg: 'block' }} fontFamily="mono" fontSize={TYPE.micro} color={P.inkFaint} minW="58px" textAlign="right" flexShrink={0}>
         {timeAgo(client.last_activity_at || client.created_at)}
       </Text>
 
-      {/* Always visible. A control at opacity 0 does not exist on a phone. */}
       <Box as="span" role="button" tabIndex={0}
         onClick={(e) => { e.stopPropagation(); onEdit(client); }}
         onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onEdit(client); } }}
-        p={1.5} borderRadius="8px" color="surface.700" flexShrink={0}
+        p={1.5} borderRadius="8px" color={P.inkFaint} flexShrink={0}
         transition={`all ${FAST} ${EASE}`}
-        _hover={{ color: 'brand.500', bg: 'surface.850' }}
+        _hover={{ color: P.limeDeep, bg: P.sunken }}
         aria-label={`Edit ${client.name}`}>
         <Icon as={TbEdit} boxSize="15px" />
       </Box>
 
-      <Icon as={TbChevronRight} boxSize="14px" color="surface.800" flexShrink={0}
-        display={{ base: 'block', md: 'none' }} />
+      <Icon as={TbChevronRight} boxSize="14px" color={P.inkFaint} flexShrink={0} display={{ base: 'block', md: 'none' }} />
     </HStack>
   );
 };
@@ -167,8 +132,8 @@ const ClientGrid = ({ clients, loading, onEdit, onAdd, isEmpty }) => {
     return (
       <Center py={16}>
         <VStack spacing={3}>
-          <Spinner size="md" color="brand.500" thickness="2px" />
-          <Text color="surface.600" fontSize={TYPE.micro} fontFamily="mono">Loading clients</Text>
+          <Spinner size="md" color={P.limeDeep} thickness="2px" />
+          <Text color={P.inkMuted} fontSize={TYPE.micro} fontFamily="mono">Loading clients</Text>
         </VStack>
       </Center>
     );
@@ -177,19 +142,17 @@ const ClientGrid = ({ clients, loading, onEdit, onAdd, isEmpty }) => {
   if (!clients.length) {
     return (
       <VStack py={{ base: 14, md: 20 }} spacing={4} align="center">
-        <Icon as={TbUsers} boxSize={9} color="surface.800" />
+        <Icon as={TbUsers} boxSize={9} color={P.inkFaint} />
         <VStack spacing={1}>
-          <Text fontSize={TYPE.body} fontWeight="600" color="text.primary">
+          <Text fontSize={TYPE.body} fontWeight="600" color={P.ink}>
             {isEmpty ? 'No clients yet' : 'No matches'}
           </Text>
-          <Text fontSize={TYPE.small} color="surface.500">
+          <Text fontSize={TYPE.small} color={P.inkMuted}>
             {isEmpty ? 'Add the first one to the herd' : 'Try a different search or filter'}
           </Text>
         </VStack>
         {isEmpty && (
-          <Button size="sm" variant="outline" borderColor="brand.500" color="brand.500"
-            fontWeight="600" borderRadius="full" onClick={onAdd} mt={2}
-            _hover={{ bg: 'divider.accent' }}>
+          <Button size="sm" bg={P.lime} color={P.limeInk} fontWeight="700" borderRadius="full" onClick={onAdd} mt={2} _hover={{ bg: '#D2E26B' }}>
             Add your first client
           </Button>
         )}
@@ -198,7 +161,7 @@ const ClientGrid = ({ clients, loading, onEdit, onAdd, isEmpty }) => {
   }
 
   return (
-    <Box borderTop="1px solid" borderColor="surface.900">
+    <Box borderTop="1px solid" borderColor={P.hair}>
       {clients.map((c) => <ClientRow key={c.id} client={c} onEdit={onEdit} />)}
     </Box>
   );

@@ -23,14 +23,15 @@
 // No oxford commas, no em dashes.
 
 import { useState, useEffect, useCallback } from 'react';
-import { Box, VStack, useDisclosure } from '@chakra-ui/react';
+import { Box, VStack, Container, useDisclosure } from '@chakra-ui/react';
 import { supabase } from '../../lib/supabase';
-import { STACK } from '../../theme/layout';
+import colors from '../../theme/colors';
 import ClientsHeader from './components/ClientsHeader';
 import ClientFilters from './components/ClientFilters';
 import ClientGrid from './components/ClientGrid';
 import ClientModal from './components/ClientModal';
 
+const P = colors.paper;
 const LIVE_SUB_STATUSES = ['active', 'past_due', 'paused', 'pending'];
 
 const Clients = () => {
@@ -137,33 +138,37 @@ const Clients = () => {
   const subscribed = clients.filter((c) => c.subscription).length;
 
   return (
-    <Box position="relative" minH="100%">
-      <VStack spacing={STACK} align="stretch">
-        <ClientsHeader
-          counts={counts}
-          subscribed={subscribed}
-          onAdd={handleAdd}
-          onShowLeads={() => setFilterStatus('lead')}
-        />
+    <Box position="relative" minH="100vh" bg={P.mat}>
+      <Box position="absolute" top={0} left={0} right={0} h="320px" bg={`radial-gradient(ellipse at top center, ${P.lime}12, transparent 70%)`} pointerEvents="none" />
 
-        <ClientFilters
-          search={search}
-          onSearch={setSearch}
-          filterStatus={filterStatus}
-          onFilterStatus={setFilterStatus}
-          sortBy={sortBy}
-          onSortBy={setSortBy}
-          counts={counts}
-        />
+      <Container maxW="1080px" px={{ base: 5, md: 8 }} py={{ base: 6, md: 10 }} position="relative">
+        <VStack spacing={{ base: 7, md: 9 }} align="stretch">
+          <ClientsHeader
+            counts={counts}
+            subscribed={subscribed}
+            onAdd={handleAdd}
+            onShowLeads={() => setFilterStatus('lead')}
+          />
 
-        <ClientGrid
-          clients={sorted}
-          loading={loading}
-          onEdit={handleEdit}
-          onAdd={handleAdd}
-          isEmpty={clients.length === 0}
-        />
-      </VStack>
+          <ClientFilters
+            search={search}
+            onSearch={setSearch}
+            filterStatus={filterStatus}
+            onFilterStatus={setFilterStatus}
+            sortBy={sortBy}
+            onSortBy={setSortBy}
+            counts={counts}
+          />
+
+          <ClientGrid
+            clients={sorted}
+            loading={loading}
+            onEdit={handleEdit}
+            onAdd={handleAdd}
+            isEmpty={clients.length === 0}
+          />
+        </VStack>
+      </Container>
 
       <ClientModal isOpen={isOpen} onClose={onClose} client={editingClient} onSave={fetchData} />
     </Box>

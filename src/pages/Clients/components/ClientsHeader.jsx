@@ -1,58 +1,47 @@
 // src/pages/Clients/components/ClientsHeader.jsx
-// SENTINEL: NB_PULSE_CLIENTS_HEADER_V2
+// SENTINEL: NB_PULSE_CLIENTS_HEADER_V3
 //
-// ── WHAT THE STRIP SAYS NOW ─────────────────────────────────────────────────
-// V1 read: 12 clients · 4 active sprints · $8.2k MTD · $3.1k outstanding.
-// Four numbers, none of which tell you anything about the list underneath them,
-// on a page whose job is to help you find one client.
-//
-// The numbers that belong on a Clients page are the ones that describe the
-// clients: how many are active, how many are leads waiting on us, how many are
-// on a subscription. Money moved to Today, where the money lives.
-//
-// The leads count is a link because a lead that has been sitting for a fortnight
-// is the most expensive row in the table and nothing anywhere surfaced it.
-//
-// No oxford commas, no em dashes.
+// Paper header. Kicker, a title, a stats strip that describes the clients (how
+// many active, how many leads waiting, how many on a subscription), and a lime
+// new-client button. Leads is a link because a lead sitting for a fortnight is
+// the most expensive row in the table. Local Paper styles, no shared dark
+// constants. No oxford commas, no dashes.
 
 import { HStack, VStack, Text, Icon, Box } from '@chakra-ui/react';
 import { TbPlus } from 'react-icons/tb';
-import {
-  PRIMARY_BUTTON_PROPS, PRIMARY_BUTTON_ICON_PROPS, PRIMARY_BUTTON_TEXT_PROPS,
-} from '../../../lib/uiConstants';
+import colors from '../../../theme/colors';
 import { TYPE, EASE, FAST } from '../../../theme/layout';
 
-const Stat = ({ n, label, tone = 'text.primary', onClick }) => (
+const P = colors.paper;
+
+const Stat = ({ n, label, tone, onClick }) => (
   <HStack spacing={1.5} align="baseline" as={onClick ? 'button' : 'div'} onClick={onClick}
-    transition={`opacity ${FAST} ${EASE}`} _hover={onClick ? { opacity: 0.75 } : undefined}>
-    <Text fontFamily="mono" fontSize={TYPE.small} fontWeight="600" color={tone}
-      sx={{ fontVariantNumeric: 'tabular-nums' }}>
+    transition={`opacity ${FAST} ${EASE}`} _hover={onClick ? { opacity: 0.7 } : undefined}>
+    <Text fontFamily="mono" fontSize={TYPE.small} fontWeight="700" color={tone || P.ink} sx={{ fontVariantNumeric: 'tabular-nums' }}>
       {n}
     </Text>
-    <Text fontFamily="mono" fontSize={TYPE.small} color="surface.600">{label}</Text>
+    <Text fontFamily="mono" fontSize={TYPE.small} color={P.inkMuted}>{label}</Text>
   </HStack>
 );
 
-const Dot = () => <Text color="surface.800" fontSize={TYPE.small} mx={2}>·</Text>;
+const Dot = () => <Text color={P.inkFaint} fontSize={TYPE.small} mx={2}>·</Text>;
 
 const ClientsHeader = ({ counts, subscribed = 0, onAdd, onShowLeads }) => (
   <VStack align="stretch" spacing={3}>
     <HStack justify="space-between" align="center" gap={3} flexWrap="wrap">
       <VStack align="start" spacing={1.5} minW={0}>
-        <Text fontFamily="mono" fontSize={TYPE.micro} fontWeight="500"
-          letterSpacing="0.22em" textTransform="uppercase" color="brand.500">
+        <Text fontFamily="mono" fontSize={TYPE.micro} fontWeight="600" letterSpacing="0.22em" textTransform="uppercase" color={P.inkMuted}>
           Clients
         </Text>
-        <Text fontSize={TYPE.title} fontWeight="600" letterSpacing="-0.03em"
-          lineHeight="1.1" color="text.primary">
+        <Text fontSize={TYPE.title} fontWeight="600" letterSpacing="-0.03em" lineHeight="1.1" color={P.ink}>
           Everybody we build for.
         </Text>
       </VStack>
 
-      <Box as="button" onClick={onAdd} {...PRIMARY_BUTTON_PROPS}>
-        <Icon as={TbPlus} {...PRIMARY_BUTTON_ICON_PROPS} />
-        <Text {...PRIMARY_BUTTON_TEXT_PROPS}>Client</Text>
-      </Box>
+      <HStack as="button" onClick={onAdd} spacing={1.5} bg={P.lime} color={P.limeInk} borderRadius="full" px={4} h="40px" fontWeight="700" fontSize="sm" transition={`all 0.18s ${EASE}`} _hover={{ bg: '#D2E26B', transform: 'translateY(-1px)' }} _active={{ transform: 'scale(0.98)' }}>
+        <Icon as={TbPlus} boxSize={4} />
+        <Text>Client</Text>
+      </HStack>
     </HStack>
 
     <HStack spacing={0} flexWrap="wrap" rowGap={1}>
@@ -61,13 +50,13 @@ const ClientsHeader = ({ counts, subscribed = 0, onAdd, onShowLeads }) => (
       <Stat
         n={counts.lead || 0}
         label={counts.lead === 1 ? 'lead' : 'leads'}
-        tone={counts.lead > 0 ? 'accent.banana' : 'text.primary'}
+        tone={counts.lead > 0 ? P.gold : P.ink}
         onClick={counts.lead > 0 ? onShowLeads : undefined}
       />
       <Dot />
       <Stat n={subscribed} label="on subscription" />
       <Dot />
-      <Stat n={counts.all || 0} label="on the books" tone="surface.500" />
+      <Stat n={counts.all || 0} label="on the books" tone={P.inkMuted} />
     </HStack>
   </VStack>
 );
