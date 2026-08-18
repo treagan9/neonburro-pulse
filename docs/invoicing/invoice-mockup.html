@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>neonburro. invoice — warm paper direction</title>
+<!--
+  docs/invoicing/invoice-mockup.html
+  A design prototype, not wired to data. This is the WARM-PAPER direction for the
+  invoice a client receives: a real letterhead document, not the dark app.
+
+  Why warm paper: it reads like a professional invoice, it prints and PDFs
+  cleanly, and it stays distinct from the near-black Pulse admin. The palette is
+  Pulse's own Alpenglow (warm light) + the one Topo Lime accent, spent on the
+  top rule, the wordmark period, the Due-now figure and the pay button. Fraunces
+  carries the marquee numbers, Geist the reading, Geist Mono the labels. Same
+  three voices as the app, warm ground.
+
+  This same template renders three ways later: the hosted invoice page, the PDF,
+  and a short email cover that points to it.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --mat:#E7DFD1; --sheet:#FBF9F4; --sheet2:#F5F0E6;
+    --ink:#241A16; --ink2:#5A4636; --muted:#8A7358; --hair:#E4DBCB; --hair2:#EFE9DC;
+    --lime:#C5D957; --lime-deep:#6E7A30; --lime-ink:#3A4319;
+    --sans:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    --mono:'Geist Mono',ui-monospace,'SF Mono',Menlo,monospace;
+    --disp:'Fraunces',Georgia,'Times New Roman',serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--mat);font-family:var(--sans);color:var(--ink);
+    -webkit-font-smoothing:antialiased;padding:32px 16px}
+  .sheet{max-width:760px;margin:0 auto;background:var(--sheet);border-radius:16px;
+    box-shadow:0 24px 60px rgba(36,26,22,0.20);overflow:hidden}
+  .pad{padding:44px 48px}
+  .kick{font-family:var(--mono);font-size:10px;font-weight:500;letter-spacing:0.22em;
+    text-transform:uppercase;color:var(--muted)}
+
+  /* header */
+  .top{display:flex;justify-content:space-between;align-items:flex-start;gap:24px}
+  .wordmark{font-size:22px;font-weight:600;letter-spacing:-0.035em;color:var(--ink)}
+  .wordmark .dot{color:var(--lime)}
+  .studio{margin-top:10px;font-size:12px;line-height:1.6;color:var(--ink2)}
+  .inv-title{text-align:right}
+  .inv-title .big{font-family:var(--disp);font-size:40px;font-weight:500;letter-spacing:-0.01em;line-height:1;color:var(--ink)}
+  .inv-title .num{margin-top:8px;font-family:var(--mono);font-size:13px;color:var(--ink2);letter-spacing:0.04em}
+  .rule{height:2px;background:var(--lime);border-radius:2px;margin:22px 0 0}
+
+  /* meta row */
+  .meta{display:grid;grid-template-columns:1.3fr 1fr;gap:28px;margin-top:26px}
+  .meta .label{margin-bottom:7px}
+  .party .nm{font-size:16px;font-weight:600;color:var(--ink)}
+  .party .ln{font-size:13px;line-height:1.65;color:var(--ink2)}
+  .dates{display:flex;flex-direction:column;gap:14px}
+  .date-row{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid var(--hair2);padding-bottom:8px}
+  .date-row .k{font-family:var(--mono);font-size:11px;letter-spacing:0.06em;color:var(--muted);text-transform:uppercase}
+  .date-row .v{font-size:14px;font-weight:500;color:var(--ink)}
+  .date-row.due .v{color:var(--lime-deep)}
+
+  /* sprints */
+  .sec{margin-top:34px}
+  .sec-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+  .sprint{display:grid;grid-template-columns:1fr auto;gap:16px;padding:18px 0;border-top:1px solid var(--hair)}
+  .sprint:first-of-type{border-top:1px solid var(--ink)}
+  .sprint .no{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:0.04em;margin-bottom:6px}
+  .sprint .ti{font-size:16px;font-weight:600;color:var(--ink);letter-spacing:-0.01em}
+  .sprint .de{font-size:13px;line-height:1.6;color:var(--ink2);margin-top:5px;max-width:46ch}
+  .chip{display:inline-block;margin-top:10px;font-family:var(--mono);font-size:10px;font-weight:500;
+    letter-spacing:0.08em;text-transform:uppercase;padding:4px 9px;border-radius:999px}
+  .chip.full{background:#EAF0D2;color:var(--lime-ink)}
+  .chip.half{background:#F3EAD3;color:#7A5A1E}
+  .chip.scope{background:#ECE6DA;color:#5A4636}
+  .amt{text-align:right;white-space:nowrap}
+  .amt .money{font-family:var(--disp);font-size:22px;font-weight:500;color:var(--ink)}
+  .amt .due{margin-top:4px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .amt .due b{color:var(--lime-deep);font-weight:500}
+
+  /* totals */
+  .totals{margin-top:8px;display:flex;justify-content:flex-end}
+  .totals-box{width:320px}
+  .tline{display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;font-size:14px;color:var(--ink2)}
+  .tline .v{font-variant-numeric:tabular-nums;color:var(--ink)}
+  .tline.sub{border-top:1px solid var(--hair)}
+  .duenow{margin-top:10px;padding:18px 20px;background:var(--sheet2);border-radius:12px;
+    display:flex;justify-content:space-between;align-items:center}
+  .duenow .k{font-family:var(--mono);font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted)}
+  .duenow .k b{display:block;margin-top:4px;font-family:var(--sans);font-size:12px;letter-spacing:0;text-transform:none;color:var(--ink2);font-weight:400}
+  .duenow .fig{font-family:var(--disp);font-size:44px;font-weight:500;line-height:1;color:var(--ink)}
+  .duenow .fig::before{content:"$";font-size:26px;vertical-align:6px;color:var(--muted);margin-right:2px}
+
+  /* CTA */
+  .cta{margin-top:30px;text-align:center;padding:30px;background:var(--sheet2);border-radius:14px}
+  .cta .btn{display:inline-block;background:var(--lime);color:var(--lime-ink);font-weight:600;font-size:15px;
+    padding:15px 34px;border-radius:999px;text-decoration:none;letter-spacing:-0.01em}
+  .cta .rails{margin-top:14px;font-size:12.5px;color:var(--ink2)}
+  .cta .rails b{color:var(--ink);font-weight:600}
+  .cta .check{margin-top:6px;font-size:12px;color:var(--muted)}
+
+  /* footer */
+  .foot{margin-top:8px;padding:24px 48px 34px;background:var(--sheet2);border-top:1px solid var(--hair)}
+  .foot-grid{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
+  .foot .blk .k{font-family:var(--mono);font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+  .foot .blk .v{font-size:12.5px;line-height:1.6;color:var(--ink2)}
+  .foot .pin{font-family:var(--mono);font-size:15px;letter-spacing:0.16em;color:var(--ink);font-weight:500}
+  .legal{margin-top:18px;font-size:11px;line-height:1.6;color:var(--muted);max-width:60ch}
+  @media(max-width:560px){
+    .pad{padding:30px 22px}.foot{padding:22px 22px 28px}
+    .meta{grid-template-columns:1fr;gap:20px}.top{flex-direction:column}
+    .inv-title{text-align:left}.duenow .fig{font-size:36px}
+  }
+</style>
+</head>
+<body>
+  <div class="sheet">
+    <div class="pad">
+
+      <div class="top">
+        <div>
+          <div class="wordmark">neonburro<span class="dot">.</span></div>
+          <div class="studio">
+            The Burroship, LLC<br>
+            PO Box 2111, Ridgway CO 81432<br>
+            hello@neonburro.com
+          </div>
+        </div>
+        <div class="inv-title">
+          <div class="big">Invoice</div>
+          <div class="num">NB260401</div>
+        </div>
+      </div>
+      <div class="rule"></div>
+
+      <div class="meta">
+        <div class="party">
+          <div class="kick label">Billed to</div>
+          <div class="nm">Summit Trailworks</div>
+          <div class="ln">
+            Attn Dana Reyes<br>
+            210 Sherman St, Ridgway CO 81432<br>
+            dana@summittrailworks.com
+          </div>
+        </div>
+        <div class="dates">
+          <div class="date-row"><span class="k">Issued</span><span class="v">Aug 18, 2026</span></div>
+          <div class="date-row due"><span class="k">Due</span><span class="v">Sep 17, 2026</span></div>
+          <div class="date-row"><span class="k">Project</span><span class="v">Website and booking</span></div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-head"><div class="kick">Sprints</div><div class="kick">Amount</div></div>
+
+        <div class="sprint">
+          <div>
+            <div class="no">NB260401-01</div>
+            <div class="ti">Discovery and architecture</div>
+            <div class="de">Sitemap, content model, staging environment and the brand intake session.</div>
+            <span class="chip full">Fund in full</span>
+          </div>
+          <div class="amt">
+            <div class="money">$2,400</div>
+            <div class="due">due now <b>$2,400</b></div>
+          </div>
+        </div>
+
+        <div class="sprint">
+          <div>
+            <div class="no">NB260401-02</div>
+            <div class="ti">Build sprint one</div>
+            <div class="de">Home, trips, guides and the booking flow wired to Stripe checkout.</div>
+            <span class="chip half">50% to start</span>
+          </div>
+          <div class="amt">
+            <div class="money">$5,200</div>
+            <div class="due">due now <b>$2,600</b></div>
+          </div>
+        </div>
+
+        <div class="sprint">
+          <div>
+            <div class="no">NB260401-03</div>
+            <div class="ti">Launch and handoff</div>
+            <div class="de">DNS cutover, analytics, a training session and 30 days of support.</div>
+            <span class="chip scope">Confirm scope</span>
+          </div>
+          <div class="amt">
+            <div class="money">$1,800</div>
+            <div class="due">due now <b>$0</b></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="totals">
+        <div class="totals-box">
+          <div class="tline sub"><span>Total project value</span><span class="v">$9,400</span></div>
+          <div class="duenow">
+            <div class="k">To push forward<b>Confirm scope, fund what starts</b></div>
+            <div class="fig">5,000</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cta">
+        <a class="btn" href="#">Approve and push forward</a>
+        <div class="rails">Pay by <b>card</b>, <b>Apple Pay</b>, <b>bank transfer</b> or <b>USDC</b></div>
+        <div class="check">or mail a check to The Burroship, LLC, PO Box 2111, Ridgway CO 81432</div>
+      </div>
+
+    </div>
+
+    <div class="foot">
+      <div class="foot-grid">
+        <div class="blk">
+          <div class="k">Questions</div>
+          <div class="v">Tyler Reagan<br>tyler@neonburro.com<br>(970) 973-8550</div>
+        </div>
+        <div class="blk">
+          <div class="k">Find this invoice again</div>
+          <div class="v">neonburro.com/pay, lookup PIN</div>
+          <div class="pin">4827</div>
+        </div>
+      </div>
+      <div class="legal">
+        Payment due Sep 17, 2026 in accordance with our service agreement. A sprint marked confirm scope
+        carries no charge now, it starts when you approve it.
+      </div>
+    </div>
+  </div>
+</body>
+</html>
