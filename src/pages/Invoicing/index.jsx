@@ -162,7 +162,7 @@ const Invoicing = () => {
         pointerEvents="none"
       />
 
-      <Container maxW="1080px" px={{ base: 5, md: 8 }} py={{ base: 6, md: 10 }} position="relative">
+      <Container maxW="1500px" mx={0} px={{ base: 5, md: 8 }} py={{ base: 6, md: 10 }} position="relative">
         <VStack spacing={{ base: 7, md: 9 }} align="stretch">
           {/* Header */}
           <VStack align="stretch" spacing={3}>

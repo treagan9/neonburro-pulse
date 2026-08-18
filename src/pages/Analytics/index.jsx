@@ -48,7 +48,7 @@ const SOURCES = [
 
 const Analytics = () => (
   <Box bg={P.mat} minH="100vh" px={{ base: 4, md: 6, xl: 8 }} py={{ base: 5, md: 7 }}>
-    <Box maxW="1100px">
+    <Box maxW="1500px">
       <Text fontFamily="mono" fontSize="2xs" fontWeight="600" letterSpacing="0.22em" textTransform="uppercase" color={P.limeDeep} mb={2}>
         Command center
       </Text>

@@ -137,7 +137,7 @@ const Calendar = () => {
 
   return (
     <Box bg={P.mat} minH="100vh" px={{ base: 4, md: 6, xl: 8 }} py={{ base: 5, md: 7 }}>
-      <Box maxW="1360px" mx="auto">
+      <Box maxW="1500px">
 
         {/* Header */}
         <Text fontFamily="mono" fontSize="2xs" fontWeight="600" letterSpacing="0.22em" textTransform="uppercase" color={P.limeDeep} mb={2}>

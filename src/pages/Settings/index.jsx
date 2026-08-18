@@ -47,7 +47,7 @@ const Settings = () => {
     <Box position="relative" minH="100vh" bg={P.mat}>
       <Box position="absolute" top={0} left={0} right={0} h="300px" bg={`radial-gradient(ellipse at top center, ${P.lime}12, transparent 70%)`} pointerEvents="none" />
 
-      <Box maxW="640px" mx="auto" px={{ base: 5, md: 8 }} py={{ base: 8, md: 12 }} position="relative">
+      <Box maxW="960px" px={{ base: 5, md: 8 }} py={{ base: 8, md: 12 }} position="relative">
         <VStack spacing={{ base: 8, md: 10 }} align="stretch">
           <SettingsHeader />
           <SettingsAvatar user={user} profile={profile} setProfile={setProfile} />

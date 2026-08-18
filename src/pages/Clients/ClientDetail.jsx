@@ -487,7 +487,7 @@ const ClientDetail = () => {
     <Box position="relative" minH="100vh" bg={P.mat}>
       <Box position="absolute" top={0} left={0} right={0} h="360px" bg={`radial-gradient(ellipse at top center, ${P.lime}14, transparent 70%)`} pointerEvents="none" />
 
-      <Container maxW="1000px" px={{ base: 5, md: 8 }} py={{ base: 6, md: 10 }} position="relative">
+      <Container maxW="1500px" mx={0} px={{ base: 5, md: 8 }} py={{ base: 6, md: 10 }} position="relative">
         <HStack spacing={5} align="start" mb={8}>
           <ClientAvatarUpload clientId={client.id} clientName={client.name} avatarUrl={client.avatar_url} size={72} onChange={handleAvatarChange} />
 

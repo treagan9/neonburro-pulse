@@ -711,7 +711,7 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
         pointerEvents="none"
       />
 
-      <Container maxW="920px" px={{ base: 5, md: 8 }} py={{ base: 6, md: 10 }} position="relative">
+      <Container maxW="1180px" mx={0} px={{ base: 5, md: 8 }} py={{ base: 6, md: 10 }} position="relative">
         <HStack
           spacing={2}
           cursor="pointer"

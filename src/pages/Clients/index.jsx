@@ -141,7 +141,7 @@ const Clients = () => {
     <Box position="relative" minH="100vh" bg={P.mat}>
       <Box position="absolute" top={0} left={0} right={0} h="320px" bg={`radial-gradient(ellipse at top center, ${P.lime}12, transparent 70%)`} pointerEvents="none" />
 
-      <Container maxW="1080px" px={{ base: 5, md: 8 }} py={{ base: 6, md: 10 }} position="relative">
+      <Container maxW="1500px" mx={0} px={{ base: 5, md: 8 }} py={{ base: 6, md: 10 }} position="relative">
         <VStack spacing={{ base: 7, md: 9 }} align="stretch">
           <ClientsHeader
             counts={counts}

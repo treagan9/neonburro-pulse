@@ -231,7 +231,7 @@ const Messages = () => {
     <Box position="relative" minH="100vh" bg={P.mat}>
       <Box position="absolute" top={0} left={0} right={0} h="260px" bg={`radial-gradient(ellipse at top center, ${P.lime}10, transparent 70%)`} pointerEvents="none" />
 
-      <Container maxW="1240px" px={{ base: 5, md: 8 }} py={{ base: 6, md: 10 }} position="relative">
+      <Container maxW="1500px" mx={0} px={{ base: 5, md: 8 }} py={{ base: 6, md: 10 }} position="relative">
         <HStack justify="space-between" align="end" mb={6} flexWrap="wrap" rowGap={3}>
           <Box>
             <HStack spacing={3} align="center">

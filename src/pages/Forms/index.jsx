@@ -156,7 +156,7 @@ const Forms = () => {
     <Box position="relative" minH="100vh" bg={P.mat}>
       <Box position="absolute" top={0} left={0} right={0} h="300px" bg={`radial-gradient(ellipse at top center, ${P.lime}12, transparent 70%)`} pointerEvents="none" />
 
-      <Container maxW="1240px" px={{ base: 5, md: 8 }} py={{ base: 6, md: 10 }} position="relative">
+      <Container maxW="1500px" mx={0} px={{ base: 5, md: 8 }} py={{ base: 6, md: 10 }} position="relative">
         <VStack align="stretch" spacing={5} mb={6}>
           <VStack align="start" spacing={2}>
             <Text fontFamily="mono" fontSize="2xs" fontWeight="600" letterSpacing="0.22em" textTransform="uppercase" color={P.inkMuted}>Forms</Text>
