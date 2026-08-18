@@ -1,43 +1,30 @@
 // src/components/common/PortalAccessCard.jsx
-// Owner-only portal access management for a client
-// - Reveal PIN (logged to activity_log)
-// - Regenerate PIN (updates both clients.portal_pin + auth.users password)
-// - Copy PIN when revealed
-// - Shows last login timestamp
+// Owner-only portal access for a client, on Paper.
+// - Reveal PIN (logged to activity_log via RPC)
+// - Regenerate PIN (updates clients.portal_pin + the auth password)
+// - Copy PIN when revealed, shows last login
+// No oxford commas, no dashes.
 
 import { useState } from 'react';
-import {
-  Box, VStack, HStack, Text, Icon, Button, useToast, Spinner,
-} from '@chakra-ui/react';
-import {
-  TbEye, TbEyeOff, TbCopy, TbCheck, TbRefresh,
-  TbLock, TbAlertTriangle,
-} from 'react-icons/tb';
+import { Box, VStack, HStack, Text, Icon, Button, useToast, Spinner } from '@chakra-ui/react';
+import { TbEye, TbEyeOff, TbCopy, TbCheck, TbRefresh, TbLock, TbAlertTriangle } from 'react-icons/tb';
 import { supabase } from '../../lib/supabase';
 import { formatDistanceToNow } from 'date-fns';
+import colors from '../../theme/colors';
+
+const P = colors.paper;
 
 const Row = ({ label, children }) => (
-  <HStack
-    py={3}
-    spacing={4}
-    borderBottom="1px solid"
-    borderColor="surface.900"
-    align="center"
-    _last={{ borderBottom: 'none' }}
-  >
-    <Text
-      fontSize="2xs"
-      fontWeight="700"
-      color="surface.600"
-      textTransform="uppercase"
-      letterSpacing="0.1em"
-      fontFamily="mono"
-      minW="90px"
-    >
-      {label}
-    </Text>
+  <HStack py={3} spacing={4} borderBottom="1px solid" borderColor={P.hairSoft} align="center" _last={{ borderBottom: 'none' }}>
+    <Text fontSize="2xs" fontWeight="600" color={P.inkMuted} textTransform="uppercase" letterSpacing="0.12em" fontFamily="mono" minW="90px">{label}</Text>
     <Box flex={1}>{children}</Box>
   </HStack>
+);
+
+const GhostBtn = ({ children, hoverColor = P.limeDeep, ...props }) => (
+  <Button size="xs" variant="ghost" color={P.inkMuted} fontWeight="600" fontSize="2xs" textTransform="uppercase" letterSpacing="0.05em" _hover={{ color: hoverColor, bg: P.sunken }} {...props}>
+    {children}
+  </Button>
 );
 
 const PortalAccessCard = ({ client, onUpdate }) => {
@@ -55,29 +42,15 @@ const PortalAccessCard = ({ client, onUpdate }) => {
   const hasPortalAccount = !!client.portal_account_created_at;
 
   const handleShow = async () => {
-    if (showPin) {
-      setShowPin(false);
-      setRevealedPin(null);
-      return;
-    }
-
+    if (showPin) { setShowPin(false); setRevealedPin(null); return; }
     setLoading(true);
     try {
-      // Log the view to audit trail
-      const { error: logError } = await supabase.rpc('log_client_pin_viewed', {
-        client_uuid: client.id,
-      });
+      const { error: logError } = await supabase.rpc('log_client_pin_viewed', { client_uuid: client.id });
       if (logError) throw logError;
-
       setRevealedPin(client.portal_pin || '—');
       setShowPin(true);
     } catch (err) {
-      toast({
-        title: 'Could not reveal PIN',
-        description: err.message,
-        status: 'error',
-        duration: 3000,
-      });
+      toast({ title: 'Could not reveal PIN', description: err.message, status: 'error', duration: 3000 });
     } finally {
       setLoading(false);
     }
@@ -89,43 +62,21 @@ const PortalAccessCard = ({ client, onUpdate }) => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      toast({
-        title: 'Copy failed',
-        description: 'Select and copy manually',
-        status: 'warning',
-        duration: 2000,
-      });
+      toast({ title: 'Copy failed', description: 'Select and copy manually', status: 'warning', duration: 2000 });
     }
   };
 
   const handleRegenerate = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.rpc('regenerate_client_pin', {
-        client_uuid: client.id,
-      });
+      const { data, error } = await supabase.rpc('regenerate_client_pin', { client_uuid: client.id });
       if (error) throw error;
-
       setRegenResult(data);
       setConfirmingRegen(false);
-
-      toast({
-        title: 'PIN regenerated',
-        description: data?.auth_updated
-          ? 'Client portal password updated'
-          : 'PIN updated (no portal account linked)',
-        status: 'success',
-        duration: 3000,
-      });
-
+      toast({ title: 'PIN regenerated', description: data?.auth_updated ? 'Client portal password updated' : 'PIN updated (no portal account linked)', status: 'success', duration: 3000 });
       if (onUpdate) onUpdate();
     } catch (err) {
-      toast({
-        title: 'Regeneration failed',
-        description: err.message,
-        status: 'error',
-        duration: 4000,
-      });
+      toast({ title: 'Regeneration failed', description: err.message, status: 'error', duration: 4000 });
     } finally {
       setLoading(false);
     }
@@ -138,219 +89,63 @@ const PortalAccessCard = ({ client, onUpdate }) => {
   return (
     <Box>
       <HStack spacing={2} mb={4}>
-        <Icon as={TbLock} boxSize={3} color="surface.600" />
-        <Text
-          fontSize="2xs"
-          fontWeight="700"
-          color="surface.600"
-          textTransform="uppercase"
-          letterSpacing="0.1em"
-          fontFamily="mono"
-        >
-          Portal Access
-        </Text>
+        <Icon as={TbLock} boxSize={3} color={P.inkMuted} />
+        <Text fontSize="2xs" fontWeight="600" color={P.inkMuted} textTransform="uppercase" letterSpacing="0.12em" fontFamily="mono">Portal access</Text>
       </HStack>
 
-      {/* Post-regen reveal — shows once, must be copied */}
       {regenResult && (
-        <Box
-          mb={4}
-          p={4}
-          bg="rgba(57,255,20,0.04)"
-          border="1px solid"
-          borderColor="rgba(57,255,20,0.25)"
-          borderRadius="md"
-        >
+        <Box mb={4} p={4} bg={`${P.lime}18`} border="1px solid" borderColor={`${P.lime}55`} borderRadius="12px">
           <HStack spacing={2} mb={2}>
-            <Icon as={TbCheck} boxSize={3.5} color="accent.neon" />
-            <Text
-              fontSize="2xs"
-              fontWeight="700"
-              color="accent.neon"
-              textTransform="uppercase"
-              letterSpacing="0.1em"
-              fontFamily="mono"
-            >
-              New PIN
-            </Text>
+            <Icon as={TbCheck} boxSize={3.5} color={P.limeDeep} />
+            <Text fontSize="2xs" fontWeight="700" color={P.limeDeep} textTransform="uppercase" letterSpacing="0.1em" fontFamily="mono">New PIN</Text>
           </HStack>
-          <Text color="surface.400" fontSize="xs" mb={3} lineHeight="1.5">
-            Copy this now. It will not be shown again.
-          </Text>
+          <Text color={P.inkSec} fontSize="xs" mb={3} lineHeight="1.5">Copy this now. It will not be shown again.</Text>
           <HStack spacing={2}>
-            <Text
-              color="white"
-              fontSize="xl"
-              fontWeight="800"
-              fontFamily="mono"
-              letterSpacing="0.15em"
-              flex={1}
-            >
-              {regenResult.pin}
-            </Text>
-            <Button
-              size="xs"
-              variant="outline"
-              borderColor="accent.neon"
-              color="accent.neon"
-              borderRadius="md"
-              leftIcon={copied ? <TbCheck size={12} /> : <TbCopy size={12} />}
-              onClick={() => handleCopy(regenResult.pin)}
-              _hover={{ bg: 'rgba(57,255,20,0.08)' }}
-            >
-              {copied ? 'Copied' : 'Copy'}
-            </Button>
-            <Button
-              size="xs"
-              variant="ghost"
-              color="surface.500"
-              onClick={() => setRegenResult(null)}
-              _hover={{ color: 'white' }}
-            >
-              Done
-            </Button>
+            <Text color={P.ink} fontSize="xl" fontWeight="800" fontFamily="mono" letterSpacing="0.15em" flex={1}>{regenResult.pin}</Text>
+            <Button size="xs" variant="outline" borderColor={P.limeDeep} color={P.limeDeep} borderRadius="md" leftIcon={copied ? <TbCheck size={12} /> : <TbCopy size={12} />} onClick={() => handleCopy(regenResult.pin)} _hover={{ bg: `${P.lime}22` }}>{copied ? 'Copied' : 'Copy'}</Button>
+            <GhostBtn onClick={() => setRegenResult(null)} hoverColor={P.ink}>Done</GhostBtn>
           </HStack>
         </Box>
       )}
 
-      {/* Regenerate confirmation */}
       {confirmingRegen && (
-        <Box
-          mb={4}
-          p={4}
-          bg="rgba(255,51,102,0.04)"
-          border="1px solid"
-          borderColor="rgba(255,51,102,0.25)"
-          borderRadius="md"
-        >
+        <Box mb={4} p={4} bg={`${P.coral}12`} border="1px solid" borderColor={`${P.coral}40`} borderRadius="12px">
           <HStack spacing={2} mb={2}>
-            <Icon as={TbAlertTriangle} boxSize={3.5} color="red.400" />
-            <Text
-              fontSize="2xs"
-              fontWeight="700"
-              color="red.400"
-              textTransform="uppercase"
-              letterSpacing="0.1em"
-              fontFamily="mono"
-            >
-              Regenerate PIN
-            </Text>
+            <Icon as={TbAlertTriangle} boxSize={3.5} color={P.coral} />
+            <Text fontSize="2xs" fontWeight="700" color={P.coral} textTransform="uppercase" letterSpacing="0.1em" fontFamily="mono">Regenerate PIN</Text>
           </HStack>
-          <Text color="surface.400" fontSize="xs" mb={3} lineHeight="1.5">
-            Old PIN stops working immediately. Client will need the new PIN to log in.
-          </Text>
+          <Text color={P.inkSec} fontSize="xs" mb={3} lineHeight="1.5">Old PIN stops working immediately. The client needs the new PIN to log in.</Text>
           <HStack spacing={2}>
-            <Button
-              size="xs"
-              bg="red.500"
-              color="white"
-              fontWeight="700"
-              borderRadius="md"
-              onClick={handleRegenerate}
-              isLoading={loading}
-              loadingText="Generating"
-              _hover={{ bg: 'red.600' }}
-            >
-              Yes, Regenerate
-            </Button>
-            <Button
-              size="xs"
-              variant="ghost"
-              color="surface.500"
-              onClick={() => setConfirmingRegen(false)}
-              _hover={{ color: 'white' }}
-            >
-              Cancel
-            </Button>
+            <Button size="xs" bg={P.coral} color="#fff" fontWeight="700" borderRadius="md" onClick={handleRegenerate} isLoading={loading} loadingText="Generating" _hover={{ bg: '#A83220' }}>Yes, regenerate</Button>
+            <GhostBtn onClick={() => setConfirmingRegen(false)} hoverColor={P.ink}>Cancel</GhostBtn>
           </HStack>
         </Box>
       )}
 
-      {/* Info rows */}
-      <Box borderTop="1px solid" borderColor="surface.900">
+      <Box borderTop="1px solid" borderColor={P.hairSoft}>
         <Row label="Username">
-          <Text color="white" fontSize="sm" fontFamily="mono" fontWeight="600">
-            {username}
-          </Text>
+          <Text color={P.ink} fontSize="sm" fontFamily="mono" fontWeight="600">{username}</Text>
         </Row>
 
         <Row label="PIN">
           <HStack spacing={2} align="center">
-            <Text
-              color={showPin ? 'white' : 'surface.600'}
-              fontSize="sm"
-              fontFamily="mono"
-              fontWeight="700"
-              letterSpacing="0.15em"
-              minW="100px"
-            >
+            <Text color={showPin ? P.ink : P.inkFaint} fontSize="sm" fontFamily="mono" fontWeight="700" letterSpacing="0.15em" minW="100px">
               {showPin ? (revealedPin || '—') : '••••••••'}
             </Text>
-            <Button
-              size="xs"
-              variant="ghost"
-              color="surface.500"
-              leftIcon={loading && !showPin ? <Spinner size="xs" /> : (showPin ? <TbEyeOff size={12} /> : <TbEye size={12} />)}
-              onClick={handleShow}
-              isDisabled={loading}
-              _hover={{ color: 'brand.500' }}
-              fontWeight="600"
-              fontSize="2xs"
-              textTransform="uppercase"
-              letterSpacing="0.05em"
-            >
-              {showPin ? 'Hide' : 'Show'}
-            </Button>
+            <GhostBtn leftIcon={loading && !showPin ? <Spinner size="xs" /> : (showPin ? <TbEyeOff size={12} /> : <TbEye size={12} />)} onClick={handleShow} isDisabled={loading}>{showPin ? 'Hide' : 'Show'}</GhostBtn>
             {showPin && revealedPin && revealedPin !== '—' && (
-              <Button
-                size="xs"
-                variant="ghost"
-                color="surface.500"
-                leftIcon={copied ? <TbCheck size={12} /> : <TbCopy size={12} />}
-                onClick={() => handleCopy(revealedPin)}
-                _hover={{ color: 'brand.500' }}
-                fontWeight="600"
-                fontSize="2xs"
-                textTransform="uppercase"
-                letterSpacing="0.05em"
-              >
-                {copied ? 'Copied' : 'Copy'}
-              </Button>
+              <GhostBtn leftIcon={copied ? <TbCheck size={12} /> : <TbCopy size={12} />} onClick={() => handleCopy(revealedPin)}>{copied ? 'Copied' : 'Copy'}</GhostBtn>
             )}
             <Box flex={1} />
-            <Button
-              size="xs"
-              variant="ghost"
-              color="surface.500"
-              leftIcon={<TbRefresh size={12} />}
-              onClick={() => setConfirmingRegen(true)}
-              isDisabled={loading || confirmingRegen}
-              _hover={{ color: 'accent.banana' }}
-              fontWeight="600"
-              fontSize="2xs"
-              textTransform="uppercase"
-              letterSpacing="0.05em"
-            >
-              Regenerate
-            </Button>
+            <GhostBtn leftIcon={<TbRefresh size={12} />} onClick={() => setConfirmingRegen(true)} isDisabled={loading || confirmingRegen} hoverColor={P.gold}>Regenerate</GhostBtn>
           </HStack>
         </Row>
 
         <Row label="Status">
-          <HStack spacing={2}>
-            <Box
-              w="6px"
-              h="6px"
-              borderRadius="full"
-              bg={hasPortalAccount ? 'accent.neon' : 'surface.600'}
-              boxShadow={hasPortalAccount ? '0 0 6px rgba(57,255,20,0.5)' : 'none'}
-            />
-            <Text color="white" fontSize="sm" fontWeight="600">
-              {hasPortalAccount ? 'Active' : 'Not activated'}
-            </Text>
-            <Text color="surface.600" fontSize="xs" fontFamily="mono">
-              · {lastLoginText}
-            </Text>
+          <HStack spacing={2} flexWrap="wrap" rowGap={1}>
+            <Box w="6px" h="6px" borderRadius="full" bg={hasPortalAccount ? P.green : P.inkFaint} />
+            <Text color={P.ink} fontSize="sm" fontWeight="600">{hasPortalAccount ? 'Active' : 'Not activated'}</Text>
+            <Text color={P.inkMuted} fontSize="xs" fontFamily="mono">· {lastLoginText}</Text>
           </HStack>
         </Row>
       </Box>
