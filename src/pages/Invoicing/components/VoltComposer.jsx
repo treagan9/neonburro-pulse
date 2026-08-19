@@ -25,6 +25,7 @@ import {
   TbKeyboard, TbMicrophone, TbPaperclip, TbSparkles, TbX, TbFileText, TbPhoto, TbArrowRight, TbRefresh,
 } from 'react-icons/tb';
 import colors from '../../../theme/colors';
+import { supabase } from '../../../lib/supabase';
 
 const P = colors.paper;
 const VOLT_AVATAR = 'https://neonburro.com/burros/volt/volt-avatar.webp';
@@ -89,8 +90,10 @@ const VoltComposer = ({ isOpen, onClose, clients = [], onDraft }) => {
   const runDraft = async () => {
     setDrafting(true); setError(null); setDraft(null);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch('/.netlify/functions/draft-invoice', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
         body: JSON.stringify({
           text,
           attachments: attachments.map((a) => ({ media_type: a.media_type, data: a.data })),

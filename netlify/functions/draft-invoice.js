@@ -12,8 +12,18 @@
 //
 // No oxford commas, no em dashes.
 
+import { createClient } from '@supabase/supabase-js';
+
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const MODEL = 'claude-sonnet-5';
+
+// Volt costs money per call, so only a signed-in Pulse user can spend it. This is
+// a public URL otherwise, and a paid key behind a public endpoint is an open tab.
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supaAuth = (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY)
+  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } })
+  : null;
 
 const SYSTEM = `You are Volt, the invoicing assistant for Neon Burro, a small digital studio in Ridgway Colorado. You turn a short spoken or typed description, plus any receipts, into a clean professional invoice draft.
 
@@ -64,6 +74,18 @@ export const handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
+
+  // Require a valid Pulse session token.
+  const authHeader = event.headers.authorization || event.headers.Authorization || '';
+  const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+  if (!supaAuth || !token) {
+    return { statusCode: 401, body: JSON.stringify({ error: 'Sign in to use Volt.' }) };
+  }
+  const { data: userData, error: authErr } = await supaAuth.auth.getUser(token);
+  if (authErr || !userData?.user) {
+    return { statusCode: 401, body: JSON.stringify({ error: 'Sign in to use Volt.' }) };
+  }
+
   if (!ANTHROPIC_API_KEY) {
     return { statusCode: 200, body: JSON.stringify({ notConnected: true, error: 'Volt is not connected yet. Add ANTHROPIC_API_KEY to the Pulse site and try again.' }) };
   }
