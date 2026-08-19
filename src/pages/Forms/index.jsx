@@ -14,7 +14,7 @@ import {
 } from '@chakra-ui/react';
 import {
   TbInbox, TbSearch, TbArchive, TbArchiveOff, TbSend, TbArrowLeft,
-  TbCircleCheck, TbCircleDashed, TbHistory, TbEdit, TbEye,
+  TbCircleCheck, TbCircleDashed, TbHistory, TbEdit, TbEye, TbTrash, TbAlertTriangle,
 } from 'react-icons/tb';
 import { formatDistanceToNow, format } from 'date-fns';
 import { supabase } from '../../lib/supabase';
@@ -147,6 +147,30 @@ const Forms = () => {
     toast({ title: 'Unarchived', status: 'success', duration: 1500 });
   };
 
+  // Hard delete, only offered from the archive. Clears the replies first so the
+  // foreign key does not block, drops the submission, logs the removal.
+  const handleDeleteForever = async (id) => {
+    try {
+      await supabase.from('form_replies').delete().eq('submission_id', id);
+      const { error } = await supabase.from('form_submissions').delete().eq('id', id);
+      if (error) throw error;
+      const { data: { user } } = await supabase.auth.getUser();
+      await supabase.from('activity_log').insert({
+        user_id: user?.id,
+        action: 'form_submission_deleted',
+        entity_type: 'form_submission',
+        entity_id: id,
+        metadata: { hard_delete: true },
+        created_at: new Date().toISOString(),
+      });
+      setSubmissions((prev) => prev.filter((s) => s.id !== id));
+      if (selectedId === id) setSelectedId(null);
+      toast({ title: 'Deleted forever', status: 'info', duration: 1800 });
+    } catch (err) {
+      toast({ title: 'Could not delete', description: err.message, status: 'error', duration: 4000 });
+    }
+  };
+
   const handleMarkUnread = async (id) => {
     await supabase.from('form_submissions').update({ status: 'unread', viewed_at: null, viewed_by: null }).eq('id', id);
     setSubmissions((prev) => prev.map((s) => (s.id === id ? { ...s, status: 'unread' } : s)));
@@ -209,7 +233,7 @@ const Forms = () => {
 
             <Box display={{ base: 'none', lg: 'block' }} flex={1} minW={0}>
               {selected ? (
-                <DetailPane submission={selected} replies={selectedReplies} onReply={() => setReplyOpen(true)} onArchive={() => handleArchive(selected.id)} onUnarchive={() => handleUnarchive(selected.id)} onMarkUnread={() => handleMarkUnread(selected.id)} />
+                <DetailPane submission={selected} replies={selectedReplies} onReply={() => setReplyOpen(true)} onArchive={() => handleArchive(selected.id)} onUnarchive={() => handleUnarchive(selected.id)} onMarkUnread={() => handleMarkUnread(selected.id)} onDeleteForever={() => handleDeleteForever(selected.id)} />
               ) : (
                 <EmptyDetail />
               )}
@@ -229,7 +253,7 @@ const Forms = () => {
                   <Text color={P.ink} fontWeight="700" fontSize="sm">Submission</Text>
                 </HStack>
                 <Box p={5}>
-                  <DetailPane submission={selected} replies={selectedReplies} onReply={() => setReplyOpen(true)} onArchive={() => handleArchive(selected.id)} onUnarchive={() => handleUnarchive(selected.id)} onMarkUnread={() => handleMarkUnread(selected.id)} />
+                  <DetailPane submission={selected} replies={selectedReplies} onReply={() => setReplyOpen(true)} onArchive={() => handleArchive(selected.id)} onUnarchive={() => handleUnarchive(selected.id)} onMarkUnread={() => handleMarkUnread(selected.id)} onDeleteForever={() => handleDeleteForever(selected.id)} />
                 </Box>
               </Box>
             )}
@@ -306,7 +330,9 @@ const ListRow = ({ submission, replyCount, selected, onClick }) => {
 // ============================================================
 // DETAIL PANE
 // ============================================================
-const DetailPane = ({ submission, replies, onReply, onArchive, onUnarchive, onMarkUnread }) => {
+const DetailPane = ({ submission, replies, onReply, onArchive, onUnarchive, onMarkUnread, onDeleteForever }) => {
+  const [confirming, setConfirming] = useState(false);
+  useEffect(() => { setConfirming(false); }, [submission.id]);
   const formType = submission.form_type || 'contact';
   const typeLabel = FORM_TYPE_LABELS[formType] || formType.replace(/_/g, ' ');
   const typeColor = FORM_TYPE_COLORS[formType] || FALLBACK_COLOR;
@@ -366,7 +392,19 @@ const DetailPane = ({ submission, replies, onReply, onArchive, onUnarchive, onMa
         <ActionButton icon={TbSend} label={replyCount === 0 ? 'Reply' : 'Send follow-up'} onClick={onReply} disabled={!senderEmail} primary />
         <ActionButton icon={TbCircleDashed} label="Mark unread" onClick={onMarkUnread} />
         {isArchived ? <ActionButton icon={TbArchiveOff} label="Unarchive" onClick={onUnarchive} /> : <ActionButton icon={TbArchive} label="Archive" onClick={onArchive} />}
+        {isArchived && !confirming && <ActionButton icon={TbTrash} label="Delete forever" onClick={() => setConfirming(true)} destructive />}
       </HStack>
+
+      {isArchived && confirming && (
+        <HStack spacing={3} bg={`${P.coral}10`} border="1px solid" borderColor={`${P.coral}44`} borderRadius="14px" p={3.5} flexWrap="wrap" rowGap={2}>
+          <Icon as={TbAlertTriangle} boxSize={4} color={P.coral} flexShrink={0} />
+          <Text fontSize="sm" color={P.ink} fontWeight="600" flex={1} minW="180px">Delete this forever? It leaves the database and cannot be recovered.</Text>
+          <HStack spacing={2}>
+            <Button size="sm" variant="ghost" color={P.inkMuted} onClick={() => setConfirming(false)} _hover={{ bg: P.sunken, color: P.ink }}>Cancel</Button>
+            <Button size="sm" bg={P.coral} color={P.sheet} fontWeight="700" leftIcon={<TbTrash size={14} />} onClick={onDeleteForever} _hover={{ bg: '#A8362A' }}>Delete forever</Button>
+          </HStack>
+        </HStack>
+      )}
 
       <Divider borderColor={P.hair} />
 
@@ -428,9 +466,9 @@ const ReplyCard = ({ reply, index }) => {
 // ============================================================
 // ACTION BUTTON
 // ============================================================
-const ActionButton = ({ icon, label, onClick, disabled, primary }) => (
+const ActionButton = ({ icon, label, onClick, disabled, primary, destructive }) => (
   <Tooltip label={disabled ? 'No email address' : null} isDisabled={!disabled} placement="top" hasArrow bg={P.ink} color={P.sheet} fontSize="xs">
-    <HStack as="button" onClick={disabled ? undefined : onClick} spacing={1.5} px={3.5} py={2} border="1px solid" borderColor={primary ? P.lime : P.hair} bg={primary ? P.lime : 'transparent'} borderRadius="full" color={primary ? P.limeInk : P.inkSec} fontSize="xs" fontFamily="mono" fontWeight="700" textTransform="uppercase" letterSpacing="0.05em" opacity={disabled ? 0.4 : 1} cursor={disabled ? 'not-allowed' : 'pointer'} transition="all 0.15s" _hover={disabled ? {} : (primary ? { bg: '#D2E26B' } : { color: P.ink, bg: P.sheet, borderColor: P.inkFaint })}>
+    <HStack as="button" onClick={disabled ? undefined : onClick} spacing={1.5} px={3.5} py={2} border="1px solid" borderColor={destructive ? `${P.coral}55` : (primary ? P.lime : P.hair)} bg={primary ? P.lime : 'transparent'} borderRadius="full" color={destructive ? P.coral : (primary ? P.limeInk : P.inkSec)} fontSize="xs" fontFamily="mono" fontWeight="700" textTransform="uppercase" letterSpacing="0.05em" opacity={disabled ? 0.4 : 1} cursor={disabled ? 'not-allowed' : 'pointer'} transition="all 0.15s" _hover={disabled ? {} : (primary ? { bg: '#D2E26B' } : destructive ? { bg: `${P.coral}14`, borderColor: P.coral } : { color: P.ink, bg: P.sheet, borderColor: P.inkFaint })}>
       <Icon as={icon} boxSize={3.5} />
       <Text>{label}</Text>
     </HStack>
