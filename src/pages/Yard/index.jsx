@@ -239,6 +239,11 @@ const Yard = () => {
                       <Text fontFamily="mono" fontSize={TYPE.label} color={P.inkFaint}>{e.wallet}</Text>
                       <Text fontFamily="mono" fontSize={TYPE.label} color={P.inkFaint}>{when(e.created_at)}</Text>
                       {e.attempts > 1 && <Text fontFamily="mono" fontSize={TYPE.label} color={P.gold}>try {e.attempts}</Text>}
+                      {e.wallet_source === 'pasted' && (
+                        <Text fontFamily="mono" fontSize={TYPE.label} color={P.gold} title="the address was typed, not signed, check it before paying out">
+                          pasted
+                        </Text>
+                      )}
                     </HStack>
 
                     {e.status === 'pasture' && e.verdict_line && (

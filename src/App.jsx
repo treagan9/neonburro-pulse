@@ -42,6 +42,7 @@ const Forms         = lazy(() => import('./pages/Forms'));
 const Blog          = lazy(() => import('./pages/Blog'));
 const PostEditor    = lazy(() => import('./pages/Blog/PostEditor'));
 const Yard          = lazy(() => import('./pages/Yard'));
+const Registry      = lazy(() => import('./pages/Registry'));
 const Messages      = lazy(() => import('./pages/Messages'));
 const Calendar      = lazy(() => import('./pages/Calendar'));
 const Analytics     = lazy(() => import('./pages/Analytics'));
@@ -85,6 +86,7 @@ function App() {
               <Route path="blog/new/" element={<PostEditor />} />
               <Route path="blog/:postId/" element={<PostEditor />} />
               <Route path="yard/" element={<Yard />} />
+              <Route path="registry/" element={<Registry />} />
               <Route path="messages/" element={<Messages />} />
               <Route path="calendar/" element={<Calendar />} />
               <Route path="analytics/" element={<Analytics />} />

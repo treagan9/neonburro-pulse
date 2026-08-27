@@ -28,7 +28,7 @@
 
 import {
   TbSunrise, TbUsers, TbFileInvoice, TbInbox,
-  TbPencil, TbHorse, TbMessageCircle, TbCalendar, TbChartBar, TbSettings,
+  TbPencil, TbHorse, TbWallet, TbMessageCircle, TbCalendar, TbChartBar, TbSettings,
 } from 'react-icons/tb';
 
 export const NAV = [
@@ -38,6 +38,7 @@ export const NAV = [
   { path: '/forms/',     label: 'Forms',     icon: TbInbox,         desc: 'Inbound submissions' },
   { path: '/blog/',      label: 'Blog',      icon: TbPencil,        desc: 'Posts and the social run' },
   { path: '/yard/',      label: 'Yard',      icon: TbHorse,         desc: 'The send a burro call' },
+  { path: '/registry/',  label: 'Registry',  icon: TbWallet,        desc: 'The book of our own wallets' },
   { path: '/messages/',  label: 'Messages',  icon: TbMessageCircle, desc: 'Threads with clients' },
   { path: '/calendar/',  label: 'Calendar',  icon: TbCalendar,      desc: 'Scheduling and sprints' },
   { path: '/analytics/', label: 'Analytics', icon: TbChartBar,      desc: 'Traffic and trends' },
