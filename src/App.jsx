@@ -21,6 +21,7 @@ import Invoicing     from './pages/Invoicing';
 import Forms         from './pages/Forms';
 import Blog          from './pages/Blog';
 import PostEditor    from './pages/Blog/PostEditor';
+import Yard          from './pages/Yard';
 import Messages      from './pages/Messages';
 import Calendar      from './pages/Calendar';
 import Analytics     from './pages/Analytics';
@@ -60,6 +61,7 @@ function App() {
             <Route path="blog/" element={<Blog />} />
             <Route path="blog/new/" element={<PostEditor />} />
             <Route path="blog/:postId/" element={<PostEditor />} />
+            <Route path="yard/" element={<Yard />} />
             <Route path="messages/" element={<Messages />} />
             <Route path="calendar/" element={<Calendar />} />
             <Route path="analytics/" element={<Analytics />} />
