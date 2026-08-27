@@ -250,7 +250,18 @@ const Yard = () => {
                           vouched
                         </Text>
                       )}
+                      {e.wallet_source === 'phrase' && (
+                        <Text fontFamily="mono" fontSize={TYPE.label} color={P.inkMuted} title="no wallet yet, the seed phrase below is the key, a claim attaches one later">
+                          open door
+                        </Text>
+                      )}
                     </HStack>
+
+                    {e.seed_phrase && (
+                      <Text fontFamily="mono" fontSize={TYPE.label} color={P.limeDeep} title="the house seed phrase, shown here so a lost one can be rescued">
+                        {e.seed_phrase}
+                      </Text>
+                    )}
 
                     {e.status === 'pasture' && e.verdict_line && (
                       <Text fontSize={TYPE.small} color={P.inkMuted} fontStyle="italic">

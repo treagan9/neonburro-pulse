@@ -90,7 +90,7 @@ export const handler = async (event) => {
     if (action === 'list') {
       const [entriesRes, dialsRes, bookRes] = await Promise.all([
         supa.from('send_a_burro_entries')
-          .select('id, username, character_name, blurb, image_path, status, spot, verdict_burro, verdict_line, attempts, wallet, wallet_source, created_at, decided_at')
+          .select('id, username, character_name, blurb, image_path, status, spot, verdict_burro, verdict_line, attempts, wallet, wallet_source, seed_phrase, created_at, decided_at')
           .order('created_at', { ascending: false }),
         supa.from('send_a_burro_settings').select('key, value'),
         supa.from('send_a_burro_wallets').select('wallet', { count: 'exact', head: true }),
@@ -165,10 +165,13 @@ export const handler = async (event) => {
         // Phosphor acknowledges the ramp. Same write as the studio's
         // send-a-burro-submit auto ramp path, change both together. An X
         // later does not revoke, pruning the guest list is its own decision.
-        try {
-          await supa.from('burrow_grants')
-            .upsert({ wallet: data.wallet, reason: 'send a burro, on the ramp' });
-        } catch { /* quiet, the sweep can catch it later */ }
+        // A phrase entry has no wallet yet, its grant lands at claim time.
+        if (data.wallet) {
+          try {
+            await supa.from('burrow_grants')
+              .upsert({ wallet: data.wallet, reason: 'send a burro, on the ramp' });
+          } catch { /* quiet, the sweep can catch it later */ }
+        }
         return { statusCode: 200, body: JSON.stringify({ ok: true, spot: data.spot }) };
       }
       if (error && !String(error.message || '').includes('duplicate')) {
