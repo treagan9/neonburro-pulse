@@ -19,6 +19,8 @@ import Clients       from './pages/Clients';
 import ClientDetail  from './pages/Clients/ClientDetail';
 import Invoicing     from './pages/Invoicing';
 import Forms         from './pages/Forms';
+import Blog          from './pages/Blog';
+import PostEditor    from './pages/Blog/PostEditor';
 import Messages      from './pages/Messages';
 import Calendar      from './pages/Calendar';
 import Analytics     from './pages/Analytics';
@@ -55,6 +57,9 @@ function App() {
             <Route path="clients/:clientId/" element={<ClientDetail />} />
             <Route path="invoicing/" element={<Invoicing />} />
             <Route path="forms/" element={<Forms />} />
+            <Route path="blog/" element={<Blog />} />
+            <Route path="blog/new/" element={<PostEditor />} />
+            <Route path="blog/:postId/" element={<PostEditor />} />
             <Route path="messages/" element={<Messages />} />
             <Route path="calendar/" element={<Calendar />} />
             <Route path="analytics/" element={<Analytics />} />
