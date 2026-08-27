@@ -23,7 +23,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Box, VStack, HStack, Text, Icon, Container, Spinner, Image,
 } from '@chakra-ui/react';
-import { TbX, TbTrash, TbArrowUp, TbRefresh } from 'react-icons/tb';
+import { TbX, TbTrash, TbArrowUp, TbRefresh, TbCheck } from 'react-icons/tb';
 import { supabase } from '../../lib/supabase';
 import colors from '../../theme/colors';
 import { TYPE, EASE, FAST } from '../../theme/layout';
@@ -127,6 +127,7 @@ const Yard = () => {
       if (action === 'pasture') setNote(`${entry.username} to the pasture. ${res.verdict_burro}. said "${res.verdict_line}"`);
       if (action === 'approve') setNote(`${entry.username} takes spot ${String(res.spot).padStart(3, '0')}.`);
       if (action === 'remove') setNote(`${entry.username} removed.`);
+      if (action === 'vouch') setNote(`${entry.username} vouched, the address is proven.`);
       await refresh();
     } catch (e) {
       setNote(e.message);
@@ -240,8 +241,13 @@ const Yard = () => {
                       <Text fontFamily="mono" fontSize={TYPE.label} color={P.inkFaint}>{when(e.created_at)}</Text>
                       {e.attempts > 1 && <Text fontFamily="mono" fontSize={TYPE.label} color={P.gold}>try {e.attempts}</Text>}
                       {e.wallet_source === 'pasted' && (
-                        <Text fontFamily="mono" fontSize={TYPE.label} color={P.gold} title="the address was typed, not signed, check it before paying out">
+                        <Text fontFamily="mono" fontSize={TYPE.label} color={P.gold} title="the address was typed, not signed, check the coin page replies for the trail name then vouch it">
                           pasted
+                        </Text>
+                      )}
+                      {e.wallet_source === 'vouched' && (
+                        <Text fontFamily="mono" fontSize={TYPE.label} color={P.limeDeep} title="the trail name appeared in a reply from the owning account, proven">
+                          vouched
                         </Text>
                       )}
                     </HStack>
@@ -252,7 +258,10 @@ const Yard = () => {
                       </Text>
                     )}
 
-                    <HStack spacing={2} pt={1}>
+                    <HStack spacing={2} pt={1} flexWrap="wrap" rowGap={2}>
+                      {e.wallet_source === 'pasted' && (
+                        <ActionChip icon={TbCheck} label="vouch" tone={P.limeDeep} onClick={() => act(e, 'vouch')} disabled={!!busyId} />
+                      )}
                       {e.status !== 'ramp' && (
                         <ActionChip icon={TbArrowUp} label="to the ramp" tone={P.limeDeep} onClick={() => act(e, 'approve')} disabled={!!busyId} />
                       )}

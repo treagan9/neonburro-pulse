@@ -111,8 +111,19 @@ export const handler = async (event) => {
       return { statusCode: 200, body: JSON.stringify({ ok: true, key, value: String(value) }) };
     }
 
-    if (!id || !['pasture', 'remove', 'approve'].includes(action)) {
+    if (!id || !['pasture', 'remove', 'approve', 'vouch'].includes(action)) {
       return { statusCode: 400, body: JSON.stringify({ error: 'Send an action and an id.' }) };
+    }
+
+    // The vouch. The operator saw the trail name in a reply on the coin page
+    // from the account that owns the pasted address, so the claim is proven
+    // socially. Only a pasted entry takes one, signed never needs it.
+    if (action === 'vouch') {
+      const { data, error } = await supa.from('send_a_burro_entries')
+        .update({ wallet_source: 'vouched' })
+        .eq('id', id).eq('wallet_source', 'pasted').select('id').single();
+      if (error || !data) return { statusCode: 404, body: JSON.stringify({ error: 'Only a pasted entry takes a vouch.' }) };
+      return { statusCode: 200, body: JSON.stringify({ ok: true }) };
     }
 
     if (action === 'pasture') {
