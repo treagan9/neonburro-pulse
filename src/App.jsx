@@ -45,6 +45,7 @@ const Yard          = lazy(() => import('./pages/Yard'));
 const Registry      = lazy(() => import('./pages/Registry'));
 const Messages      = lazy(() => import('./pages/Messages'));
 const Calendar      = lazy(() => import('./pages/Calendar'));
+const Releases      = lazy(() => import('./pages/Releases'));
 const Analytics     = lazy(() => import('./pages/Analytics'));
 const Settings      = lazy(() => import('./pages/Settings'));
 
@@ -89,6 +90,7 @@ function App() {
               <Route path="registry/" element={<Registry />} />
               <Route path="messages/" element={<Messages />} />
               <Route path="calendar/" element={<Calendar />} />
+              <Route path="releases/" element={<Releases />} />
               <Route path="analytics/" element={<Analytics />} />
               <Route path="settings/" element={<Settings />} />
               {/* Projects redirect to clients - the source of truth now */}
