@@ -10,9 +10,9 @@
 // delete on this page, a release that dies gets its notes updated and stays
 // on the record, the timeline is a ledger not a todo list.
 //
-// If the reads fail with a missing table the page says so and points at
-// supabase/migrations/2026082901_releases.sql, which Tyler applies by hand
-// in the dashboard, the connector cannot reach this org.
+// The table was applied 2026-08-29. The missing table panel stays in the code
+// anyway, it is what a fresh branch database shows before its migrations run,
+// and it points at supabase/migrations/2026082901_releases.sql.
 //
 // Paper system page, same idioms as Blog and Clients. Lime is spent once,
 // on the add button. No oxford commas, no em dashes.

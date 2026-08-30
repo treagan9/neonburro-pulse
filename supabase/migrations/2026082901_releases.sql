@@ -2,8 +2,8 @@
 -- The release timeline. One row is one thing the studio intends to put into
 -- the world: a site feature, a post on a channel, a newsletter, a page, a
 -- product door opening. The Releases page in Pulse reads and writes this
--- straight through the client. NOT YET APPLIED, Tyler pastes this in the
--- dashboard SQL editor, the connector cannot reach this org.
+-- straight through the client. APPLIED 2026-08-29 through the connector,
+-- seeded with the eight rows at the bottom.
 --
 -- channel is free text on purpose (site, x, instagram, reddit, telegram,
 -- blog, newsletter, phosphor, shop, pulse), a check list would need a
