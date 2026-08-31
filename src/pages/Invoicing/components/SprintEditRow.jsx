@@ -160,81 +160,38 @@ const SprintEditRow = ({ sprint, onUpdate, onDelete }) => {
             )}
           </HStack>
 
-          {/* ── TWO FIELDS, TWO VOICES ──────────────────────────────────────
-              The summary is the plain sentence and it prints FIRST and largest
-              on the client's document. The description is the technical
-              breakdown underneath it, smaller and muted.
+          {/* ── ONE FIELD, DELIBERATELY ─────────────────────────────────────
+              This briefly had two, a plain sentence above a technical
+              paragraph. It was reverted: two blocks of prose per line turned a
+              one page invoice into a document, and being readable at a glance
+              was the thing that made the letterhead good.
 
-              The split exists because one field was carrying both jobs and the
-              technical voice was winning. A client who does not know what
-              Resend is cannot tell whether that sentence is worth two thousand
-              dollars, and an invoice they cannot evaluate is one they have to
-              take on faith. See the note on invoice_items.summary.
+              The readability fix that survived is the SIZE. It was rows 2.
+              These paragraphs run sixty words, and reading one through a two
+              line slot is why nobody proofreads them. Six rows, and draggable
+              taller.
 
-              The description box is rows 6 and resizable rather than rows 2.
-              These paragraphs run sixty words and reading one through a two
-              line slot is why nobody proofreads them. */}
+              Write it opening with where the work is, "Second pass." or
+              "Initial build, in progress.", then the detail. */}
           {expanded && (
-            <Box mt={3}>
-              <Text
-                fontFamily="mono"
-                fontSize="2xs"
-                fontWeight="700"
-                textTransform="uppercase"
-                letterSpacing="0.1em"
-                color={P.inkMuted}
-                mb={1.5}
-              >
-                In plain words
-              </Text>
-              <Textarea
-                value={sprint.summary || ''}
-                onChange={(e) => onUpdate({ ...sprint, summary: e.target.value })}
-                placeholder="One sentence, in their language. What they got, not what it was built with."
-                bg={P.sheet}
-                border="1px solid"
-                borderColor={P.hair}
-                borderRadius="lg"
-                color={P.ink}
-                fontSize="sm"
-                fontWeight="500"
-                rows={2}
-                resize="vertical"
-                isReadOnly={isLocked}
-                _focus={{ borderColor: P.lime, boxShadow: `0 0 0 3px ${P.lime}33` }}
-                _placeholder={{ color: P.inkFaint }}
-              />
-
-              <Text
-                fontFamily="mono"
-                fontSize="2xs"
-                fontWeight="700"
-                textTransform="uppercase"
-                letterSpacing="0.1em"
-                color={P.inkMuted}
-                mt={4}
-                mb={1.5}
-              >
-                Technical detail
-              </Text>
-              <Textarea
-                value={sprint.description || ''}
-                onChange={(e) => onUpdate({ ...sprint, description: e.target.value })}
-                placeholder="The full breakdown. Stack names are fine here, this is the part they can read if they want it."
-                bg={P.sheet}
-                border="1px solid"
-                borderColor={P.hair}
-                borderRadius="lg"
-                color={P.inkSec}
-                fontSize="sm"
-                rows={6}
-                minH="140px"
-                resize="vertical"
-                isReadOnly={isLocked}
-                _focus={{ borderColor: P.lime, boxShadow: `0 0 0 3px ${P.lime}33` }}
-                _placeholder={{ color: P.inkFaint }}
-              />
-            </Box>
+            <Textarea
+              value={sprint.description || ''}
+              onChange={(e) => onUpdate({ ...sprint, description: e.target.value })}
+              placeholder="Where the work is, then what it covers. Drag the corner for more room."
+              mt={3}
+              bg={P.sheet}
+              border="1px solid"
+              borderColor={P.hair}
+              borderRadius="lg"
+              color={P.inkSec}
+              fontSize="sm"
+              rows={6}
+              minH="140px"
+              resize="vertical"
+              isReadOnly={isLocked}
+              _focus={{ borderColor: P.lime, boxShadow: `0 0 0 3px ${P.lime}33` }}
+              _placeholder={{ color: P.inkFaint }}
+            />
           )}
         </Box>
       </HStack>

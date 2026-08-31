@@ -118,24 +118,19 @@ const buildSprintRow = (item, idx, isFirst) => {
           ${escapeHtml(item.title || 'Untitled sprint')}
         </div>
         ${
-          // ── THE PLAIN SENTENCE, THEN THE TECHNICAL PARAGRAPH ──────────────
-          // summary is what the client actually reads: their language, what
-          // they got, no stack names. It sits directly under the title at
-          // reading size. description keeps the breakdown underneath it,
-          // smaller and lighter, for whoever wants it.
+          // ── ONE PROSE FIELD, ON PURPOSE ───────────────────────────────────
+          // This briefly had two: a plain sentence above a technical paragraph.
+          // It was reverted. Two blocks of prose per line turned a one page
+          // invoice into a document, and the thing that made this letterhead
+          // good was that you could read the whole of it at a glance.
           //
-          // WHEN THERE IS NO SUMMARY the description renders exactly as it
-          // always did, same size and same colour. Every invoice already sent
-          // predates this field, and a paid invoice must never re-render
-          // differently than the copy the client is holding.
-          item.summary
-            ? `<div style="font-family:${SANS};font-size:14px;line-height:1.65;color:${EMAIL.inkSec};margin-top:7px;max-width:52ch;">${escapeHtml(item.summary)}</div>`
-              + (item.description
-                ? `<div style="font-family:${SANS};font-size:12px;line-height:1.6;color:${EMAIL.inkMuted};margin-top:9px;max-width:52ch;">${escapeHtml(item.description)}</div>`
-                : '')
-            : item.description
-              ? `<div style="font-family:${SANS};font-size:13px;line-height:1.6;color:${EMAIL.inkSec};margin-top:5px;max-width:46ch;">${escapeHtml(item.description)}</div>`
-              : ''
+          // The readability problem was real, the fix was just in the wrong
+          // place. It belongs in HOW the paragraph is written, not in adding a
+          // second one. Open with where the work is, "Second pass." or "Initial
+          // build, in progress.", then the detail. One field, one voice.
+          item.description
+            ? `<div style="font-family:${SANS};font-size:13px;line-height:1.6;color:${EMAIL.inkSec};margin-top:5px;max-width:46ch;">${escapeHtml(item.description)}</div>`
+            : ''
         }
         <div style="margin-top:11px;">
           <span style="display:inline-block;font-family:${MONO};font-size:10px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;padding:4px 10px;border-radius:100px;background:${chip.bg};color:${chip.ink};">
