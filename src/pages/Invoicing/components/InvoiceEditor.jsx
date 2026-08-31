@@ -40,6 +40,7 @@ import { validateSprintsForSend } from '../../../lib/invoiceValidation';
 import colors from '../../../theme/colors';
 
 import SprintEditRow from './SprintEditRow';
+import InvoiceAttachments from './InvoiceAttachments';
 import CancelInvoiceModal from './CancelInvoiceModal';
 import MarkPaidModal from './MarkPaidModal';
 import InvoicePreview from './InvoicePreview';
@@ -1043,6 +1044,16 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
                 </HStack>
               )}
             </Box>
+
+            <Divider borderColor={P.hair} />
+
+            {/* Backup documents. Sits between the sprints and the internal
+                notes because it belongs to what the CLIENT sees, not to what
+                the team writes to itself. A supplier invoice attached here is
+                what turns a line billed at cost into a line they can check.
+                See InvoiceAttachments.jsx for why these are emailed rather
+                than linked. */}
+            <InvoiceAttachments invoiceId={invoiceId} readOnly={isPaid} />
 
             <Divider borderColor={P.hair} />
 

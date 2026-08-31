@@ -184,6 +184,12 @@ export const buildInvoiceEmailHTML = ({
   lineItems,
   invoiceDate,
   payUrl,
+  // Rows from invoice_attachments. The FILES themselves ride as real email
+  // attachments, added by send-invoice.js, because the bucket is private and a
+  // supplier invoice must never sit behind a guessable URL. What this list does
+  // is tell the reader the evidence is in the message, which is the whole point
+  // of a pass through line billed at cost. See the note in send-invoice.js.
+  attachments,
 }) => {
   const items = lineItems || [];
   const totalAmount = items.reduce((sum, i) => sum + parseFloat(i.amount || 0), 0);
@@ -285,6 +291,32 @@ export const buildInvoiceEmailHTML = ({
       </tr>
     </table>`;
 
+  // ---- attached backup ---------------------------------------------------
+  // Only prints when there is something to print, so an ordinary invoice is
+  // unchanged. Deliberately quiet: mono label, hairline rows, no lime. The lime
+  // is spent four times already and a list of filenames is not the fifth.
+  const files = attachments || [];
+  const attachmentsBlock = files.length ? `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:30px;">
+      <tr>
+        <td style="font-family:${MONO};font-size:10px;font-weight:500;letter-spacing:0.22em;text-transform:uppercase;color:${EMAIL.inkMuted};padding-bottom:10px;">
+          Attached ${files.length === 1 ? '' : `<span style="letter-spacing:0.1em;">(${files.length})</span>`}
+        </td>
+      </tr>
+      ${files.map((f) => `
+      <tr>
+        <td style="padding:10px 0;border-top:1px solid ${EMAIL.hair};">
+          <div style="font-family:${SANS};font-size:13.5px;font-weight:600;color:${EMAIL.ink};">${escapeHtml(f.label || f.filename)}</div>
+          ${f.label ? `<div style="font-family:${MONO};font-size:11px;color:${EMAIL.inkMuted};margin-top:3px;">${escapeHtml(f.filename)}</div>` : ''}
+        </td>
+      </tr>`).join('')}
+      <tr>
+        <td style="padding-top:10px;font-family:${SANS};font-size:11.5px;line-height:1.6;color:${EMAIL.inkFaint};">
+          Sent with this email as ${files.length === 1 ? 'a file' : 'files'}. Anything billed at cost is receipted here.
+        </td>
+      </tr>
+    </table>` : '';
+
   // ---- footer ------------------------------------------------------------
   const footer = `
     <tr>
@@ -343,6 +375,8 @@ export const buildInvoiceEmailHTML = ({
         ${itemsHTML}
 
         <div style="margin-top:8px;overflow:hidden;">${totalsBox}</div>
+
+        ${attachmentsBlock}
 
         ${cta}
 

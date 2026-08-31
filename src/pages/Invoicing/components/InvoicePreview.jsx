@@ -7,11 +7,13 @@ import { useMemo } from 'react';
 import { Box, VStack, HStack, Text, Icon } from '@chakra-ui/react';
 import { TbClock, TbMailFast } from 'react-icons/tb';
 import { buildInvoiceEmailHTML } from '../../../lib/invoiceEmailTemplate';
+import { useInvoiceAttachments } from '../../../lib/useInvoiceAttachments';
 import colors from '../../../theme/colors';
 
 const P = colors.paper;
 
 const InvoicePreview = ({ invoice, client, sprints }) => {
+  const attachments = useInvoiceAttachments(invoice?.id);
   const html = useMemo(() => {
     if (!client || !sprints || sprints.length === 0) return null;
     const invoiceDate = new Date().toLocaleDateString('en-US', {
@@ -24,8 +26,9 @@ const InvoicePreview = ({ invoice, client, sprints }) => {
       lineItems: sprints,
       invoiceDate,
       payUrl: '#preview',
+      attachments,
     });
-  }, [invoice, client, sprints]);
+  }, [invoice, client, sprints, attachments]);
 
   if (!html) {
     return (

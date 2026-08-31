@@ -93,8 +93,18 @@ const rebuildHtmlFromSnapshot = async ({ invoice, snapshot }) => {
     is_billable: true,
   }));
 
+  // Metadata only. This is the fallback path used when the stored rendered_html
+  // is missing, and that stored html already lists the attachments, so this is
+  // only here so the rebuilt version does not come out different.
+  const { data: attachmentRows } = await supabase
+    .from('invoice_attachments')
+    .select('filename, label')
+    .eq('invoice_id', invoice.id)
+    .order('sort_order');
+
   return buildInvoiceEmailHTML({
     invoice, client, project, lineItems,
+    attachments: attachmentRows || [],
     invoiceDate: snapshot.invoice_date || new Date().toLocaleDateString('en-US', {
       year: 'numeric', month: 'long', day: 'numeric',
     }),
@@ -102,6 +112,31 @@ const rebuildHtmlFromSnapshot = async ({ invoice, snapshot }) => {
       ? `https://neonburro.com/pay/?token=${invoice.pay_token}`
       : 'https://neonburro.com/account/'),
   });
+};
+
+// ── BACKUP DOCUMENTS, PULLED FROM THE PRIVATE BUCKET ────────────────────────
+// invoice-attachments has no anon read policy on purpose, these are supplier
+// invoices carrying wholesale pricing. The service role reads the bytes and
+// they ride as real attachments. See netlify/functions/send-invoice.js.
+const loadAttachmentsForEmail = async (invoiceId) => {
+  const { data: rows } = await supabase
+    .from('invoice_attachments')
+    .select('storage_path, filename')
+    .eq('invoice_id', invoiceId)
+    .order('sort_order');
+
+  const out = [];
+  for (const row of rows || []) {
+    const { data, error } = await supabase.storage
+      .from('invoice-attachments')
+      .download(row.storage_path);
+    // A missing file must not silently drop off a resend, the document says it
+    // is attached.
+    if (error) throw new Error(`Could not read attachment "${row.filename}": ${error.message}`);
+    const buf = Buffer.from(await data.arrayBuffer());
+    out.push({ filename: row.filename, content: buf.toString('base64') });
+  }
+  return out;
 };
 
 // ---------- client-facing reminder email — light, banner-led ----------
@@ -315,6 +350,14 @@ const handleResend = async ({ invoiceId, userId }) => {
   const recipientEmail = lastHistory.sent_to || invoice.clients.email;
   const ccList = sanitizeCcList(invoice.cc_emails, recipientEmail);
 
+  // ── A RESEND CARRIES THE SAME FILES ───────────────────────────────────────
+  // The rebuilt HTML already lists the attachments, because the snapshot's
+  // document does. If the files themselves did not come along, the client would
+  // get a resent invoice that names backup documents which are not in the
+  // message, which is worse than not naming them. Same private bucket, same
+  // service role read as send-invoice.js.
+  const attachments = await loadAttachmentsForEmail(invoiceId);
+
   const result = await resend.emails.send({
     from: FROM_EMAIL,
     to: recipientEmail,
@@ -322,6 +365,7 @@ const handleResend = async ({ invoiceId, userId }) => {
     reply_to: 'hello@neonburro.com',
     subject: `Invoice ${invoice.invoice_number} from NeonBurro (resent)`,
     html,
+    attachments: attachments.length ? attachments : undefined,
   });
 
   if (result.error) throw new Error(result.error.message || 'Resend failed');

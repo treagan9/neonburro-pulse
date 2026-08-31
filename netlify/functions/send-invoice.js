@@ -61,10 +61,37 @@ const sbUpdate = (table, id, data) =>
 const sbInsert = (table, data) =>
   sbFetch(table, { method: 'POST', body: JSON.stringify(data), prefer: 'return=minimal' });
 
-const sendEmail = async (from, to, subject, html, replyTo, cc) => {
+// ── BACKUP DOCUMENTS TRAVEL AS REAL ATTACHMENTS ─────────────────────────────
+//
+// The invoice-attachments bucket is PRIVATE and there is no anon read policy on
+// it, unlike invoices and invoice_items which anon can read by pay_token. That
+// is deliberate: these are supplier invoices carrying wholesale pricing, and a
+// public URL is a competitor reading what we pay for cameras.
+//
+// So the bytes are pulled here with the service role and attached to the
+// message. The client gets real files in their inbox, the bucket stays sealed,
+// and there is no link to expire. If you are ever tempted to make this a
+// download link, add a policy nowhere and attach the file instead.
+const downloadAttachment = async (storagePath) => {
+  const res = await fetch(
+    `${SUPABASE_URL}/storage/v1/object/invoice-attachments/${storagePath}`,
+    { headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` } },
+  );
+  if (!res.ok) throw new Error(`Attachment fetch failed: ${res.status}`);
+  const buf = await res.arrayBuffer();
+  return Buffer.from(buf).toString('base64');
+};
+
+// Resend refuses a message over roughly 40MB and answers with an opaque error,
+// so the ceiling is enforced here where it can say something useful. 20MB
+// leaves room for the HTML and for base64 inflating the bytes by a third.
+const ATTACHMENT_BUDGET_BYTES = 20 * 1024 * 1024;
+
+const sendEmail = async (from, to, subject, html, replyTo, cc, attachments) => {
   const payload = { from, to: Array.isArray(to) ? to : [to], subject, html };
   if (replyTo) payload.reply_to = replyTo;
   if (cc && cc.length) payload.cc = cc;
+  if (attachments && attachments.length) payload.attachments = attachments;
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
@@ -276,8 +303,30 @@ export const handler = async (event) => {
       status: 'sent', sent_at: now, total: totalAmount, pay_token: payToken, updated_at: now,
     });
 
+    // Backup documents. Loaded before the send so a broken one fails the whole
+    // send loudly rather than quietly posting an invoice with no evidence
+    // behind a pass through line.
+    const attachmentRows = await sbGet(
+      'invoice_attachments',
+      `invoice_id=eq.${invoiceId}&order=sort_order.asc&select=storage_path,filename,content_type,size_bytes,label`,
+    ) || [];
+
+    let budget = ATTACHMENT_BUDGET_BYTES;
+    const attachments = [];
+    for (const row of attachmentRows) {
+      const size = Number(row.size_bytes || 0);
+      if (size > budget) {
+        throw new Error(
+          `Attachments are too large to email. "${row.filename}" pushes this over the limit, remove it or send it separately.`,
+        );
+      }
+      budget -= size;
+      attachments.push({ filename: row.filename, content: await downloadAttachment(row.storage_path) });
+    }
+
     const clientHtml = buildInvoiceEmailHTML({
       invoice, client, project, lineItems, invoiceDate, payUrl,
+      attachments: attachmentRows,
     });
 
     const clientResult = await sendEmail(
@@ -286,7 +335,8 @@ export const handler = async (event) => {
       `Invoice ${invoice.invoice_number}${project?.name ? ` - ${project.name}` : ''}`,
       clientHtml,
       null,
-      ccFinal
+      ccFinal,
+      attachments
     );
 
     const snapshot = {

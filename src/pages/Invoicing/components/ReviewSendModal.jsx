@@ -29,6 +29,7 @@ import {
 } from '@chakra-ui/react';
 import { TbArrowLeft, TbSend, TbAlertTriangle, TbMailFast } from 'react-icons/tb';
 import { buildInvoiceEmailHTML } from '../../../lib/invoiceEmailTemplate';
+import { useInvoiceAttachments } from '../../../lib/useInvoiceAttachments';
 import colors from '../../../theme/colors';
 
 const P = colors.paper;
@@ -60,6 +61,10 @@ const ReviewSendModal = ({ isOpen, onClose, invoice, client, project, sprints, d
   const billable = (sprints || []).filter((s) => s.is_billable !== false);
   const total = billable.reduce((sum, s) => sum + parseFloat(s.amount || 0), 0);
   const hasEmail = !!client?.email;
+  // THE GATE MUST SHOW WHAT WILL BE SENT. Somebody approves this document and
+  // that approval fires the email, so if the email carries attachments and this
+  // does not, they approved something they did not see.
+  const attachments = useInvoiceAttachments(invoice?.id);
 
   const html = useMemo(() => {
     if (!client || billable.length === 0) return null;
@@ -71,9 +76,10 @@ const ReviewSendModal = ({ isOpen, onClose, invoice, client, project, sprints, d
       lineItems: billable,
       invoiceDate,
       payUrl: '#preview',
+      attachments,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [invoice, client, project, sprints, dueDate]);
+  }, [invoice, client, project, sprints, dueDate, attachments]);
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="2xl" isCentered scrollBehavior="inside">
