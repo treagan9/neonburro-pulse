@@ -87,6 +87,7 @@ const rebuildHtmlFromSnapshot = async ({ invoice, snapshot }) => {
   const lineItems = (snapshot.line_items || []).map((item) => ({
     sprint_number: item.sprint_number,
     title: item.title,
+    summary: item.summary,
     description: item.description,
     amount: item.amount,
     payment_mode: item.payment_mode,

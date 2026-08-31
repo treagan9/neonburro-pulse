@@ -349,6 +349,9 @@ export const handler = async (event) => {
       line_items: lineItems.map((item) => ({
         sprint_number: item.sprint_number,
         title: item.title,
+        // the plain sentence. without it here a resend rebuilds the document
+        // with only the technical paragraph, which is not what was sent.
+        summary: item.summary,
         description: item.description,
         amount: parseFloat(item.amount || 0),
         payment_mode: item.payment_mode,

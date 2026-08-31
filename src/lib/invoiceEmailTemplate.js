@@ -118,9 +118,24 @@ const buildSprintRow = (item, idx, isFirst) => {
           ${escapeHtml(item.title || 'Untitled sprint')}
         </div>
         ${
-          item.description
-            ? `<div style="font-family:${SANS};font-size:13px;line-height:1.6;color:${EMAIL.inkSec};margin-top:5px;max-width:46ch;">${escapeHtml(item.description)}</div>`
-            : ''
+          // ── THE PLAIN SENTENCE, THEN THE TECHNICAL PARAGRAPH ──────────────
+          // summary is what the client actually reads: their language, what
+          // they got, no stack names. It sits directly under the title at
+          // reading size. description keeps the breakdown underneath it,
+          // smaller and lighter, for whoever wants it.
+          //
+          // WHEN THERE IS NO SUMMARY the description renders exactly as it
+          // always did, same size and same colour. Every invoice already sent
+          // predates this field, and a paid invoice must never re-render
+          // differently than the copy the client is holding.
+          item.summary
+            ? `<div style="font-family:${SANS};font-size:14px;line-height:1.65;color:${EMAIL.inkSec};margin-top:7px;max-width:52ch;">${escapeHtml(item.summary)}</div>`
+              + (item.description
+                ? `<div style="font-family:${SANS};font-size:12px;line-height:1.6;color:${EMAIL.inkMuted};margin-top:9px;max-width:52ch;">${escapeHtml(item.description)}</div>`
+                : '')
+            : item.description
+              ? `<div style="font-family:${SANS};font-size:13px;line-height:1.6;color:${EMAIL.inkSec};margin-top:5px;max-width:46ch;">${escapeHtml(item.description)}</div>`
+              : ''
         }
         <div style="margin-top:11px;">
           <span style="display:inline-block;font-family:${MONO};font-size:10px;font-weight:500;letter-spacing:0.08em;text-transform:uppercase;padding:4px 10px;border-radius:100px;background:${chip.bg};color:${chip.ink};">

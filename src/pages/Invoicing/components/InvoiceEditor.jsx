@@ -288,6 +288,8 @@ const InvoiceEditor = ({ invoiceId, clientId: initialClientId, clients, onClose,
     for (const sprint of sprints) {
       const sprintPayload = {
         title: sprint.title || 'Untitled Sprint',
+        // the plain sentence the client reads first. see SprintEditRow.jsx
+        summary: sprint.summary || null,
         description: sprint.description || null,
         amount: parseFloat(sprint.amount || 0),
         payment_mode: sprint.payment_mode || 'approve_only',
